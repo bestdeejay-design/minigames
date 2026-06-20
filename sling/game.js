@@ -32,142 +32,134 @@ const POWER_MULT = 0.155;
 
 // ─── Levels ──────────────────────────────────────────────
 const LEVELS = [
-  // 1: одна большая цель
+  // 1: одна большая цель справа
   {
-    targets: [{ x: 0.55, y: 0.45, w: 40, h: 40, points: 10 }],
+    targets: [{ x: 0.72, y: 0.48, w: 50, h: 50, points: 10 }],
     obstacles: [],
     shots: 3,
   },
-  // 2: две цели, простое препятствие
+  // 2: две цели по сторонам
   {
     targets: [
-      { x: 0.2, y: 0.4, w: 30, h: 40, points: 10 },
-      { x: 0.75, y: 0.35, w: 30, h: 40, points: 15 },
+      { x: 0.2, y: 0.5, w: 40, h: 40, points: 10 },
+      { x: 0.78, y: 0.42, w: 40, h: 40, points: 15 },
     ],
-    obstacles: [
-      { x: 0.3, y: 0.55, w: 0.12, h: 10 },
-      { x: 0.58, y: 0.5, w: 0.12, h: 10 },
-    ],
+    obstacles: [],
     shots: 4,
   },
-  // 3: три цели, две платформы
+  // 3: три цели
   {
     targets: [
-      { x: 0.15, y: 0.3, w: 28, h: 28, points: 10 },
-      { x: 0.42, y: 0.35, w: 28, h: 28, points: 10 },
-      { x: 0.78, y: 0.25, w: 28, h: 28, points: 20 },
+      { x: 0.18, y: 0.4, w: 34, h: 34, points: 10 },
+      { x: 0.5, y: 0.52, w: 34, h: 34, points: 10 },
+      { x: 0.8, y: 0.35, w: 34, h: 34, points: 20 },
     ],
     obstacles: [
-      { x: 0.1, y: 0.5, w: 0.25, h: 8 },
-      { x: 0.65, y: 0.45, w: 0.25, h: 8 },
+      { x: 0.1, y: 0.58, w: 0.2, h: 7 },
+      { x: 0.7, y: 0.55, w: 0.2, h: 7 },
     ],
     shots: 5,
   },
-  // 4: движущаяся цель
+  // 4: движущаяся + две статичные
   {
     targets: [
-      { x: 0.2, y: 0.35, w: 26, h: 26, points: 10 },
-      { x: 0.7, y: 0.3, w: 26, h: 26, points: 15, moving: true, moveRange: 50, moveSpeed: 0.025 },
-      { x: 0.45, y: 0.15, w: 26, h: 26, points: 20 },
+      { x: 0.22, y: 0.45, w: 30, h: 30, points: 10 },
+      { x: 0.72, y: 0.25, w: 30, h: 30, points: 15, moving: true, moveRange: 40, moveSpeed: 0.02 },
+      { x: 0.5, y: 0.32, w: 30, h: 30, points: 20 },
     ],
     obstacles: [
-      { x: 0.1, y: 0.55, w: 0.8, h: 6 },
-      { x: 0.4, y: 0.35, w: 0.2, h: 6 },
+      { x: 0.05, y: 0.58, w: 0.9, h: 6 },
     ],
     shots: 5,
   },
-  // 5: цели за стеной, нужно перекидывать
+  // 5: две цели за стеной
   {
     targets: [
-      { x: 0.15, y: 0.18, w: 24, h: 24, points: 20 },
-      { x: 0.8, y: 0.22, w: 24, h: 24, points: 20 },
+      { x: 0.2, y: 0.28, w: 28, h: 28, points: 20 },
+      { x: 0.78, y: 0.28, w: 28, h: 28, points: 20 },
     ],
     obstacles: [
-      { x: 0.05, y: 0.5, w: 0.45, h: 8 },
-      { x: 0.5, y: 0.5, w: 0.45, h: 8 },
-      { x: 0.42, y: 0.25, w: 0.16, h: 0.25 },
+      { x: 0, y: 0.55, w: 0.3, h: 7 },
+      { x: 0.33, y: 0.55, w: 0.34, h: 7 },
+      { x: 0.7, y: 0.55, w: 0.3, h: 7 },
     ],
     shots: 5,
   },
-  // 6: движущиеся цели, перегородки
+  // 6: движущиеся цели
   {
     targets: [
-      { x: 0.2, y: 0.15, w: 22, h: 22, points: 15, moving: true, moveRange: 35, moveSpeed: 0.03 },
-      { x: 0.75, y: 0.2, w: 22, h: 22, points: 15, moving: true, moveRange: 40, moveSpeed: 0.025 },
-      { x: 0.5, y: 0.08, w: 22, h: 22, points: 25, moving: true, moveRange: 25, moveSpeed: 0.04 },
+      { x: 0.22, y: 0.3, w: 26, h: 26, points: 15, moving: true, moveRange: 30, moveSpeed: 0.02 },
+      { x: 0.76, y: 0.3, w: 26, h: 26, points: 15, moving: true, moveRange: 30, moveSpeed: 0.025 },
+      { x: 0.5, y: 0.18, w: 26, h: 26, points: 25, moving: true, moveRange: 20, moveSpeed: 0.03 },
     ],
     obstacles: [
-      { x: 0, y: 0.45, w: 0.3, h: 7 },
-      { x: 0.35, y: 0.5, w: 0.3, h: 7 },
-      { x: 0.65, y: 0.45, w: 0.35, h: 7 },
+      { x: 0.05, y: 0.52, w: 0.4, h: 6 },
+      { x: 0.55, y: 0.52, w: 0.4, h: 6 },
     ],
     shots: 6,
   },
-  // 7: много мелких целей
+  // 7: ряд мелких целей
   {
     targets: [
-      { x: 0.08, y: 0.25, w: 20, h: 20, points: 8 },
-      { x: 0.22, y: 0.25, w: 20, h: 20, points: 8 },
-      { x: 0.36, y: 0.25, w: 20, h: 20, points: 8 },
-      { x: 0.55, y: 0.22, w: 20, h: 20, points: 8 },
-      { x: 0.7, y: 0.22, w: 20, h: 20, points: 8 },
-      { x: 0.85, y: 0.22, w: 20, h: 20, points: 8 },
+      { x: 0.1, y: 0.3, w: 22, h: 22, points: 8 },
+      { x: 0.26, y: 0.3, w: 22, h: 22, points: 8 },
+      { x: 0.42, y: 0.3, w: 22, h: 22, points: 8 },
+      { x: 0.58, y: 0.3, w: 22, h: 22, points: 8 },
+      { x: 0.74, y: 0.3, w: 22, h: 22, points: 8 },
+      { x: 0.9, y: 0.3, w: 22, h: 22, points: 8 },
     ],
     obstacles: [
-      { x: 0.05, y: 0.5, w: 0.9, h: 6 },
-      { x: 0.3, y: 0.37, w: 0.4, h: 6 },
+      { x: 0, y: 0.52, w: 0.5, h: 6 },
+      { x: 0.52, y: 0.52, w: 0.48, h: 6 },
     ],
     shots: 6,
   },
-  // 8: движущиеся + стены-лабиринт
+  // 8: лабиринт
   {
     targets: [
-      { x: 0.15, y: 0.12, w: 20, h: 20, points: 15 },
-      { x: 0.82, y: 0.15, w: 20, h: 20, points: 15 },
-      { x: 0.48, y: 0.35, w: 20, h: 20, points: 20, moving: true, moveRange: 30, moveSpeed: 0.02 },
+      { x: 0.15, y: 0.18, w: 24, h: 24, points: 15 },
+      { x: 0.82, y: 0.2, w: 24, h: 24, points: 15 },
+      { x: 0.5, y: 0.38, w: 24, h: 24, points: 20, moving: true, moveRange: 25, moveSpeed: 0.02 },
     ],
     obstacles: [
-      { x: 0, y: 0.48, w: 0.18, h: 7 },
-      { x: 0.22, y: 0.48, w: 0.18, h: 7 },
-      { x: 0.44, y: 0.48, w: 0.18, h: 7 },
-      { x: 0.66, y: 0.48, w: 0.35, h: 7 },
-      { x: 0.25, y: 0.22, w: 50, h: 6 },
-      { x: 0.55, y: 0.18, w: 50, h: 6 },
+      { x: 0, y: 0.5, w: 0.18, h: 6 },
+      { x: 0.2, y: 0.5, w: 0.18, h: 6 },
+      { x: 0.4, y: 0.5, w: 0.18, h: 6 },
+      { x: 0.6, y: 0.5, w: 0.18, h: 6 },
+      { x: 0.8, y: 0.5, w: 0.2, h: 6 },
     ],
     shots: 6,
   },
-  // 9: скоростные движущиеся
+  // 9: быстрые движущиеся
   {
     targets: [
-      { x: 0.15, y: 0.2, w: 18, h: 18, points: 12, moving: true, moveRange: 45, moveSpeed: 0.03 },
-      { x: 0.5, y: 0.12, w: 18, h: 18, points: 18, moving: true, moveRange: 30, moveSpeed: 0.035 },
-      { x: 0.82, y: 0.2, w: 18, h: 18, points: 12, moving: true, moveRange: 45, moveSpeed: 0.03 },
-      { x: 0.35, y: 0.35, w: 18, h: 18, points: 10 },
-      { x: 0.65, y: 0.35, w: 18, h: 18, points: 10 },
+      { x: 0.2, y: 0.35, w: 20, h: 20, points: 12, moving: true, moveRange: 40, moveSpeed: 0.03 },
+      { x: 0.5, y: 0.2, w: 20, h: 20, points: 18, moving: true, moveRange: 28, moveSpeed: 0.035 },
+      { x: 0.78, y: 0.35, w: 20, h: 20, points: 12, moving: true, moveRange: 40, moveSpeed: 0.03 },
+      { x: 0.35, y: 0.45, w: 20, h: 20, points: 10 },
+      { x: 0.65, y: 0.45, w: 20, h: 20, points: 10 },
     ],
     obstacles: [
-      { x: 0, y: 0.5, w: 1, h: 6 },
-      { x: 0.35, y: 0.3, w: 0.3, h: 6 },
+      { x: 0, y: 0.52, w: 0.5, h: 6 },
+      { x: 0.52, y: 0.52, w: 0.48, h: 6 },
     ],
     shots: 6,
   },
   // 10: финал — всё сразу
   {
     targets: [
-      { x: 0.08, y: 0.15, w: 16, h: 16, points: 10 },
-      { x: 0.22, y: 0.32, w: 16, h: 16, points: 10, moving: true, moveRange: 30, moveSpeed: 0.025 },
-      { x: 0.38, y: 0.1, w: 16, h: 16, points: 20 },
-      { x: 0.55, y: 0.3, w: 16, h: 16, points: 15, moving: true, moveRange: 35, moveSpeed: 0.03 },
-      { x: 0.72, y: 0.15, w: 16, h: 16, points: 10 },
-      { x: 0.88, y: 0.32, w: 16, h: 16, points: 10, moving: true, moveRange: 25, moveSpeed: 0.02 },
+      { x: 0.12, y: 0.25, w: 20, h: 20, points: 10 },
+      { x: 0.3, y: 0.45, w: 20, h: 20, points: 10, moving: true, moveRange: 28, moveSpeed: 0.025 },
+      { x: 0.45, y: 0.15, w: 20, h: 20, points: 20 },
+      { x: 0.6, y: 0.42, w: 20, h: 20, points: 15, moving: true, moveRange: 30, moveSpeed: 0.03 },
+      { x: 0.78, y: 0.25, w: 20, h: 20, points: 10 },
+      { x: 0.9, y: 0.4, w: 20, h: 20, points: 10, moving: true, moveRange: 20, moveSpeed: 0.02 },
     ],
     obstacles: [
-      { x: 0, y: 0.5, w: 0.25, h: 6 },
-      { x: 0.28, y: 0.5, w: 0.22, h: 6 },
-      { x: 0.53, y: 0.5, w: 0.22, h: 6 },
-      { x: 0.78, y: 0.5, w: 0.22, h: 6 },
-      { x: 0.15, y: 0.25, w: 0.1, h: 0.18 },
-      { x: 0.75, y: 0.22, w: 0.1, h: 0.18 },
+      { x: 0, y: 0.52, w: 0.25, h: 6 },
+      { x: 0.28, y: 0.52, w: 0.22, h: 6 },
+      { x: 0.53, y: 0.52, w: 0.22, h: 6 },
+      { x: 0.78, y: 0.52, w: 0.22, h: 6 },
     ],
     shots: 7,
   },
