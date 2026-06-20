@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Рогатка</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-wrapper">
+    <div id="hud">
+      <span id="score">🎯 0</span>
+      <span id="shots">🔫 5</span>
+      <span id="level">🏁 1</span>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="overlay" class="hidden">
+      <p id="overlay-title">Уровень 1</p>
+      <p id="overlay-sub">Попади по всем целям!</p>
+      <button id="btn-next">Начать</button>
+    </div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
