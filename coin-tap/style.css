@@ -29,14 +29,37 @@ body {
 
 #hud {
   position: absolute;
-  top: 12px;
+  top: 0;
   left: 0;
   right: 0;
   z-index: 10;
-  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  font-size: 1.1rem;
   font-weight: bold;
+  background: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%);
+}
+
+#hud-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#lives { font-size: 1.2rem; }
+#shield-icon { font-size: 1.2rem; }
+#shield-icon.hidden { display: none; }
+
+#score {
   color: #ffd700;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+#effect-indicator {
+  font-size: 0.85rem;
+  color: #aaa;
 }
 
 canvas {
@@ -56,19 +79,34 @@ canvas {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0,0,0,0.75);
   z-index: 20;
+  gap: 12px;
+  padding: 24px;
 }
 
 #overlay.hidden {
   display: none;
 }
 
-#overlay-text {
+#overlay-title {
   font-size: 2rem;
   color: #ffd700;
   font-weight: bold;
-  margin-bottom: 20px;
+}
+
+#overlay-sub {
+  font-size: 1rem;
+  color: #ccc;
+}
+
+#overlay-items {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0;
+  font-size: 1.5rem;
 }
 
 #btn-next {
@@ -79,8 +117,18 @@ canvas {
   background: #e94560;
   color: #fff;
   cursor: pointer;
+  margin-top: 8px;
 }
 
 #btn-next:active {
   opacity: 0.7;
+}
+
+.flash {
+  animation: flashAnim 0.3s ease-out;
+}
+
+@keyframes flashAnim {
+  0% { filter: brightness(3); }
+  100% { filter: brightness(1); }
 }

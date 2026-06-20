@@ -9,12 +9,19 @@
 <body>
   <div id="game-wrapper">
     <div id="hud">
+      <span id="hud-left">
+        <span id="lives">❤️❤️❤️</span>
+        <span id="shield-icon" class="hidden">🛡</span>
+      </span>
       <span id="score">0 / 10</span>
+      <span id="effect-indicator"></span>
     </div>
     <canvas id="gameCanvas"></canvas>
     <div id="overlay" class="hidden">
-      <p id="overlay-text">Уровень пройден!</p>
-      <button id="btn-next">Дальше</button>
+      <p id="overlay-title">Уровень 1</p>
+      <p id="overlay-sub"></p>
+      <div id="overlay-items"></div>
+      <button id="btn-next">Начать</button>
     </div>
   </div>
   <script src="game.js"></script>
