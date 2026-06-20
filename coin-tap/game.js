@@ -55,12 +55,12 @@ function getLevelConfig(level) {
   const group = level <= 3 ? 0 : level <= 6 ? 1 : level <= 10 ? 2 : level <= 20 ? 3 : level <= 35 ? 4 : 5;
 
   const targets = [3, 5, 7, 10, 10, 10];
-  const spawnIntervals = [900, 850, 800, 800, 750, 700];
-  const speedMults = [1, 1.15, 1.3, 1.6, 2.0, 2.8];
+  const spawnIntervals = [750, 720, 680, 650, 580, 500];
+  const speedMults = [1, 1.2, 1.5, 1.9, 2.4, 3.2];
 
   const base = {
-    spawnInterval: Math.round((spawnIntervals[group] || 800) - t * 200),
-    speedMult: (speedMults[group] || 1) + t * 0.8,
+    spawnInterval: Math.round((spawnIntervals[group] || 750) - t * 150),
+    speedMult: (speedMults[group] || 1) + t * 0.6,
     target: targets[group],
     group,
   };
@@ -96,6 +96,31 @@ let itemId = 0;
 let cfg = null;
 let stunTimer = 0;
 
+// ─── Trajectories ────────────────────────────────────────
+const TRAJECTORIES = ['straight', 'sine', 'zigzag', 'diagonal', 'bounce'];
+
+function pickTrajectory(level) {
+  const r = Math.random();
+  // Early levels: mostly straight + some sine
+  if (level <= 5) {
+    if (r < 0.6) return 'straight';
+    if (r < 0.9) return 'sine';
+    return 'zigzag';
+  }
+  if (level <= 15) {
+    if (r < 0.35) return 'straight';
+    if (r < 0.55) return 'sine';
+    if (r < 0.73) return 'zigzag';
+    if (r < 0.88) return 'diagonal';
+    return 'bounce';
+  }
+  if (r < 0.2) return 'straight';
+  if (r < 0.38) return 'sine';
+  if (r < 0.55) return 'zigzag';
+  if (r < 0.73) return 'diagonal';
+  return 'bounce';
+}
+
 // ─── Item Class ──────────────────────────────────────────
 class Item {
   constructor(type) {
@@ -106,10 +131,17 @@ class Item {
     this.points = this.info.points;
     this.x = this.size + Math.random() * (rectW - this.size * 2);
     this.y = -this.size;
-    this.baseSpeed = 1.5 * (cfg ? cfg.speedMult : 1);
+    this.baseSpeed = 2.5 * (cfg ? cfg.speedMult : 1);
     this.collected = false;
     this.rot = Math.random() * Math.PI * 2;
     this.sparkle = Math.random() * 100;
+
+    // Trajectory
+    this.trajectory = pickTrajectory(level);
+    this.startX = this.x;
+    this.txPhase = Math.random() * Math.PI * 2;
+    this.diagDir = Math.random() < 0.5 ? -1 : 1;
+    this.bounceDir = Math.random() < 0.5 ? -1 : 1;
   }
 
   getSpeed() {
@@ -122,6 +154,24 @@ class Item {
   update() {
     if (this.collected) return;
 
+    const speed = this.getSpeed();
+    this.y += speed;
+
+    // Trajectory
+    if (this.trajectory === 'sine') {
+      this.x = this.startX + Math.sin(this.y * 0.04 + this.txPhase) * 55;
+    } else if (this.trajectory === 'zigzag') {
+      this.x = this.startX + Math.sin(Math.floor(this.y * 0.06) * 1.2 + this.txPhase) * 45;
+    } else if (this.trajectory === 'diagonal') {
+      this.x += this.diagDir * 0.9;
+      if (this.x < this.size) { this.x = this.size; this.diagDir = 1; }
+      if (this.x > rectW - this.size) { this.x = rectW - this.size; this.diagDir = -1; }
+    } else if (this.trajectory === 'bounce') {
+      this.x += this.bounceDir * 1.8;
+      if (this.x < this.size) { this.x = this.size; this.bounceDir = 1; }
+      if (this.x > rectW - this.size) { this.x = rectW - this.size; this.bounceDir = -1; }
+    }
+
     // Magnet effect: pull toward center
     if (effects.magnet && this.type !== 'bomb') {
       const cx = rectW / 2;
@@ -129,7 +179,6 @@ class Item {
       this.x += dx * 0.025;
     }
 
-    this.y += this.getSpeed();
     this.rot += 0.01;
     this.sparkle += 0.05;
   }
