@@ -41,33 +41,37 @@ const TYPES = {
 const TYPE_KEYS = Object.keys(TYPES);
 
 // ─── Level Config ────────────────────────────────────────
-const GROUP_SUBS = {
-  'level-start': [
-    { text: 'Тапай по монеткам!', types: ['coin', 'gold'] },
-    { text: 'Осторожно, бомбы! 🧨', types: ['coin', 'gold', 'bomb'] },
-    { text: 'Магниты помогут! 🧲', types: ['coin', 'gold', 'bomb', 'magnet'] },
-    { text: 'Замедление и проклятье!', types: ['coin', 'gold', 'bomb', 'magnet', 'slow', 'curse'] },
-    { text: 'Всё сразу! 💥', types: Object.keys(TYPES) },
-  ],
-};
+const GROUP_SUBS = [
+  { text: 'Собери 3 монетки! 🪙' },
+  { text: 'Золотые монеты дают +3! 💰' },
+  { text: 'Бомбы! Не тапай их 🧨', types: ['coin', 'gold', 'bomb'] },
+  { text: 'Магниты притянут монеты 🧲', types: ['coin', 'gold', 'bomb', 'magnet'] },
+  { text: 'Замедление и проклятье! 🐌😈', types: ['coin', 'gold', 'bomb', 'magnet', 'slow', 'curse'] },
+  { text: 'Всё сразу! 💥', types: Object.keys(TYPES) },
+];
 
 function getLevelConfig(level) {
   const t = Math.min((level - 1) / 49, 1);
-  const group = level <= 5 ? 0 : level <= 10 ? 1 : level <= 20 ? 2 : level <= 35 ? 3 : 4;
+  const group = level <= 3 ? 0 : level <= 6 ? 1 : level <= 10 ? 2 : level <= 20 ? 3 : level <= 35 ? 4 : 5;
+
+  const targets = [3, 5, 7, 10, 10, 10];
+  const spawnIntervals = [900, 850, 800, 800, 750, 700];
+  const speedMults = [1, 1.15, 1.3, 1.6, 2.0, 2.8];
 
   const base = {
-    spawnInterval: Math.round(1100 - t * 500),
-    speedMult: 1 + t * 2.5,
-    target: 10,
+    spawnInterval: Math.round((spawnIntervals[group] || 800) - t * 200),
+    speedMult: (speedMults[group] || 1) + t * 0.8,
+    target: targets[group],
     group,
   };
 
   const weightsByGroup = [
     { coin: 100, gold: 0 },
-    { coin: 88, gold: 12 },
-    { coin: 72, gold: 10, bomb: 12, magnet: 6 },
-    { coin: 55, gold: 8, bomb: 18, magnet: 5, slow: 5, curse: 5, speed: 2, shield: 2 },
-    { coin: 35, gold: 5, bomb: 25, magnet: 5, slow: 5, curse: 10, speed: 10, shield: 5 },
+    { coin: 85, gold: 15 },
+    { coin: 75, gold: 10, bomb: 10, magnet: 5 },
+    { coin: 60, gold: 8, bomb: 15, magnet: 5, slow: 5, curse: 4, speed: 2, shield: 1 },
+    { coin: 45, gold: 5, bomb: 20, magnet: 5, slow: 5, curse: 7, speed: 8, shield: 5 },
+    { coin: 30, gold: 3, bomb: 27, magnet: 5, slow: 5, curse: 10, speed: 12, shield: 8 },
   ];
 
   const w = weightsByGroup[group];
@@ -325,10 +329,11 @@ function showLevelStart() {
   cfg = getLevelConfig(level);
   overlay.classList.remove('hidden');
   overlayTitle.textContent = `Уровень ${level}`;
-  overlaySub.textContent = GROUP_SUBS['level-start'][cfg.group].text;
+  const groupInfo = GROUP_SUBS[cfg.group];
+  overlaySub.textContent = groupInfo.text;
 
-  const newTypes = cfg.types;
-  overlayItems.innerHTML = newTypes.map(t =>
+  const showTypes = groupInfo.types || cfg.types;
+  overlayItems.innerHTML = showTypes.map(t =>
     `<span title="${TYPES[t].label}">${TYPES[t].emoji}</span>`
   ).join('');
 
