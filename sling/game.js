@@ -30,138 +30,94 @@ const SLING_X = () => cw / 2;
 const SLING_Y = () => ch * 0.55;
 const POWER_MULT = 0.16;
 
-// ─── Levels ──────────────────────────────────────────────
+// Препятствия ВСЕГДА ниже рогатки (y = 0.62), чтобы не мешать
+// снаряду лететь вверх. Они ловят только неудачные выстрелы,
+// уходящие далеко вниз/вбок. Центр свободен.
 const LEVELS = [
-  // 1: одна большая цель справа
-  {
-    targets: [{ x: 0.7, y: 0.35, w: 50, h: 50, points: 10 }],
-    obstacles: [],
-    shots: 3,
-  },
-  // 2: две цели по сторонам
-  {
-    targets: [
-      { x: 0.2, y: 0.35, w: 44, h: 44, points: 10 },
-      { x: 0.78, y: 0.3, w: 44, h: 44, points: 15 },
-    ],
-    obstacles: [],
-    shots: 4,
-  },
-  // 3: три цели + платформы
-  {
-    targets: [
-      { x: 0.15, y: 0.25, w: 36, h: 36, points: 10 },
-      { x: 0.5, y: 0.4, w: 36, h: 36, points: 10 },
-      { x: 0.82, y: 0.22, w: 36, h: 36, points: 20 },
-    ],
-    obstacles: [
-      { x: 0.15, y: 0.42, w: 0.22, h: 6 },
-      { x: 0.63, y: 0.4, w: 0.22, h: 6 },
-    ],
-    shots: 5,
-  },
-  // 4: движущаяся + две статичные
-  {
-    targets: [
-      { x: 0.2, y: 0.25, w: 32, h: 32, points: 10 },
-      { x: 0.72, y: 0.18, w: 32, h: 32, points: 15, moving: true, moveRange: 35, moveSpeed: 0.02 },
-      { x: 0.5, y: 0.35, w: 32, h: 32, points: 20 },
-    ],
-    obstacles: [],
-    shots: 5,
-  },
-  // 5: цели за укрытиями
-  {
-    targets: [
-      { x: 0.18, y: 0.18, w: 30, h: 30, points: 20 },
-      { x: 0.8, y: 0.2, w: 30, h: 30, points: 20 },
-    ],
-    obstacles: [
-      { x: 0.1, y: 0.38, w: 0.25, h: 6 },
-      { x: 0.38, y: 0.4, w: 0.24, h: 6 },
-      { x: 0.65, y: 0.38, w: 0.25, h: 6 },
-    ],
-    shots: 5,
-  },
-  // 6: движущиеся цели
-  {
-    targets: [
-      { x: 0.2, y: 0.2, w: 28, h: 28, points: 15, moving: true, moveRange: 30, moveSpeed: 0.025 },
-      { x: 0.78, y: 0.22, w: 28, h: 28, points: 15, moving: true, moveRange: 30, moveSpeed: 0.025 },
-      { x: 0.5, y: 0.12, w: 28, h: 28, points: 25, moving: true, moveRange: 20, moveSpeed: 0.03 },
-    ],
-    obstacles: [
-      { x: 0.1, y: 0.38, w: 0.35, h: 6 },
-      { x: 0.55, y: 0.38, w: 0.35, h: 6 },
-    ],
-    shots: 6,
-  },
-  // 7: ряд мелких целей
-  {
-    targets: [
-      { x: 0.08, y: 0.2, w: 24, h: 24, points: 8 },
-      { x: 0.24, y: 0.2, w: 24, h: 24, points: 8 },
-      { x: 0.4, y: 0.2, w: 24, h: 24, points: 8 },
-      { x: 0.56, y: 0.2, w: 24, h: 24, points: 8 },
-      { x: 0.72, y: 0.2, w: 24, h: 24, points: 8 },
-      { x: 0.88, y: 0.2, w: 24, h: 24, points: 8 },
-    ],
-    obstacles: [
-      { x: 0.05, y: 0.4, w: 0.4, h: 6 },
-      { x: 0.55, y: 0.4, w: 0.4, h: 6 },
-    ],
-    shots: 6,
-  },
-  // 8: лабиринт
-  {
-    targets: [
-      { x: 0.15, y: 0.12, w: 26, h: 26, points: 15 },
-      { x: 0.82, y: 0.14, w: 26, h: 26, points: 15 },
-      { x: 0.5, y: 0.35, w: 26, h: 26, points: 20, moving: true, moveRange: 22, moveSpeed: 0.02 },
-    ],
-    obstacles: [
-      { x: 0, y: 0.4, w: 0.15, h: 6 },
-      { x: 0.17, y: 0.4, w: 0.15, h: 6 },
-      { x: 0.34, y: 0.4, w: 0.15, h: 6 },
-      { x: 0.51, y: 0.4, w: 0.15, h: 6 },
-      { x: 0.68, y: 0.4, w: 0.15, h: 6 },
-      { x: 0.85, y: 0.4, w: 0.15, h: 6 },
-    ],
-    shots: 6,
-  },
-  // 9: быстрые движущиеся
-  {
-    targets: [
-      { x: 0.2, y: 0.3, w: 22, h: 22, points: 12, moving: true, moveRange: 38, moveSpeed: 0.03 },
-      { x: 0.5, y: 0.15, w: 22, h: 22, points: 18, moving: true, moveRange: 25, moveSpeed: 0.035 },
-      { x: 0.78, y: 0.3, w: 22, h: 22, points: 12, moving: true, moveRange: 38, moveSpeed: 0.03 },
-      { x: 0.35, y: 0.42, w: 22, h: 22, points: 10 },
-      { x: 0.65, y: 0.42, w: 22, h: 22, points: 10 },
-    ],
-    obstacles: [
-      { x: 0.05, y: 0.38, w: 0.4, h: 6 },
-      { x: 0.55, y: 0.38, w: 0.4, h: 6 },
-    ],
-    shots: 6,
-  },
-  // 10: финал
-  {
-    targets: [
-      { x: 0.1, y: 0.18, w: 22, h: 22, points: 10 },
-      { x: 0.28, y: 0.38, w: 22, h: 22, points: 10, moving: true, moveRange: 25, moveSpeed: 0.025 },
-      { x: 0.45, y: 0.1, w: 22, h: 22, points: 20 },
-      { x: 0.6, y: 0.35, w: 22, h: 22, points: 15, moving: true, moveRange: 28, moveSpeed: 0.03 },
-      { x: 0.78, y: 0.18, w: 22, h: 22, points: 10 },
-      { x: 0.9, y: 0.32, w: 22, h: 22, points: 10, moving: true, moveRange: 18, moveSpeed: 0.02 },
-    ],
-    obstacles: [
-      { x: 0.02, y: 0.38, w: 0.22, h: 6 },
-      { x: 0.26, y: 0.4, w: 0.2, h: 6 },
-      { x: 0.52, y: 0.38, w: 0.2, h: 6 },
-      { x: 0.76, y: 0.4, w: 0.22, h: 6 },
-    ],
-    shots: 7,
-  },
+  { targets: [{ x: 0.72, y: 0.28, w: 55, h: 55, points: 10 }], obstacles: [], shots: 3 },
+
+  { targets: [
+    { x: 0.18, y: 0.30, w: 46, h: 46, points: 10 },
+    { x: 0.76, y: 0.25, w: 46, h: 46, points: 15 },
+  ], obstacles: [], shots: 4 },
+
+  { targets: [
+    { x: 0.15, y: 0.22, w: 40, h: 40, points: 10 },
+    { x: 0.50, y: 0.36, w: 40, h: 40, points: 10 },
+    { x: 0.82, y: 0.20, w: 40, h: 40, points: 20 },
+  ], obstacles: [
+    { x: 0, y: 0.62, w: 0.10, h: 6 },
+    { x: 0.90, y: 0.62, w: 0.10, h: 6 },
+  ], shots: 5 },
+
+  { targets: [
+    { x: 0.18, y: 0.22, w: 36, h: 36, points: 10 },
+    { x: 0.74, y: 0.17, w: 36, h: 36, points: 15, moving: true, moveRange: 28, moveSpeed: 0.02 },
+    { x: 0.48, y: 0.34, w: 36, h: 36, points: 20 },
+  ], obstacles: [], shots: 5 },
+
+  { targets: [
+    { x: 0.20, y: 0.16, w: 34, h: 34, points: 20 },
+    { x: 0.78, y: 0.16, w: 34, h: 34, points: 20 },
+  ], obstacles: [
+    { x: 0.04, y: 0.62, w: 0.10, h: 6 },
+    { x: 0.86, y: 0.62, w: 0.10, h: 6 },
+  ], shots: 5 },
+
+  { targets: [
+    { x: 0.18, y: 0.17, w: 32, h: 32, points: 15, moving: true, moveRange: 22, moveSpeed: 0.025 },
+    { x: 0.80, y: 0.19, w: 32, h: 32, points: 15, moving: true, moveRange: 22, moveSpeed: 0.025 },
+    { x: 0.48, y: 0.10, w: 32, h: 32, points: 25, moving: true, moveRange: 12, moveSpeed: 0.03 },
+  ], obstacles: [
+    { x: 0, y: 0.62, w: 0.12, h: 6 },
+    { x: 0.88, y: 0.62, w: 0.12, h: 6 },
+  ], shots: 6 },
+
+  { targets: [
+    { x: 0.04, y: 0.20, w: 24, h: 24, points: 8 },
+    { x: 0.20, y: 0.20, w: 24, h: 24, points: 8 },
+    { x: 0.36, y: 0.20, w: 24, h: 24, points: 8 },
+    { x: 0.52, y: 0.20, w: 24, h: 24, points: 8 },
+    { x: 0.68, y: 0.20, w: 24, h: 24, points: 8 },
+    { x: 0.84, y: 0.20, w: 24, h: 24, points: 8 },
+  ], obstacles: [
+    { x: 0.15, y: 0.62, w: 0.25, h: 6 },
+    { x: 0.55, y: 0.62, w: 0.30, h: 6 },
+  ], shots: 6 },
+
+  { targets: [
+    { x: 0.15, y: 0.12, w: 28, h: 28, points: 15 },
+    { x: 0.83, y: 0.14, w: 28, h: 28, points: 15 },
+    { x: 0.48, y: 0.34, w: 28, h: 28, points: 20, moving: true, moveRange: 16, moveSpeed: 0.02 },
+  ], obstacles: [
+    { x: 0, y: 0.62, w: 0.15, h: 6 },
+    { x: 0.85, y: 0.62, w: 0.15, h: 6 },
+  ], shots: 6 },
+
+  { targets: [
+    { x: 0.18, y: 0.27, w: 20, h: 20, points: 12, moving: true, moveRange: 35, moveSpeed: 0.03 },
+    { x: 0.50, y: 0.14, w: 22, h: 22, points: 18, moving: true, moveRange: 20, moveSpeed: 0.035 },
+    { x: 0.80, y: 0.27, w: 20, h: 20, points: 12, moving: true, moveRange: 35, moveSpeed: 0.03 },
+    { x: 0.35, y: 0.40, w: 22, h: 22, points: 10 },
+    { x: 0.65, y: 0.40, w: 22, h: 22, points: 10 },
+  ], obstacles: [
+    { x: 0, y: 0.62, w: 0.12, h: 6 },
+    { x: 0.40, y: 0.62, w: 0.20, h: 6 },
+    { x: 0.76, y: 0.62, w: 0.12, h: 6 },
+  ], shots: 6 },
+
+  { targets: [
+    { x: 0.10, y: 0.14, w: 22, h: 22, points: 10 },
+    { x: 0.28, y: 0.36, w: 22, h: 22, points: 10, moving: true, moveRange: 20, moveSpeed: 0.025 },
+    { x: 0.45, y: 0.08, w: 24, h: 24, points: 20 },
+    { x: 0.60, y: 0.34, w: 22, h: 22, points: 15, moving: true, moveRange: 22, moveSpeed: 0.03 },
+    { x: 0.78, y: 0.14, w: 22, h: 22, points: 10 },
+    { x: 0.90, y: 0.30, w: 22, h: 22, points: 10, moving: true, moveRange: 14, moveSpeed: 0.02 },
+  ], obstacles: [
+    { x: 0.05, y: 0.62, w: 0.10, h: 6 },
+    { x: 0.42, y: 0.62, w: 0.16, h: 6 },
+    { x: 0.78, y: 0.62, w: 0.17, h: 6 },
+  ], shots: 7 },
 ];
 
 let level = 0;
@@ -440,17 +396,35 @@ function draw() {
         const launchVy = Math.sin(angle) * velocity;
         let px = s.x, py = s.y - 7;
         let pvx = launchVx, pvy = launchVy;
-        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        let prevX = s.x, prevY = s.y - 7;
+        // рисуем линию
+        ctx.strokeStyle = 'rgba(255,255,100,0.35)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 6]);
+        ctx.beginPath();
+        ctx.moveTo(prevX, prevY);
         for (let i = 0; i < 40; i++) {
           pvy += GRAVITY;
           px += pvx;
           py += pvy;
           if (py > ch || px < -20 || px > cw + 20) break;
-          if (i % 2 === 0) {
-            ctx.beginPath();
-            ctx.arc(px, py, 2, 0, Math.PI * 2);
-            ctx.fill();
-          }
+          ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // точки поверх линии
+        pvy = launchVy; px = s.x; py = s.y - 7;
+        for (let i = 0; i < 40; i++) {
+          pvy += GRAVITY;
+          px += pvx;
+          py += pvy;
+          if (py > ch || px < -20 || px > cw + 20) break;
+          const bright = 0.7 + 0.3 * (1 - i / 40);
+          ctx.fillStyle = `rgba(255,255,100,${bright})`;
+          ctx.beginPath();
+          ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+          ctx.fill();
         }
       } else {
         // Resting projectile
