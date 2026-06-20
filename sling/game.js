@@ -24,10 +24,10 @@ resize();
 window.addEventListener('resize', resize);
 
 // ─── Constants ──────────────────────────────────────────
-const GRAVITY = 0.35;
-const MAX_PULL = 120;
+const GRAVITY = 0.28;
+const MAX_PULL = 150;
 const SLING_X = () => cw / 2;
-const SLING_Y = () => ch - 100;
+const SLING_Y = () => ch - 80;
 const FORK_SPREAD = 20;
 
 // ─── Levels ──────────────────────────────────────────────
@@ -52,11 +52,12 @@ const LEVELS = [
   {
     targets: [
       { x: 40, y: 160, w: 30, h: 30, points: 10 },
-      { x: cw - 70, y: 180, w: 30, h: 30, points: 10 },
+      { x: 180, y: 180, w: 30, h: 30, points: 10 },
       { x: cw / 2 - 15, y: 120, w: 30, h: 30, points: 20 },
     ],
     obstacles: [
-      { x: 0, y: 260, w: cw, h: 8 },
+      { x: 30, y: 260, w: 90, h: 8 },
+      { x: 200, y: 220, w: 80, h: 8 },
     ],
     shots: 5,
   },
@@ -202,7 +203,7 @@ function fireProjectile(vx, vy) {
     y: s.y - 10,
     vx: vx,
     vy: vy,
-    r: 10,
+    r: 7,
     trail: [],
   };
   gameState = 'flying';
@@ -243,11 +244,11 @@ function update() {
       const dx = proj.x - cx;
       const dy = proj.y - cy;
       if (Math.abs(dx / o.w) > Math.abs(dy / o.h)) {
-        proj.vx *= -0.5;
-        proj.x += proj.vx > 0 ? 2 : -2;
+        proj.vx *= -0.6;
+        proj.x += proj.vx > 0 ? 3 : -3;
       } else {
-        proj.vy *= -0.5;
-        proj.y += proj.vy > 0 ? 2 : -2;
+        proj.vy *= -0.6;
+        proj.y += proj.vy < 0 ? -3 : 3;
       }
     }
   }
@@ -392,8 +393,8 @@ function draw() {
       ctx.fill();
 
       // Trajectory preview
-      const launchVx = Math.cos(angle) * power * 22;
-      const launchVy = Math.sin(angle) * power * 22;
+      const launchVx = Math.cos(angle) * power * 26;
+      const launchVy = Math.sin(angle) * power * 26;
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       let px = s.x, py = s.y - 10;
       let pvx = launchVx, pvy = launchVy;
@@ -429,7 +430,7 @@ function draw() {
       const a = i / proj.trail.length * 0.5;
       ctx.fillStyle = `rgba(44,44,44,${a})`;
       ctx.beginPath();
-      ctx.arc(proj.trail[i].x, proj.trail[i].y, 4, 0, Math.PI * 2);
+      ctx.arc(proj.trail[i].x, proj.trail[i].y, 3, 0, Math.PI * 2);
       ctx.fill();
     }
     // Projectile
@@ -507,8 +508,8 @@ canvas.addEventListener('touchend', (e) => {
     const limited = Math.min(pull, MAX_PULL);
     const angle = Math.atan2(dy, dx);
     const power = limited / MAX_PULL;
-    const vx = Math.cos(angle) * power * 22;
-    const vy = Math.sin(angle) * power * 22;
+    const vx = Math.cos(angle) * power * 26;
+    const vy = Math.sin(angle) * power * 26;
     fireProjectile(vx, vy);
   }
   touchActive = false;
@@ -541,8 +542,8 @@ canvas.addEventListener('mouseup', () => {
     const limited = Math.min(pull, MAX_PULL);
     const angle = Math.atan2(dy, dx);
     const power = limited / MAX_PULL;
-    const vx = Math.cos(angle) * power * 22;
-    const vy = Math.sin(angle) * power * 22;
+    const vx = Math.cos(angle) * power * 26;
+    const vy = Math.sin(angle) * power * 26;
     fireProjectile(vx, vy);
   }
   touchActive = false;
