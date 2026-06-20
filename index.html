@@ -5,17 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Minigames</title>
   <style>
-    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100dvh; padding: 20px; text-align: center; }
-    h1 { color: #e94560; margin-bottom: 8px; }
-    p { color: #aaa; margin-bottom: 24px; }
-    a { display: inline-block; padding: 14px 40px; background: #0f3460; color: #eee; text-decoration: none; border-radius: 12px; font-size: 1.2rem; }
+    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100dvh; padding: 30px; text-align: center; gap: 12px; }
+    h1 { color: #e94560; font-size: 1.6rem; }
+    p { color: #aaa; font-size: 0.9rem; }
+    a { display: block; padding: 14px 40px; background: #0f3460; color: #eee; text-decoration: none; border-radius: 12px; font-size: 1.1rem; width: 100%; max-width: 280px; }
     a:hover { background: #e94560; }
+    .desc { font-size: 0.8rem; color: #667; margin-top: -8px; }
   </style>
 </head>
 <body>
   <h1>🎮 Minigames</h1>
   <p>Коллекция браузерных мини-игр</p>
-  <a href="platformer/">Platformer</a>
-  <a href="coin-tap/" style="margin-top:12px;">Coin Tap</a>
+  <a href="coin-tap/">🪙 Coin Tap</a>
+  <span class="desc">тапай монетки, 50 уровней</span>
+  <a href="tycoon/">🏢 Небоскрёб</a>
+  <span class="desc">строй этажи, управляй бизнесом</span>
+  <a href="platformer/">🎮 Platformer</a>
+  <span class="desc">классический платформер</span>
 </body>
 </html>

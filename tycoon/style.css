@@ -1,0 +1,116 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body {
+  background: #1a1a2e;
+  color: #eee;
+  font-family: system-ui, -apple-system, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100dvh;
+  overflow: hidden;
+  touch-action: none;
+}
+
+#game-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  height: 100dvh;
+  max-height: 900px;
+  display: flex;
+  flex-direction: column;
+  touch-action: none;
+  background: #16213e;
+}
+
+#hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  font-size: 1rem;
+  font-weight: bold;
+  background: rgba(0,0,0,0.4);
+  z-index: 10;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+#hud span {
+  white-space: nowrap;
+}
+
+#money { color: #ffd700; }
+#info { color: #7bed9f; }
+#pop { color: #70a1ff; }
+
+canvas {
+  flex: 1;
+  width: 100%;
+  touch-action: none;
+  display: block;
+  background: #0f3460;
+}
+
+#panel {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pbtn {
+  padding: 10px;
+  font-size: 1rem;
+  border: none;
+  border-radius: 10px;
+  background: #2d5a27;
+  color: #fff;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.pbtn:disabled {
+  background: #444;
+  color: #777;
+}
+
+.pbtn:active:not(:disabled) {
+  opacity: 0.7;
+}
+
+#shop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+}
+
+.shop-btn {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  border: none;
+  border-radius: 8px;
+  background: #0f3460;
+  color: #eee;
+  cursor: pointer;
+}
+
+.shop-btn:disabled {
+  background: #333;
+  color: #555;
+}
+
+.shop-btn:active:not(:disabled) {
+  background: #e94560;
+}
