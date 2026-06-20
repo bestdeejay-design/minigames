@@ -229,6 +229,7 @@ function fireProjectile(vx, vy) {
     vy: vy,
     r: 7,
     trail: [],
+    lifetime: 0,
   };
   gameState = 'flying';
   shotsLeft--;
@@ -246,6 +247,10 @@ function update() {
       t.x = t.baseX + Math.sin(Date.now() * t.moveSpeed) * t.moveRange;
     }
   }
+
+  // Lifetime
+  proj.lifetime++;
+  if (proj.lifetime > 300) { endShot(); return; }
 
   // Physics
   proj.vy += GRAVITY;
@@ -289,12 +294,16 @@ function update() {
   }
 
   // Out of bounds
-  if (proj.y > ch + 100 || proj.x < -200 || proj.x > cw + 200) {
-    endShot();
+  if (proj.y > ch + 20 || proj.x < -100 || proj.x > cw + 100) {
+    endShot(); return;
   }
-  // Stop if very slow and below screen
-  if (Math.abs(proj.vx) < 0.3 && Math.abs(proj.vy) < 0.3 && proj.y > ch - 50) {
-    endShot();
+  // Hit ground
+  if (proj.y > ch - 25 && Math.abs(proj.vy) < 2) {
+    endShot(); return;
+  }
+  // Very slow anywhere
+  if (Math.abs(proj.vx) < 0.2 && Math.abs(proj.vy) < 0.2 && proj.y > ch - 60) {
+    endShot(); return;
   }
 }
 
