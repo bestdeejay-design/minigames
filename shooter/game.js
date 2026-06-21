@@ -160,11 +160,21 @@ function drawPickup(p) {
     ctx.textBaseline = 'middle';
     ctx.fillText('$', p.x, p.y + 0.5);
   } else if (p.type === 'life') {
+    const s = 6 * pulse;
+    ctx.fillStyle = 'rgba(255,68,68,0.2)';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, s * 1.4, 0, Math.PI * 2);
+    ctx.fill();
     ctx.fillStyle = '#f44';
-    ctx.font = '13px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('❤️', p.x, p.y);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y + s * 0.3);
+    ctx.bezierCurveTo(p.x, p.y + s * 0.8, p.x - s * 0.7, p.y + s * 0.2, p.x, p.y - s * 0.3);
+    ctx.bezierCurveTo(p.x + s * 0.7, p.y + s * 0.2, p.x, p.y + s * 0.8, p.x, p.y + s * 0.3);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.arc(p.x - s * 0.15, p.y - s * 0.15, s * 0.15, 0, Math.PI * 2);
+    ctx.fill();
   } else {
     ctx.fillStyle = '#8B4513';
     roundRect(ctx, p.x - 8, p.y - 7, 16, 14, 2);
@@ -385,10 +395,10 @@ function loop() {
         if (e.hp <= 0) {
           score += 10 + frameId * 0.05;
           burst(e.x, e.y, '#f44', 12);
-          const r = Math.random();
-          if (r < 0.12) pickups.push({ x: e.x, y: e.y, type: 'coin' });
-          else if (r < 0.16) pickups.push({ x: e.x, y: e.y, type: 'life' });
-          else if (r < 0.22) pickups.push({ x: e.x, y: e.y, type: 'upgrade' });
+      const r = Math.random();
+      if (r < 0.12) pickups.push({ x: e.x, y: e.y, type: 'coin' });
+      else if (r < 0.20) pickups.push({ x: e.x, y: e.y, type: 'life' });
+      else if (r < 0.28) pickups.push({ x: e.x, y: e.y, type: 'upgrade' });
           enemies.splice(j, 1);
         }
         break;
