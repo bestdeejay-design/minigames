@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Шутер</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <span>💥 <span id="score">0</span></span>
+    <span id="lives">❤️❤️❤️</span>
+    <span id="wave-label">WAVE 1</span>
+  </div>
+  <canvas id="gameCanvas"></canvas>
+  <div id="overlay" class="hidden">
+    <div id="overlay-title"></div>
+    <div id="overlay-sub"></div>
+    <button id="btn-next">Старт!</button>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
