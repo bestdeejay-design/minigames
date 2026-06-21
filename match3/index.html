@@ -132,6 +132,7 @@ let soundOn = true, levelTarget = 0;
 let locked = false;
 
 // ======================== AUDIO ========================
+// Генерируем WAV на лету и играем через Audio — работает на iOS
 let audioCtx = null;
 
 function initAudio() {
@@ -139,46 +140,40 @@ function initAudio() {
   try {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    // Play silent buffer to unlock iOS
-    const buf = audioCtx.createBuffer(1, 1, 22050);
-    const src = audioCtx.createBufferSource();
-    src.buffer = buf;
-    const g = audioCtx.createGain();
-    g.gain.value = 0.001;
-    src.connect(g); g.connect(audioCtx.destination);
-    src.start();
   } catch(e) {}
 }
 
-function playNote(freq, dur, vol, type, delay, sweepTo) {
+function beep(freq, dur, vol, sweep) {
   if (!soundOn) return;
   try {
-    if (!audioCtx) initAudio();
-    if (!audioCtx) return;
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const t = (delay || 0) + audioCtx.currentTime + 0.02;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = type || 'sine';
-    if (sweepTo) {
-      osc.frequency.setValueAtTime(freq, t);
-      osc.frequency.exponentialRampToValueAtTime(sweepTo, t + dur);
-    } else {
-      osc.frequency.value = freq;
+    const sr = 22050, len = Math.floor(sr * dur), fade = Math.floor(sr * 0.003);
+    const buf = new ArrayBuffer(44 + len * 2);
+    const dv = new DataView(buf);
+    const w = (s, o) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+    w('RIFF', 0); dv.setUint32(4, 36 + len * 2, true); w('WAVE', 8);
+    w('fmt ', 12); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true);
+    dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    w('data', 36); dv.setUint32(40, len * 2, true);
+    for (let i = 0; i < len; i++) {
+      const t = i / sr, f = sweep ? freq + (sweep - freq) * (i / len) : freq;
+      const s = Math.sin(2 * Math.PI * f * t) * 0.4 * vol;
+      const env = Math.min(1, i / fade) * Math.min(1, (len - i) / fade);
+      dv.setInt16(44 + i * 2, s * 32767 * env, true);
     }
-    gain.gain.setValueAtTime(vol || 0.1, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + dur + 0.01);
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.start(t); osc.stop(t + dur + 0.01);
-  } catch(e) {}
+    const a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
+    a.volume = 0.7;
+    a.play();
+    setTimeout(() => URL.revokeObjectURL(a.src), dur * 1000 + 500);
+  } catch (e) {}
 }
 
-function sndClick() { playNote(880, 0.05, 0.1); }
-function sndSwap() { playNote(350, 0.12, 0.12, 'sine', 0, 700); }
-function sndMatch() { [523, 659, 784].forEach((f, i) => playNote(f, 0.18, 0.14, 'sine', i * 0.07)); }
-function sndBad() { playNote(160, 0.2, 0.1, 'sawtooth'); }
-function sndWin() { [523, 659, 784, 1047].forEach((f, i) => playNote(f, 0.3, 0.16, 'sine', i * 0.15)); }
-function sndLose() { playNote(400, 0.5, 0.1, 'sawtooth', 0, 100); }
+function sndClick() { beep(880, 0.05, 0.3); }
+function sndSwap() { beep(350, 0.12, 0.3, 700); }
+function sndMatch() { beep(523, 0.12, 0.35); setTimeout(() => beep(659, 0.12, 0.35), 70); setTimeout(() => beep(784, 0.15, 0.35), 140); }
+function sndBad() { beep(160, 0.2, 0.25); }
+function sndWin() { beep(523, 0.2, 0.4); setTimeout(() => beep(659, 0.2, 0.4), 150); setTimeout(() => beep(784, 0.2, 0.4), 300); setTimeout(() => beep(1047, 0.35, 0.4), 450); }
+function sndLose() { beep(400, 0.25, 0.3, 100); }
 
 // ======================== SAVE/LOAD ========================
 function saveGame() {
