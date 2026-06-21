@@ -37,13 +37,14 @@ const TABLE = {
 };
 
 // Портрет: центральные лузы по бокам (длинные борта)
+// Лузы на границе стола — открытый край, куда шар может закатиться
 const POCKETS = [
-  { x: () => cw * 0.08, y: () => ch * 0.10, pts: 3 },
-  { x: () => cw * 0.92, y: () => ch * 0.10, pts: 3 },
-  { x: () => cw * 0.06, y: () => ch * 0.50, pts: 7 },
-  { x: () => cw * 0.94, y: () => ch * 0.50, pts: 7 },
-  { x: () => cw * 0.08, y: () => ch * 0.90, pts: 3 },
-  { x: () => cw * 0.92, y: () => ch * 0.90, pts: 3 },
+  { x: () => cw * 0.10, y: () => ch * 0.10, pts: 3 },
+  { x: () => cw * 0.90, y: () => ch * 0.10, pts: 3 },
+  { x: () => cw * 0.10, y: () => ch * 0.50, pts: 7 },
+  { x: () => cw * 0.90, y: () => ch * 0.50, pts: 7 },
+  { x: () => cw * 0.10, y: () => ch * 0.90, pts: 3 },
+  { x: () => cw * 0.90, y: () => ch * 0.90, pts: 3 },
 ];
 
 const BALL_COLORS = [
@@ -164,11 +165,14 @@ function update() {
 
     if (Math.abs(b.vx) > 0.05 || Math.abs(b.vy) > 0.05) allStill = false;
 
-    // walls
-    if (b.x - b.r < TABLE.left()) { b.x = TABLE.left() + b.r; b.vx = Math.abs(b.vx) * WALL_BOUNCE; }
-    if (b.x + b.r > TABLE.right()) { b.x = TABLE.right() - b.r; b.vx = -Math.abs(b.vx) * WALL_BOUNCE; }
-    if (b.y - b.r < TABLE.top()) { b.y = TABLE.top() + b.r; b.vy = Math.abs(b.vy) * WALL_BOUNCE; }
-    if (b.y + b.r > TABLE.bottom()) { b.y = TABLE.bottom() - b.r; b.vy = -Math.abs(b.vy) * WALL_BOUNCE; }
+    // walls (пропускаем отскок если шар у лузы)
+    const atPocket = nearPocket(b);
+    if (!atPocket) {
+      if (b.x - b.r < TABLE.left()) { b.x = TABLE.left() + b.r; b.vx = Math.abs(b.vx) * WALL_BOUNCE; }
+      if (b.x + b.r > TABLE.right()) { b.x = TABLE.right() - b.r; b.vx = -Math.abs(b.vx) * WALL_BOUNCE; }
+      if (b.y - b.r < TABLE.top()) { b.y = TABLE.top() + b.r; b.vy = Math.abs(b.vy) * WALL_BOUNCE; }
+      if (b.y + b.r > TABLE.bottom()) { b.y = TABLE.bottom() - b.r; b.vy = -Math.abs(b.vy) * WALL_BOUNCE; }
+    }
   }
 
   // Ball-ball collisions
@@ -195,26 +199,18 @@ function update() {
     }
   }
 
-  // Balls still in pocket radius reduction (leave pocket area)
-  for (const b of balls) {
-    if (!b.active) continue;
-    for (const p of POCKETS) {
-      const dx = b.x - p.x(), dy = b.y - p.y();
-      if (dx * dx + dy * dy < (POCKET_R + b.r) * (POCKET_R + b.r)) {
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < POCKET_R + b.r && dist > 0.01) {
-          const push = (POCKET_R + b.r - dist) * 0.3;
-          b.x += (dx / dist) * push;
-          b.y += (dy / dist) * push;
-        }
-      }
-    }
-  }
-
   if (settling && allStill) {
     settling = false;
     endTurn();
   }
+}
+
+function nearPocket(ball) {
+  for (const p of POCKETS) {
+    const dx = ball.x - p.x(), dy = ball.y - p.y();
+    if (dx * dx + dy * dy < (POCKET_R + ball.r + 2) * (POCKET_R + ball.r + 2)) return true;
+  }
+  return false;
 }
 
 function collide(a, b) {
@@ -395,10 +391,13 @@ function draw() {
       for (let i = 0; i < 500; i++) {
         px += pvx; py += pvy;
         pvx *= FRICTION; pvy *= FRICTION;
-        if (px < tl) { px = tl; pvx = Math.abs(pvx) * WALL_BOUNCE; }
-        if (px > tr) { px = tr; pvx = -Math.abs(pvx) * WALL_BOUNCE; }
-        if (py < tt) { py = tt; pvy = Math.abs(pvy) * WALL_BOUNCE; }
-        if (py > tb) { py = tb; pvy = -Math.abs(pvy) * WALL_BOUNCE; }
+        const nearP = nearPocket({ x: px, y: py, r: BALL_R });
+        if (!nearP) {
+          if (px < tl) { px = tl; pvx = Math.abs(pvx) * WALL_BOUNCE; }
+          if (px > tr) { px = tr; pvx = -Math.abs(pvx) * WALL_BOUNCE; }
+          if (py < tt) { py = tt; pvy = Math.abs(pvy) * WALL_BOUNCE; }
+          if (py > tb) { py = tb; pvy = -Math.abs(pvy) * WALL_BOUNCE; }
+        }
         if (Math.abs(pvx) < 0.2 && Math.abs(pvy) < 0.2) break;
         if (i % 3 === 0) dotList.push({ x: px, y: py });
       }
