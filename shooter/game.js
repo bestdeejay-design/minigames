@@ -18,13 +18,14 @@ function calcSizes() {
   PW = cw * 0.075; PH = PW * 1.35;
   EW = cw * 0.065; EH = EW * 1.0;
 }
+const NUM_TREES = 16, NUM_ROCKS = 8, NUM_LAKES = 2;
 
 // ─── State ──────────────────────────────────────────────
 let score = 0, lives = 3, wlevel = 1;
 let player = { x: 0, y: 0 };
 let bullets = [], enemyBullets = [];
 let enemies = [], pickups = [], particles = [], paras = [];
-let stars = [], groundTrees = [];
+let stars = [], terrainFeatures = [];
 let gameOver = false, gameState = 'playing';
 let frameId = 0, fireTimer = 0, invulnTimer = 0;
 let scrollY = 0, groundY = 0;
@@ -221,7 +222,78 @@ function drawGround(scroll) {
     ctx.fill();
   }
 }
-function groundTop() { return 0; } // нет отдельной полосы земли
+function groundTop() { return 0; }
+
+// ─── Terrain Features ────────────────────────────────────
+function initTerrain() {
+  terrainFeatures = [];
+  for (let i = 0; i < NUM_TREES; i++) {
+    terrainFeatures.push({
+      type: 'tree', x: Math.random() * cw, y: Math.random() * ch,
+      size: 0.7 + Math.random() * 0.6, shade: Math.random() * 0.3
+    });
+  }
+  for (let i = 0; i < NUM_ROCKS; i++) {
+    terrainFeatures.push({
+      type: 'rock', x: Math.random() * cw, y: Math.random() * ch,
+      size: 0.6 + Math.random() * 0.8, shade: Math.random() * 0.3
+    });
+  }
+  for (let i = 0; i < NUM_LAKES; i++) {
+    terrainFeatures.push({
+      type: 'lake', x: Math.random() * cw, y: Math.random() * ch,
+      w: 40 + Math.random() * 40, h: 25 + Math.random() * 25,
+      hasShip: Math.random() < 0.5
+    });
+  }
+}
+
+function drawTree(f) {
+  const s = f.size, x = f.x, y = f.y;
+  ctx.fillStyle = '#5a3a1a';
+  ctx.fillRect(x - 1.5 * s, y - 4 * s, 3 * s, 10 * s);
+  ctx.fillStyle = `rgb(${30 - f.shade * 20}, ${80 - f.shade * 20}, ${30 - f.shade * 20})`;
+  ctx.beginPath(); ctx.arc(x, y - 12 * s, 10 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = `rgb(${38 - f.shade * 20}, ${100 - f.shade * 20}, ${38 - f.shade * 20})`;
+  ctx.beginPath(); ctx.arc(x - 3 * s, y - 8 * s, 7 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 4 * s, y - 9 * s, 8 * s, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawRock(f) {
+  const s = f.size, x = f.x, y = f.y;
+  const b = 100 + Math.floor(f.shade * 60);
+  ctx.fillStyle = `rgb(${b}, ${b - 10}, ${b - 20})`;
+  ctx.beginPath(); ctx.ellipse(x, y, 8 * s, 6 * s, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = `rgb(${b + 30}, ${b + 20}, ${b + 10})`;
+  ctx.beginPath(); ctx.ellipse(x - 2 * s, y - 2 * s, 4 * s, 3 * s, 0.1, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawLake(f) {
+  const x = f.x, y = f.y, w = f.w, h = f.h;
+  ctx.fillStyle = 'rgba(30,80,150,0.35)';
+  ctx.beginPath(); ctx.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(50,120,200,0.2)';
+  ctx.beginPath(); ctx.ellipse(x - w * 0.08, y - h * 0.08, w * 0.4, h * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+  if (f.hasShip) {
+    const sx = x + Math.sin(frameId * 0.02 + f.x) * 3;
+    const sy = y + Math.cos(frameId * 0.03 + f.y) * 2;
+    ctx.fillStyle = '#5a3a1a';
+    ctx.beginPath(); ctx.moveTo(sx - 6, sy + 2); ctx.lineTo(sx + 6, sy + 2);
+    ctx.lineTo(sx + 4, sy + 5); ctx.lineTo(sx - 4, sy + 5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ddd';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy + 2); ctx.lineTo(sx, sy - 6); ctx.lineTo(sx + 5, sy - 1); ctx.closePath(); ctx.fill();
+  }
+}
+
+function drawTerrain() {
+  for (const f of terrainFeatures) {
+    if (f.y < -80 || f.y > ch + 80) continue;
+    if (f.type === 'tree') drawTree(f);
+    else if (f.type === 'rock') drawRock(f);
+    else if (f.type === 'lake') drawLake(f);
+  }
+}
 
 // ─── Spawning ───────────────────────────────────────────
 function spawnEnemy() {
@@ -260,6 +332,7 @@ function resetGame() {
   touchX = null; touchY = null;
   overlay.classList.add('hidden');
   if (animId) { cancelAnimationFrame(animId); animId = null; }
+  initTerrain();
   loop();
 }
 
@@ -271,7 +344,16 @@ function loop() {
   if (invulnTimer > 0) invulnTimer -= dt;
   scrollY += 0.8;
 
-  // Stars
+  for (const f of terrainFeatures) {
+    f.y += 0.8;
+    if (f.y > ch + 80) {
+      f.y = -80 - Math.random() * 40;
+      f.x = 20 + Math.random() * (cw - 40);
+      if (f.type === 'lake') { f.w = 40 + Math.random() * 40; f.h = 25 + Math.random() * 25; f.hasShip = Math.random() < 0.5; }
+      else if (f.type === 'tree') { f.size = 0.7 + Math.random() * 0.6; f.shade = Math.random() * 0.3; }
+      else if (f.type === 'rock') { f.size = 0.6 + Math.random() * 0.8; f.shade = Math.random() * 0.3; }
+    }
+  }
   for (const s of stars) { s.y += s.sp; if (s.y > ch) { s.y = -2; s.x = Math.random() * cw; } }
 
   // Player follow touch
@@ -449,6 +531,7 @@ function hitPlayer() {
 function draw() {
   ctx.clearRect(0, 0, cw, ch);
   drawGround(scrollY);
+  drawTerrain();
 
   for (const p of pickups) drawPickup(p);
   for (const p of paras) drawPara(p);
@@ -542,7 +625,7 @@ function resize() {
   canvas.style.height = ch + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   calcSizes();
-  initGround();
+  initTerrain();
   initStars();
 }
 window.addEventListener('resize', resize);
