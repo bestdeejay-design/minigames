@@ -419,7 +419,7 @@ function payOut() {
 // ─── Resize ──────────────────────────────────────────────
 
 function resize() {
-  cw = window.innerWidth;
+  cw = Math.min(window.innerWidth, 420);
   ch = Math.min(cw, window.innerHeight * 0.46);
   canvas.width = cw * dpr;
   canvas.height = ch * dpr;
