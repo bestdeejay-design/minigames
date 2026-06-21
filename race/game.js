@@ -250,15 +250,23 @@ function draw() {
     }
   }
 
-  // Spawn warning (red glow)
+  // Spawn warning (красная подсветка на дороге)
   if (pendingSpawn) {
-    const w = carW * 1.4, h = carH * 0.3;
-    const alpha = 0.2 + 0.4 * Math.sin(pendingSpawn.delay * 0.05);
+    const warnW = carW * 1.5, warnH = carH * 0.4;
+    const alpha = 0.3 + 0.5 * Math.sin(pendingSpawn.delay * 0.08);
     ctx.fillStyle = `rgba(255,0,0,${alpha})`;
-    roundRect(ctx, pendingSpawn.x - w / 2, -h, w, h, 4);
+    roundRect(ctx, pendingSpawn.x - warnW / 2, 4, warnW, warnH, 5);
     ctx.fill();
-    ctx.fillStyle = `rgba(255,100,0,${alpha * 0.5})`;
-    roundRect(ctx, pendingSpawn.x - w / 2, -h + 2, w, h * 0.4, 3);
+    ctx.fillStyle = `rgba(255,200,0,${alpha * 0.6})`;
+    roundRect(ctx, pendingSpawn.x - warnW / 2 + 3, 7, warnW - 6, warnH * 0.4, 3);
+    ctx.fill();
+    // Треугольник-указатель
+    ctx.fillStyle = `rgba(255,0,0,${alpha * 0.7})`;
+    ctx.beginPath();
+    ctx.moveTo(pendingSpawn.x, 4 + warnH + 8);
+    ctx.lineTo(pendingSpawn.x - 6, 4 + warnH + 1);
+    ctx.lineTo(pendingSpawn.x + 6, 4 + warnH + 1);
+    ctx.closePath();
     ctx.fill();
   }
 
