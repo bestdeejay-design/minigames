@@ -385,35 +385,30 @@ function draw() {
       ctx.lineTo(cueBall.x + Math.cos(angle) * stickLen, cueBall.y + Math.sin(angle) * stickLen);
       ctx.stroke();
 
-      // Trajectory dots
+      // Полная траектория по всему столу с рикошетами
       let px = cueBall.x, py = cueBall.y;
       let pvx = Math.cos(angle) * power;
       let pvy = Math.sin(angle) * power;
-      for (let i = 0; i < 30; i++) {
+      const dotList = [];
+      const tl = TABLE.left() + BALL_R, tr = TABLE.right() - BALL_R;
+      const tt = TABLE.top() + BALL_R, tb = TABLE.bottom() - BALL_R;
+      for (let i = 0; i < 500; i++) {
         px += pvx; py += pvy;
         pvx *= FRICTION; pvy *= FRICTION;
-        if (px < TABLE.left() || px > TABLE.right() || py < TABLE.top() || py > TABLE.bottom()) break;
-        const alpha = 0.5 + 0.4 * (1 - i / 30);
+        if (px < tl) { px = tl; pvx = Math.abs(pvx) * WALL_BOUNCE; }
+        if (px > tr) { px = tr; pvx = -Math.abs(pvx) * WALL_BOUNCE; }
+        if (py < tt) { py = tt; pvy = Math.abs(pvy) * WALL_BOUNCE; }
+        if (py > tb) { py = tb; pvy = -Math.abs(pvy) * WALL_BOUNCE; }
+        if (Math.abs(pvx) < 0.2 && Math.abs(pvy) < 0.2) break;
+        if (i % 3 === 0) dotList.push({ x: px, y: py });
+      }
+      for (let i = 0; i < dotList.length; i++) {
+        const alpha = 0.3 + 0.5 * (1 - i / dotList.length);
         ctx.fillStyle = `rgba(255,255,200,${alpha})`;
         ctx.beginPath();
-        ctx.arc(px, py, 2, 0, Math.PI * 2);
+        ctx.arc(dotList[i].x, dotList[i].y, 2, 0, Math.PI * 2);
         ctx.fill();
-        // Simple wall bounce for preview
-        if (px - BALL_R < TABLE.left()) { pvx = Math.abs(pvx) * WALL_BOUNCE; px = TABLE.left() + BALL_R; }
-        if (px + BALL_R > TABLE.right()) { pvx = -Math.abs(pvx) * WALL_BOUNCE; px = TABLE.right() - BALL_R; }
-        if (py - BALL_R < TABLE.top()) { pvy = Math.abs(pvy) * WALL_BOUNCE; py = TABLE.top() + BALL_R; }
-        if (py + BALL_R > TABLE.bottom()) { pvy = -Math.abs(pvy) * WALL_BOUNCE; py = TABLE.bottom() - BALL_R; }
       }
-
-      // Aim line from cue direction
-      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([3, 5]);
-      ctx.beginPath();
-      ctx.moveTo(cueBall.x, cueBall.y);
-      ctx.lineTo(cueBall.x + Math.cos(angle) * 200, cueBall.y + Math.sin(angle) * 200);
-      ctx.stroke();
-      ctx.setLineDash([]);
     }
 
     // Drag indicator
