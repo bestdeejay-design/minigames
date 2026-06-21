@@ -203,7 +203,7 @@ function simulateTrajectory(sx, sy, svx, svy) {
   const results = [];
   const hitBalls = new Set();
 
-  const sims = [{ x: sx, y: sy, vx: svx, vy: svy, dotR: 1.5, color: 'rgba(255,255,200,1)', dots: [], idx: -1 }];
+  const sims = [{ x: sx, y: sy, vx: svx, vy: svy, dotR: 2.5, color: 'rgba(255,255,200,1)', dots: [], idx: -1 }];
   results.push(sims[0]);
 
   for (let iter = 0; iter < 800; iter++) {
@@ -240,7 +240,7 @@ function simulateTrajectory(sx, sy, svx, svy) {
           const transfer = relV * 0.85;
           const tcolor = ball.color;
           const previewColor = `rgba(${parseInt(tcolor.slice(1,3),16)},${parseInt(tcolor.slice(3,5),16)},${parseInt(tcolor.slice(5,7),16)},1)`;
-          const tsim = { x: ball.x + nx * BALL_R, y: ball.y + ny * BALL_R, vx: nx * transfer, vy: ny * transfer, dotR: 1.2, color: previewColor, dots: [], idx: sims.length, stopped: false, collided: false };
+          const tsim = { x: ball.x + nx * BALL_R, y: ball.y + ny * BALL_R, vx: nx * transfer, vy: ny * transfer, dotR: 2, color: previewColor, dots: [], idx: sims.length, stopped: false, collided: false };
           sims.push(tsim);
           results.push(tsim);
           sim.collided = sim.idx > 0; // кий (idx=-1) может бить дальше
@@ -454,11 +454,31 @@ function draw() {
       const trajectories = simulateTrajectory(cueBall.x, cueBall.y, Math.cos(angle) * power, Math.sin(angle) * power);
       for (const traj of trajectories) {
         const dots = traj.dots;
+        // Пунктирная линия для траектории кия
+        if (traj.idx === -1 && dots.length > 1) {
+          ctx.strokeStyle = 'rgba(255,255,200,0.25)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 5]);
+          ctx.beginPath();
+          ctx.moveTo(dots[0].x, dots[0].y);
+          for (let i = 1; i < dots.length; i++) ctx.lineTo(dots[i].x, dots[i].y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        // Точки с белой подложкой для контраста на сукне
         for (let i = 0; i < dots.length; i++) {
-          const alpha = 0.3 + 0.5 * (1 - i / dots.length);
+          const r = traj.dotR;
+          const p = dots[i];
+          const alpha = 0.5 + 0.45 * (1 - i / dots.length);
+          // Белая подложка
+          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, r + 1, 0, Math.PI * 2);
+          ctx.fill();
+          // Цветной центр
           ctx.fillStyle = traj.color.replace('1)', alpha + ')');
           ctx.beginPath();
-          ctx.arc(dots[i].x, dots[i].y, traj.dotR, 0, Math.PI * 2);
+          ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
           ctx.fill();
         }
       }
