@@ -10,7 +10,7 @@ body { background: #0a0a1a; color: #eee; font-family: system-ui, -apple-system, 
 }
 #hud #result-label { font-weight: bold; font-size: 0.9rem; min-width: 80px; text-align: center; }
 
-canvas { display: block; width: 100%; flex: 0 0 auto; touch-action: none; }
+canvas { display: block; touch-action: none; }
 
 #betting {
   flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;
@@ -22,7 +22,7 @@ canvas { display: block; width: 100%; flex: 0 0 auto; touch-action: none; }
   padding: 4px; overflow-y: auto; flex: 1; min-height: 0;
 }
 #num-grid button {
-  aspect-ratio: 1; border: none; border-radius: 3px;
+  height: 32px; border: none; border-radius: 3px;
   font-size: 0.7rem; font-weight: bold; color: #fff;
   cursor: pointer; touch-action: manipulation;
   display: flex; align-items: center; justify-content: center;

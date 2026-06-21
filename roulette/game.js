@@ -420,7 +420,8 @@ function payOut() {
 
 function resize() {
   cw = Math.min(window.innerWidth, 420);
-  ch = Math.min(cw, window.innerHeight * 0.46);
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  ch = Math.min(cw, vh * 0.40);
   canvas.width = cw * dpr;
   canvas.height = ch * dpr;
   canvas.style.width = cw + 'px';
@@ -428,8 +429,8 @@ function resize() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   draw();
 }
-
 window.addEventListener('resize', resize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 
 // ─── Init ────────────────────────────────────────────────
 
