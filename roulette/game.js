@@ -447,21 +447,11 @@ outsideBtns.forEach(btn => {
   btn.addEventListener('click', () => placeBet(btn.dataset.bet));
 });
 
+const btnClear = document.getElementById('btn-clear');
 btnSpin.addEventListener('click', startSpin);
 btnSpin.addEventListener('touchstart', (e) => { e.preventDefault(); startSpin(); }, { passive: false });
-
-// Long-press on canvas to clear
-let clearTimer = null;
-document.addEventListener('touchstart', (e) => {
-  if (e.target.closest('button') || e.target.closest('#chip-row')) return;
-  clearTimer = setTimeout(clearBets, 800);
-});
-document.addEventListener('touchend', () => {
-  if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
-});
-document.addEventListener('touchmove', () => {
-  if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
-});
+btnClear.addEventListener('click', clearBets);
+btnClear.addEventListener('touchstart', (e) => { e.preventDefault(); clearBets(); }, { passive: false });
 
 resize();
 updateHUD();
