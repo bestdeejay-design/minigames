@@ -172,13 +172,13 @@ function loop() {
   const interval = Math.max(350, 1200 - gameTime * 10);
   spawnTimer += dt;
   if (spawnTimer >= interval && !pendingSpawn) {
-    spawnTimer = 0;
     if (Math.random() < 0.65 + gameTime * 0.005) {
       pendingSpawn = {
         x: roadL + carW / 2 + Math.random() * (roadW - carW),
         delay: Math.max(300, 700 - gameTime * 3),
       };
     }
+    spawnTimer = 0;
   }
 
   // Stars
