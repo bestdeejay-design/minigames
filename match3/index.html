@@ -133,101 +133,77 @@ let locked = false;
 
 // ======================== AUDIO ========================
 let audioCtx = null;
-function getAudioCtx() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-  }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  return audioCtx;
-}
-function sndClick() {
-  if (!soundOn) return;
+let audioReady = false;
+
+function initAudio() {
   try {
-    const ac = getAudioCtx();
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // iOS: unlock by playing silence synchronously in user gesture
+    const buf = audioCtx.createBuffer(1, 1, 22050);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    const g = audioCtx.createGain();
+    g.gain.value = 0.001;
+    src.connect(g); g.connect(audioCtx.destination);
+    src.start();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    audioReady = true;
+  } catch(e) {}
+}
+
+function playNote(freq, dur, vol, type, delay) {
+  if (!audioReady || !soundOn) return;
+  try {
+    const ac = audioCtx;
     const osc = ac.createOscillator();
     const gain = ac.createGain();
-    osc.type = 'sine'; osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.06, ac.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.04);
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    const t = (delay || 0) + ac.currentTime;
+    gain.gain.setValueAtTime(vol || 0.1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
     osc.connect(gain); gain.connect(ac.destination);
-    osc.start(); osc.stop(ac.currentTime + 0.05);
-  } catch(e){}
+    osc.start(t); osc.stop(t + dur);
+  } catch(e) {}
 }
+
+function sndClick() { playNote(880, 0.04, 0.08); }
 function sndSwap() {
-  if (!soundOn) return;
+  if (!audioReady || !soundOn) return;
   try {
-    const ac = getAudioCtx();
+    const ac = audioCtx;
     const osc = ac.createOscillator();
     const gain = ac.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(350, ac.currentTime);
     osc.frequency.exponentialRampToValueAtTime(700, ac.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.07, ac.currentTime);
+    gain.gain.setValueAtTime(0.1, ac.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
     osc.connect(gain); gain.connect(ac.destination);
     osc.start(); osc.stop(ac.currentTime + 0.12);
-  } catch(e){}
+  } catch(e) {}
 }
 function sndMatch() {
-  if (!soundOn) return;
-  try {
-    const ac = getAudioCtx();
-    [523, 659, 784].forEach((freq, i) => {
-      const osc = ac.createOscillator();
-      const gain = ac.createGain();
-      osc.type = 'sine'; osc.frequency.value = freq;
-      const t = ac.currentTime + i * 0.07;
-      gain.gain.setValueAtTime(0.08, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-      osc.connect(gain); gain.connect(ac.destination);
-      osc.start(t); osc.stop(t + 0.2);
-    });
-  } catch(e){}
+  [523, 659, 784].forEach((f, i) => playNote(f, 0.18, 0.12, 'sine', i * 0.07));
 }
-function sndBad() {
-  if (!soundOn) return;
-  try {
-    const ac = getAudioCtx();
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = 'sawtooth'; osc.frequency.value = 160;
-    gain.gain.setValueAtTime(0.05, ac.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.2);
-    osc.connect(gain); gain.connect(ac.destination);
-    osc.start(); osc.stop(ac.currentTime + 0.2);
-  } catch(e){}
-}
+function sndBad() { playNote(160, 0.2, 0.08, 'sawtooth'); }
 function sndWin() {
-  if (!soundOn) return;
-  try {
-    const ac = getAudioCtx();
-    [523, 659, 784, 1047].forEach((freq, i) => {
-      const osc = ac.createOscillator();
-      const gain = ac.createGain();
-      osc.type = 'sine'; osc.frequency.value = freq;
-      const t = ac.currentTime + i * 0.15;
-      gain.gain.setValueAtTime(0.1, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-      osc.connect(gain); gain.connect(ac.destination);
-      osc.start(t); osc.stop(t + 0.35);
-    });
-  } catch(e){}
+  [523, 659, 784, 1047].forEach((f, i) => playNote(f, 0.3, 0.14, 'sine', i * 0.15));
 }
 function sndLose() {
-  if (!soundOn) return;
+  if (!audioReady || !soundOn) return;
   try {
-    const ac = getAudioCtx();
+    const ac = audioCtx;
     const osc = ac.createOscillator();
     const gain = ac.createGain();
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(400, ac.currentTime);
     osc.frequency.exponentialRampToValueAtTime(100, ac.currentTime + 0.5);
-    gain.gain.setValueAtTime(0.06, ac.currentTime);
+    gain.gain.setValueAtTime(0.08, ac.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.5);
     osc.connect(gain); gain.connect(ac.destination);
     osc.start(); osc.stop(ac.currentTime + 0.5);
-  } catch(e){}
+  } catch(e) {}
 }
 
 // ======================== SAVE/LOAD ========================
@@ -704,6 +680,7 @@ let touchStartR = -1, touchStartC = -1, touchStartX = 0, touchStartY = 0, hasSwi
 
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
+  initAudio();
   if (locked || animState !== 'idle') return;
   const t = e.touches[0];
   const cell = getGridCell(t.clientX, t.clientY);
@@ -751,6 +728,7 @@ canvas.addEventListener('touchend', (e) => {
 
 // Mouse support for desktop testing
 canvas.addEventListener('mousedown', (e) => {
+  initAudio();
   if (locked || animState !== 'idle') return;
   const cell = getGridCell(e.clientX, e.clientY);
   if (!cell) return;
@@ -775,6 +753,7 @@ function loop() {
 // ======================== INIT ========================
 loadGame();
 document.getElementById('btn-play').onclick = () => {
+  initAudio();
   welcomeEl.style.display = 'none';
   startLevel();
 };
