@@ -284,10 +284,10 @@ function startLevel() {
   if (!hasValidMoves()) shuffleGrid();
   animState = 'idle'; animType = ''; animData = null; locked = false;
   selectedR = -1; selectedC = -1;
-  resizeCanvas();
-  updateHUD();
   modalEl.classList.add('hidden');
   gameEl.classList.remove('hidden');
+  requestAnimationFrame(() => resizeCanvas());
+  updateHUD();
 }
 
 function doSwap(r1, c1, r2, c2) {
@@ -476,6 +476,7 @@ function drawCell(c, r) {
 }
 
 function render() {
+  if (!cellSize || !cw) return;
   ctx.clearRect(0, 0, cw, ch);
   drawBackground();
   const isAnim = animState === 'anim';
@@ -593,11 +594,25 @@ function showVictory() {
 }
 
 // ======================== CANVAS SIZING ========================
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+    if (r > w/2) r = w/2; if (r > h/2) r = h/2;
+    this.moveTo(x + r, y); this.lineTo(x + w - r, y);
+    this.quadraticCurveTo(x + w, y, x + w, y + r);
+    this.lineTo(x + w, y + h - r);
+    this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    this.lineTo(x + r, y + h);
+    this.quadraticCurveTo(x, y + h, x, y + h - r);
+    this.lineTo(x, y + r);
+    this.quadraticCurveTo(x, y, x + r, y);
+  };
+}
+
 function resizeCanvas() {
   const maxW = Math.min(window.innerWidth, 420);
   const wrap = document.getElementById('canvas-wrap');
   const wrapH = wrap.clientHeight;
-  if (wrapH < 50) { requestAnimationFrame(resizeCanvas); return; }
+  if (wrapH < 50 || gridSize < 3) return;
   const avail = Math.min(maxW - 16, wrapH - 8);
   cellSize = Math.floor(avail / gridSize);
   cw = cellSize * gridSize;
@@ -607,20 +622,6 @@ function resizeCanvas() {
   canvas.style.width = cw + 'px';
   canvas.style.height = ch + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // roundRect polyfill for older browsers
-  if (!CanvasRenderingContext2D.prototype.roundRect) {
-    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
-      if (r > w/2) r = w/2; if (r > h/2) r = h/2;
-      this.moveTo(x + r, y); this.lineTo(x + w - r, y);
-      this.quadraticCurveTo(x + w, y, x + w, y + r);
-      this.lineTo(x + w, y + h - r);
-      this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      this.lineTo(x + r, y + h);
-      this.quadraticCurveTo(x, y + h, x, y + h - r);
-      this.lineTo(x, y + r);
-      this.quadraticCurveTo(x, y, x + r, y);
-    };
-  }
 }
 
 // ======================== INPUT ========================
