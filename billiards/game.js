@@ -73,22 +73,28 @@ function genLevel(lv) {
   const tt = TABLE.top(), tb = TABLE.bottom();
 
   function randPos() {
+    // Шары в центральной зоне, подальше от бортов и луз
+    const cx = tl + (tr - tl) * 0.5;
+    const cy = tt + (tb - tt) * 0.5;
+    const halfW = (tr - tl) * 0.25;
+    const halfH = (tb - tt) * 0.25;
     for (let attempt = 0; attempt < 100; attempt++) {
-      const x = tl + BALL_R + Math.random() * (tr - tl - BALL_R * 2);
-      const y = tt + BALL_R + Math.random() * (tb - tt - BALL_R * 2);
+      const x = cx - halfW + Math.random() * halfW * 2;
+      const y = cy - halfH + Math.random() * halfH * 2;
       let ok = true;
       for (const p of placed) {
         const dx = x - p.x, dy = y - p.y;
-        if (dx * dx + dy * dy < (BALL_R * 2 + 6) * (BALL_R * 2 + 6)) { ok = false; break; }
+        if (dx * dx + dy * dy < (BALL_R * 2 + 8) * (BALL_R * 2 + 8)) { ok = false; break; }
       }
       for (const pk of POCKETS) {
         const px = pk.x(), py = pk.y();
         const dx = x - px, dy = y - py;
-        if (dx * dx + dy * dy < (POCKET_R + BALL_R + 4) * (POCKET_R + BALL_R + 4)) { ok = false; break; }
+        if (dx * dx + dy * dy < (POCKET_R + BALL_R + 8) * (POCKET_R + BALL_R + 8)) { ok = false; break; }
       }
       if (ok) return { x, y };
     }
-    return { x: tl + BALL_R + Math.random() * (tr - tl - BALL_R * 2), y: tt + BALL_R + Math.random() * (tb - tt - BALL_R * 2) };
+    // fallback — в центре
+    return { x: cx, y: cy };
   }
 
   // Кий всегда внизу по центру
@@ -245,24 +251,24 @@ function simulateTrajectory(sx, sy, svx, svy) {
       if (sim.stopped || sim.collided) continue;
       for (const ball of balls) {
         if (!ball.active || ball.cue || hitBalls.has(ball)) continue;
-        const dx = sim.x - ball.x, dy = sim.y - ball.y;
+        const dx = ball.x - sim.x, dy = ball.y - sim.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < BALL_R * 2 && dist > 0.01) {
+          // nx,ny от кия к цели — направление удара
           const nx = dx / dist, ny = dy / dist;
           const relV = sim.vx * nx + sim.vy * ny;
-          if (relV > 0) continue;
-          // Скорость цели вдоль линии удара
-          const power = Math.abs(relV) * 0.95;
+          if (relV <= 0) continue; // кий движется не в сторону шара
+          // Передаём импульс цели
+          const transfer = relV * 0.85;
           const tcolor = ball.color;
-          // Подбираем оттенок для превью
           const previewColor = `rgba(${parseInt(tcolor.slice(1,3),16)},${parseInt(tcolor.slice(3,5),16)},${parseInt(tcolor.slice(5,7),16)},1)`;
-          const tsim = { x: ball.x + nx * BALL_R, y: ball.y + ny * BALL_R, vx: nx * power, vy: ny * power, dotR: 1, color: previewColor, dots: [], idx: sims.length, stopped: false, collided: false };
+          const tsim = { x: ball.x + nx * BALL_R, y: ball.y + ny * BALL_R, vx: nx * transfer, vy: ny * transfer, dotR: 1.2, color: previewColor, dots: [], idx: sims.length, stopped: false, collided: false };
           sims.push(tsim);
           results.push(tsim);
-          sim.collided = true;
-          // Кий теряет часть энергии
-          sim.vx -= nx * power * 0.5;
-          sim.vy -= ny * power * 0.5;
+          sim.collided = sim.idx > 0; // кий (idx=-1) может бить дальше
+          // Кий теряет составляющую вдоль линии удара
+          sim.vx -= nx * transfer;
+          sim.vy -= ny * transfer;
           hitBalls.add(ball);
           break;
         }
