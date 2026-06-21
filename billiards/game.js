@@ -213,6 +213,67 @@ function nearPocket(ball) {
   return false;
 }
 
+function simulateTrajectory(sx, sy, svx, svy) {
+  const tl = TABLE.left() + BALL_R, tr = TABLE.right() - BALL_R;
+  const tt = TABLE.top() + BALL_R, tb = TABLE.bottom() - BALL_R;
+  const results = [];
+  const hitBalls = new Set();
+
+  const sims = [{ x: sx, y: sy, vx: svx, vy: svy, dotR: 1.5, color: 'rgba(255,255,200,1)', dots: [], idx: -1 }];
+  results.push(sims[0]);
+
+  for (let iter = 0; iter < 800; iter++) {
+    let anyMoving = false;
+    for (const sim of sims) {
+      if (sim.stopped) continue;
+      sim.vx *= FRICTION; sim.vy *= FRICTION;
+      sim.x += sim.vx; sim.y += sim.vy;
+      if (Math.abs(sim.vx) < 0.15 && Math.abs(sim.vy) < 0.15) { sim.stopped = true; continue; }
+      anyMoving = true;
+      const nearP = nearPocket({ x: sim.x, y: sim.y, r: BALL_R });
+      if (!nearP) {
+        if (sim.x < tl) { sim.x = tl; sim.vx = Math.abs(sim.vx) * WALL_BOUNCE; }
+        if (sim.x > tr) { sim.x = tr; sim.vx = -Math.abs(sim.vx) * WALL_BOUNCE; }
+        if (sim.y < tt) { sim.y = tt; sim.vy = Math.abs(sim.vy) * WALL_BOUNCE; }
+        if (sim.y > tb) { sim.y = tb; sim.vy = -Math.abs(sim.vy) * WALL_BOUNCE; }
+      }
+      if (iter % 2 === 0) sim.dots.push({ x: sim.x, y: sim.y });
+    }
+
+    // Соударения между симулированными шарами и реальными
+    for (const sim of sims) {
+      if (sim.stopped || sim.collided) continue;
+      for (const ball of balls) {
+        if (!ball.active || ball.cue || hitBalls.has(ball)) continue;
+        const dx = sim.x - ball.x, dy = sim.y - ball.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < BALL_R * 2 && dist > 0.01) {
+          const nx = dx / dist, ny = dy / dist;
+          const relV = sim.vx * nx + sim.vy * ny;
+          if (relV > 0) continue;
+          // Скорость цели вдоль линии удара
+          const power = Math.abs(relV) * 0.95;
+          const tcolor = ball.color;
+          // Подбираем оттенок для превью
+          const previewColor = `rgba(${parseInt(tcolor.slice(1,3),16)},${parseInt(tcolor.slice(3,5),16)},${parseInt(tcolor.slice(5,7),16)},1)`;
+          const tsim = { x: ball.x + nx * BALL_R, y: ball.y + ny * BALL_R, vx: nx * power, vy: ny * power, dotR: 1, color: previewColor, dots: [], idx: sims.length, stopped: false, collided: false };
+          sims.push(tsim);
+          results.push(tsim);
+          sim.collided = true;
+          // Кий теряет часть энергии
+          sim.vx -= nx * power * 0.5;
+          sim.vy -= ny * power * 0.5;
+          hitBalls.add(ball);
+          break;
+        }
+      }
+    }
+
+    if (!anyMoving) break;
+  }
+  return results;
+}
+
 function collide(a, b) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -381,32 +442,17 @@ function draw() {
       ctx.lineTo(cueBall.x + Math.cos(angle) * stickLen, cueBall.y + Math.sin(angle) * stickLen);
       ctx.stroke();
 
-      // Полная траектория по всему столу с рикошетами
-      let px = cueBall.x, py = cueBall.y;
-      let pvx = Math.cos(angle) * power;
-      let pvy = Math.sin(angle) * power;
-      const dotList = [];
-      const tl = TABLE.left() + BALL_R, tr = TABLE.right() - BALL_R;
-      const tt = TABLE.top() + BALL_R, tb = TABLE.bottom() - BALL_R;
-      for (let i = 0; i < 500; i++) {
-        px += pvx; py += pvy;
-        pvx *= FRICTION; pvy *= FRICTION;
-        const nearP = nearPocket({ x: px, y: py, r: BALL_R });
-        if (!nearP) {
-          if (px < tl) { px = tl; pvx = Math.abs(pvx) * WALL_BOUNCE; }
-          if (px > tr) { px = tr; pvx = -Math.abs(pvx) * WALL_BOUNCE; }
-          if (py < tt) { py = tt; pvy = Math.abs(pvy) * WALL_BOUNCE; }
-          if (py > tb) { py = tb; pvy = -Math.abs(pvy) * WALL_BOUNCE; }
+      // Траектории: кий + соударения с шарами
+      const trajectories = simulateTrajectory(cueBall.x, cueBall.y, Math.cos(angle) * power, Math.sin(angle) * power);
+      for (const traj of trajectories) {
+        const dots = traj.dots;
+        for (let i = 0; i < dots.length; i++) {
+          const alpha = 0.3 + 0.5 * (1 - i / dots.length);
+          ctx.fillStyle = traj.color.replace('1)', alpha + ')');
+          ctx.beginPath();
+          ctx.arc(dots[i].x, dots[i].y, traj.dotR, 0, Math.PI * 2);
+          ctx.fill();
         }
-        if (Math.abs(pvx) < 0.2 && Math.abs(pvy) < 0.2) break;
-        if (i % 3 === 0) dotList.push({ x: px, y: py });
-      }
-      for (let i = 0; i < dotList.length; i++) {
-        const alpha = 0.3 + 0.5 * (1 - i / dotList.length);
-        ctx.fillStyle = `rgba(255,255,200,${alpha})`;
-        ctx.beginPath();
-        ctx.arc(dotList[i].x, dotList[i].y, 2, 0, Math.PI * 2);
-        ctx.fill();
       }
     }
 
