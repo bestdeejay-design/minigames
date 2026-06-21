@@ -134,31 +134,101 @@ let locked = false;
 // ======================== AUDIO ========================
 let audioCtx = null;
 function getAudioCtx() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
-function playTone(freq, dur, type, vol) {
+function sndClick() {
   if (!soundOn) return;
   try {
     const ac = getAudioCtx();
     const osc = ac.createOscillator();
     const gain = ac.createGain();
-    osc.type = type || 'sine';
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(vol || 0.12, ac.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur);
+    osc.type = 'sine'; osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.06, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.04);
     osc.connect(gain); gain.connect(ac.destination);
-    osc.start(); osc.stop(ac.currentTime + dur);
+    osc.start(); osc.stop(ac.currentTime + 0.05);
   } catch(e){}
 }
-function sndClick() { playTone(660, 0.06, 'sine', 0.08); }
-function sndSwap() { playTone(520, 0.08, 'sine', 0.1); }
-function sndMatch() { playTone(880, 0.12, 'sine', 0.1); setTimeout(()=>playTone(1100,0.1,'sine',0.08),80); }
-function sndBad() { playTone(220, 0.15, 'square', 0.06); }
-function sndWin() {
-  [0,100,200,300].forEach((d,i)=>setTimeout(()=>playTone(660+i*110,0.15,'sine',0.1),d));
+function sndSwap() {
+  if (!soundOn) return;
+  try {
+    const ac = getAudioCtx();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(350, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(700, ac.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.07, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.start(); osc.stop(ac.currentTime + 0.12);
+  } catch(e){}
 }
-function sndLose() { playTone(330, 0.3, 'sawtooth', 0.05); }
+function sndMatch() {
+  if (!soundOn) return;
+  try {
+    const ac = getAudioCtx();
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      const t = ac.currentTime + i * 0.07;
+      gain.gain.setValueAtTime(0.08, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      osc.connect(gain); gain.connect(ac.destination);
+      osc.start(t); osc.stop(t + 0.2);
+    });
+  } catch(e){}
+}
+function sndBad() {
+  if (!soundOn) return;
+  try {
+    const ac = getAudioCtx();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'sawtooth'; osc.frequency.value = 160;
+    gain.gain.setValueAtTime(0.05, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.2);
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.start(); osc.stop(ac.currentTime + 0.2);
+  } catch(e){}
+}
+function sndWin() {
+  if (!soundOn) return;
+  try {
+    const ac = getAudioCtx();
+    [523, 659, 784, 1047].forEach((freq, i) => {
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      const t = ac.currentTime + i * 0.15;
+      gain.gain.setValueAtTime(0.1, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      osc.connect(gain); gain.connect(ac.destination);
+      osc.start(t); osc.stop(t + 0.35);
+    });
+  } catch(e){}
+}
+function sndLose() {
+  if (!soundOn) return;
+  try {
+    const ac = getAudioCtx();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(400, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, ac.currentTime + 0.5);
+    gain.gain.setValueAtTime(0.06, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.5);
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.start(); osc.stop(ac.currentTime + 0.5);
+  } catch(e){}
+}
 
 // ======================== SAVE/LOAD ========================
 function saveGame() {
@@ -311,13 +381,7 @@ function processMatches(prevMatches) {
   const matches = prevMatches || findMatches();
   if (!matches.length) { afterCascade(); return; }
 
-  const groups = groupMatches(matches);
-  let pts = 0;
-  for (const g of groups) {
-    if (g.length === 3) pts += SCORE_3;
-    else if (g.length === 4) pts += SCORE_4;
-    else pts += SCORE_5P;
-  }
+  const pts = calcScore(matches);
   levelScore += pts; totalScore += pts;
   sndMatch();
   updateHUD();
@@ -332,10 +396,46 @@ function processMatches(prevMatches) {
   });
 }
 
+function calcScore(matches) {
+  const isMatch = {};
+  for (const m of matches) isMatch[m.r * gridSize + m.c] = true;
+  const used = new Set();
+  let total = 0;
+  // Horizontal lines
+  for (let r = 0; r < gridSize; r++) {
+    let c = 0;
+    while (c < gridSize) {
+      const t = grid[r][c];
+      if (t < 0 || !isMatch[r * gridSize + c]) { c++; continue; }
+      let len = 1;
+      while (c + len < gridSize && grid[r][c + len] === t && isMatch[r * gridSize + c + len]) len++;
+      if (len >= 3) {
+        for (let i = 0; i < len; i++) used.add(r * gridSize + c + i);
+        total += len === 3 ? SCORE_3 : len === 4 ? SCORE_4 : SCORE_5P;
+      }
+      c += len;
+    }
+  }
+  // Vertical lines (skip cells already counted in horizontal)
+  for (let c = 0; c < gridSize; c++) {
+    let r = 0;
+    while (r < gridSize) {
+      const key = r * gridSize + c;
+      const t = grid[r][c];
+      if (t < 0 || !isMatch[key] || used.has(key)) { r++; continue; }
+      let len = 1;
+      while (r + len < gridSize && grid[r + len][c] === t && isMatch[(r + len) * gridSize + c]) len++;
+      if (len >= 3) total += len === 3 ? SCORE_3 : len === 4 ? SCORE_4 : SCORE_5P;
+      r += len;
+    }
+  }
+  return total;
+}
+
 function afterCascade() {
   if (levelScore >= levelTarget) {
     sndWin(); saveGame(); showModal('🎉 Уровень пройден!', `Очки: ${levelScore}`, 'Далее', () => {
-      if (currentLevel < LEVELS.length - 1) { currentLevel++; totalScore = Math.max(totalScore, levelScore); startLevel(); }
+      if (currentLevel < LEVELS.length - 1) { currentLevel++; startLevel(); }
       else showVictory();
     }, 'win');
   } else if (movesLeft <= 0) {
@@ -346,41 +446,6 @@ function afterCascade() {
   } else {
     locked = false;
   }
-}
-
-function groupMatches(matches) {
-  const groups = [], used = new Set();
-  for (const m of matches) {
-    const key = m.r * gridSize + m.c;
-    if (used.has(key)) continue;
-    const g = [m]; used.add(key);
-    // extend horizontally
-    for (let dc = 1; m.c + dc < gridSize && grid[m.r][m.c+dc] === grid[m.r][m.c]; dc++) {
-      const k = m.r * gridSize + (m.c + dc);
-      if (!used.has(k) && matches.some(x => x.r === m.r && x.c === m.c + dc)) { g.push({r:m.r,c:m.c+dc}); used.add(k); }
-    }
-    for (let dc = 1; m.c - dc >= 0 && grid[m.r][m.c-dc] === grid[m.r][m.c]; dc++) {
-      const k = m.r * gridSize + (m.c - dc);
-      if (!used.has(k) && matches.some(x => x.r === m.r && x.c === m.c - dc)) { g.push({r:m.r,c:m.c-dc}); used.add(k); }
-    }
-    if (g.length >= 3) groups.push(g);
-  }
-  // vertical groups
-  for (const m of matches) {
-    const key = m.r * gridSize + m.c;
-    if (used.has(key)) continue;
-    const g = [m]; used.add(key);
-    for (let dr = 1; m.r + dr < gridSize && grid[m.r+dr][m.c] === grid[m.r][m.c]; dr++) {
-      const k = (m.r + dr) * gridSize + m.c;
-      if (!used.has(k) && matches.some(x => x.r === m.r + dr && x.c === m.c)) { g.push({r:m.r+dr,c:m.c}); used.add(k); }
-    }
-    for (let dr = 1; m.r - dr >= 0 && grid[m.r-dr][m.c] === grid[m.r][m.c]; dr++) {
-      const k = (m.r - dr) * gridSize + m.c;
-      if (!used.has(k) && matches.some(x => x.r === m.r - dr && x.c === m.c)) { g.push({r:m.r-dr,c:m.c}); used.add(k); }
-    }
-    if (g.length >= 3) groups.push(g);
-  }
-  return groups;
 }
 
 function applyGravity() {
