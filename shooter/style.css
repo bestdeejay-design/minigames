@@ -5,10 +5,10 @@ body { background: #0a0a1a; color: #eee; font-family: system-ui, -apple-system, 
 
 #hud {
   display: flex; justify-content: space-around; align-items: center;
-  padding: 6px 10px; background: #0a0a1a; font-size: 0.8rem; flex-shrink: 0;
+  padding: 5px 8px; background: #0a0a1a; font-size: 0.8rem; flex-shrink: 0;
   border-bottom: 1px solid #1a1a3a;
 }
-#hud #wave-label { color: #e94560; font-weight: bold; font-size: 0.75rem; }
+#hud #wlevel { color: #ffd700; font-weight: bold; }
 
 canvas { display: block; width: 100%; flex: 1; touch-action: none; }
 
