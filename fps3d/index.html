@@ -77,6 +77,7 @@ canvas{display:block}
   <div class="keys">
     <span class="key">W</span>
     <span class="key">A S D</span>
+    <span class="key">← →</span>
     <span class="key">Пробел</span>
     <span class="key">R</span>
   </div>
@@ -119,6 +120,7 @@ const L = 30, W = 7, H = 4;
 let scene,camera,renderer,clock;
 let hp=100,score=0,wave=0,alive=true;
 let enemies=[];
+let flickerLights=[];
 let keys={w:false,a:false,s:false,d:false};
 let locked=false;
 let ammo=12,maxAmmo=12,reloading=false,reloadTimer=0;
@@ -243,7 +245,7 @@ function init(){
   scene.add(new THREE.AmbientLight(0x1a1a2e,.5));
   for(let z=-L/2+2;z<L/2-2;z+=5){
     const pl=new THREE.PointLight(0x4444aa,.4,6);
-    pl.position.set(0,hh-.3,z);scene.add(pl);
+    pl.position.set(0,hh-.3,z);scene.add(pl);flickerLights.push(pl);
   }
   const dl=new THREE.DirectionalLight(0x6666cc,.15);
   dl.position.set(0,10,0);scene.add(dl);
@@ -265,9 +267,13 @@ function init(){
   });
   document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===renderer.domElement});
   document.addEventListener('keydown',e=>{
-    const k=e.key.toLowerCase();
-    if(k=='r'&&alive&&!gameOver)startReload();
+    const k=e.key;
+    if(k.toLowerCase()=='r'&&alive&&!gameOver)startReload();
     if(k=='w'||k=='a'||k=='s'||k=='d')keys[k]=true;
+    if(k=='ArrowLeft')camera.rotation.y+=.12;
+    if(k=='ArrowRight')camera.rotation.y-=.12;
+    if(k=='q')camera.rotation.y+=.08;
+    if(k=='e')camera.rotation.y-=.08;
     if(k==' '){e.preventDefault();shoot()}
   });
   document.addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k=='w'||k=='a'||k=='s'||k=='d')keys[k]=false});
@@ -499,6 +505,11 @@ function animate(){
   for(const e of enemies){
     if(!e.alive)continue;
     e.mesh.material.emissiveIntensity=.3+Math.sin(Date.now()*.006+e.mesh.position.x)*.2;
+  }
+  for(const fl of flickerLights){
+    const flicker=Math.sin(Date.now()*.017+fl.position.z*2)*.25+.75;
+    const bump=Math.sin(Date.now()*.031+fl.position.z*3)*.15;
+    fl.intensity=(.3+Math.random()*.1)*(flicker+bump);
   }
   renderer.render(scene,camera);
 }
