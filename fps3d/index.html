@@ -59,6 +59,7 @@ canvas{display:block}
 #ammo-display{position:absolute;bottom:80px;right:24px;color:#fff;font-size:1rem;font-weight:700;background:rgba(0,0,0,.3);padding:5px 12px;border-radius:8px;backdrop-filter:blur(4px)}
 #reload-hint{position:absolute;bottom:58px;right:24px;color:#e74c3c;font-size:.65rem;opacity:0;transition:opacity .25s;background:rgba(0,0,0,.3);padding:3px 8px;border-radius:5px}
 #damage-overlay{position:fixed;inset:0;z-index:9;pointer-events:none;background:radial-gradient(ellipse at center,transparent 50%,rgba(255,0,0,0));opacity:0;transition:opacity .1s}
+#lightning-overlay{position:fixed;inset:0;z-index:8;pointer-events:none;background:#fff;opacity:0;transition:opacity .03s;mix-blend-mode:overlay}
 #hit-crosshair{position:fixed;inset:0;z-index:11;pointer-events:none;opacity:0;transition:opacity .08s;display:flex;align-items:center;justify-content:center}
 #hit-crosshair span{display:block;width:60px;height:60px;border:3px solid #ff4444;border-radius:50%;transform:scale(0.5);transition:transform .1s}
 
@@ -68,6 +69,7 @@ canvas{display:block}
 <body>
 
 <div id="damage-overlay"></div>
+<div id="lightning-overlay"></div>
 <div id="hit-crosshair"><span></span></div>
 
 <div id="start-screen">
@@ -121,6 +123,7 @@ let scene,camera,renderer,clock;
 let hp=100,score=0,wave=0,alive=true;
 let enemies=[];
 let flickerLights=[];
+let lightningLight,lightningTimer=3+Math.random()*5;
 let keys={w:false,a:false,s:false,d:false};
 let locked=false;
 let ammo=12,maxAmmo=12,reloading=false,reloadTimer=0;
@@ -171,6 +174,21 @@ function beep(type){
       g.gain.setValueAtTime(.08,c.currentTime);
       g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.25);
       o.start(c.currentTime);o.stop(c.currentTime+.25);
+    }else if(type=='thunder'){
+      const osc2=c.createOscillator();osc2.type='sawtooth';
+      osc2.frequency.setValueAtTime(60,c.currentTime);
+      osc2.frequency.exponentialRampToValueAtTime(30,c.currentTime+.3);
+      const g2=c.createGain();g2.gain.setValueAtTime(.15,c.currentTime);
+      g2.gain.exponentialRampToValueAtTime(.001,c.currentTime+.3);
+      osc2.connect(g2);g2.connect(c.destination);
+      osc2.start(c.currentTime);osc2.stop(c.currentTime+.3);
+      const o2=c.createOscillator();o2.type='sine';
+      o2.frequency.setValueAtTime(80,c.currentTime);
+      o2.frequency.exponentialRampToValueAtTime(20,c.currentTime+.2);
+      const g3=c.createGain();g3.gain.setValueAtTime(.1,c.currentTime);
+      g3.gain.exponentialRampToValueAtTime(.001,c.currentTime+.2);
+      o2.connect(g3);g3.connect(c.destination);
+      o2.start(c.currentTime);o2.stop(c.currentTime+.2);
     }
   }catch(e){}
 }
@@ -249,6 +267,9 @@ function init(){
   }
   const dl=new THREE.DirectionalLight(0x6666cc,.15);
   dl.position.set(0,10,0);scene.add(dl);
+
+  lightningLight=new THREE.PointLight(0xffffff,0,20);
+  lightningLight.position.set(0,3,0);scene.add(lightningLight);
 
   const g=new THREE.Group();
   const bm=new THREE.MeshStandardMaterial({color:0x2a2a3a,roughness:.4,metalness:.5});
@@ -510,6 +531,27 @@ function animate(){
     const flicker=Math.sin(Date.now()*.017+fl.position.z*2)*.25+.75;
     const bump=Math.sin(Date.now()*.031+fl.position.z*3)*.15;
     fl.intensity=(.3+Math.random()*.1)*(flicker+bump);
+  }
+  lightningTimer-=dt;
+  if(lightningTimer<=0){
+    lightningLight.intensity=3+Math.random()*2;
+    document.getElementById('lightning-overlay').style.opacity='.15';
+    beep('thunder');
+    setTimeout(()=>{
+      lightningLight.intensity=0;
+      document.getElementById('lightning-overlay').style.opacity='0';
+    },80+Math.random()*60);
+    if(Math.random()<.3){
+      setTimeout(()=>{
+        lightningLight.intensity=2+Math.random()*2;
+        document.getElementById('lightning-overlay').style.opacity='.1';
+        setTimeout(()=>{
+          lightningLight.intensity=0;
+          document.getElementById('lightning-overlay').style.opacity='0';
+        },40+Math.random()*40);
+      },100+Math.random()*200);
+    }
+    lightningTimer=4+Math.random()*8;
   }
   renderer.render(scene,camera);
 }
