@@ -349,6 +349,7 @@ function shoot(){
   const r=new THREE.Raycaster();
   r.setFromCamera({x:0,y:0},camera);
   let hit=null,hitD=Infinity;
+
   for(const e of enemies){
     if(!e.alive)continue;
     const d=camera.position.distanceTo(e.mesh.position);
@@ -357,6 +358,18 @@ function shoot(){
       if(r.ray.intersectsBox(b)&&d<hitD){hit=e;hitD=d;}
     }
   }
+
+  if(!hit){
+    const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+    for(const e of enemies){
+      if(!e.alive)continue;
+      const dir=new THREE.Vector3().copy(e.mesh.position).sub(camera.position).normalize();
+      const angle=fwd.angleTo(dir);
+      const d=camera.position.distanceTo(e.mesh.position);
+      if(angle<.4&&d<hitD){hit=e;hitD=d;}
+    }
+  }
+
   if(hit){
     hit.hp-=33;beep('hit');
     hit.mesh.material.color.setHex(0xff4444);
