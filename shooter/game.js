@@ -18,17 +18,15 @@ function calcSizes() {
   PW = cw * 0.075; PH = PW * 1.35;
   EW = cw * 0.065; EH = EW * 1.0;
 }
-const NUM_TREES = 16, NUM_ROCKS = 8, NUM_LAKES = 2;
 
 // ─── State ──────────────────────────────────────────────
 let score = 0, lives = 3, wlevel = 1;
 let player = { x: 0, y: 0 };
 let bullets = [], enemyBullets = [];
 let enemies = [], pickups = [], particles = [], paras = [];
-let stars = [], terrainFeatures = [];
+let stars = [];
 let gameOver = false, gameState = 'playing';
 let frameId = 0, fireTimer = 0, invulnTimer = 0;
-let scrollY = 0, groundY = 0;
 let spawnTimer = 0, paraDropTimer = 0;
 let touchX = null, touchY = null;
 let animId = null;
@@ -47,104 +45,261 @@ function weaponConfig(lvl) {
   return cfg;
 }
 
-// ─── Player ─────────────────────────────────────────────
+// ─── Player — X-wing ────────────────────────────────────
 function drawShip(x, y) {
   ctx.save();
   if (invulnTimer > 0 && Math.floor(invulnTimer / 80) % 2 === 0) ctx.globalAlpha = 0.3;
-  ctx.fillStyle = '#4af';
+  const hw = PW / 2, hh = PH / 2;
+
+  // Engine glow
+  ctx.fillStyle = `rgba(255,160,50,${0.15 + 0.12 * Math.sin(frameId * 0.2)})`;
   ctx.beginPath();
-  ctx.moveTo(x, y - PH / 2);
-  ctx.lineTo(x - PW / 2, y + PH / 2);
-  ctx.lineTo(x + PW / 2, y + PH / 2);
-  ctx.closePath();
+  ctx.ellipse(x, y + hh * 0.6, PW * 0.35, PH * 0.12, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = 'rgba(150,220,255,0.4)';
+
+  // S-foils in attack position
+  ctx.fillStyle = '#b0b8c0';
+  ctx.strokeStyle = '#889098';
+  ctx.lineWidth = 0.5;
+  // Top-left wing
   ctx.beginPath();
-  ctx.moveTo(x, y - PH / 3);
-  ctx.lineTo(x - PW / 4, y + PH / 6);
-  ctx.lineTo(x + PW / 4, y + PH / 6);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#38d';
-  ctx.fillRect(x - PW / 2 - 2, y + PH / 6, 2, PH / 5);
-  ctx.fillRect(x + PW / 2, y + PH / 6, 2, PH / 5);
-  if (frameId % 6 < 3) {
-    ctx.fillStyle = 'rgba(255,200,50,0.5)';
-    ctx.beginPath();
-    ctx.moveTo(x - PW / 4, y + PH / 2);
-    ctx.lineTo(x, y + PH / 2 + 5);
-    ctx.lineTo(x + PW / 4, y + PH / 2);
-    ctx.closePath();
-    ctx.fill();
+  ctx.moveTo(x - hw * 0.15, y - hh * 0.05);
+  ctx.lineTo(x - hw * 0.85, y - hh * 0.25);
+  ctx.lineTo(x - hw * 0.8, y + hh * 0.15);
+  ctx.lineTo(x - hw * 0.15, y + hh * 0.1);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Top-right wing
+  ctx.beginPath();
+  ctx.moveTo(x + hw * 0.15, y - hh * 0.05);
+  ctx.lineTo(x + hw * 0.85, y - hh * 0.25);
+  ctx.lineTo(x + hw * 0.8, y + hh * 0.15);
+  ctx.lineTo(x + hw * 0.15, y + hh * 0.1);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Bottom-left wing
+  ctx.beginPath();
+  ctx.moveTo(x - hw * 0.15, y + hh * 0.2);
+  ctx.lineTo(x - hw * 0.78, y + hh * 0.05);
+  ctx.lineTo(x - hw * 0.72, y + hh * 0.5);
+  ctx.lineTo(x - hw * 0.15, y + hh * 0.35);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Bottom-right wing
+  ctx.beginPath();
+  ctx.moveTo(x + hw * 0.15, y + hh * 0.2);
+  ctx.lineTo(x + hw * 0.78, y + hh * 0.05);
+  ctx.lineTo(x + hw * 0.72, y + hh * 0.5);
+  ctx.lineTo(x + hw * 0.15, y + hh * 0.35);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // Wingtip exhausts
+  ctx.fillStyle = `rgba(255,180,60,${0.25 + 0.15 * Math.sin(frameId * 0.12)})`;
+  for (const [ex, ey] of [[x - hw * 0.78, y + hh * 0.08], [x + hw * 0.78, y + hh * 0.08],
+                           [x - hw * 0.71, y + hh * 0.48], [x + hw * 0.71, y + hh * 0.48]]) {
+    ctx.fillRect(ex - 2, ey, 4, 5);
   }
+
+  // Fuselage
+  ctx.fillStyle = '#c8d0d8';
+  roundRect(ctx, x - hw * 0.18, y - hh * 0.25, PW * 0.36, PH * 0.65, 3);
+  ctx.fill();
+  ctx.strokeStyle = '#889098';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+
+  // Nose cone
+  ctx.fillStyle = '#a0a8b0';
+  ctx.beginPath();
+  ctx.moveTo(x - hw * 0.14, y - hh * 0.25);
+  ctx.lineTo(x, y - hh * 0.55);
+  ctx.lineTo(x + hw * 0.14, y - hh * 0.25);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // Cockpit
+  ctx.fillStyle = '#3a9fd4';
+  ctx.beginPath();
+  ctx.ellipse(x, y - hh * 0.05, hw * 0.08, hh * 0.12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(150,220,255,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(x - hw * 0.02, y - hh * 0.07, hw * 0.04, hh * 0.06, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // R2
+  ctx.fillStyle = '#eee';
+  ctx.beginPath();
+  ctx.arc(x + hw * 0.14, y + hh * 0.05, hw * 0.06, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#3a9fd4';
+  ctx.beginPath();
+  ctx.arc(x + hw * 0.14, y + hh * 0.05, hw * 0.03, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.restore();
 }
 
 // ─── Enemies ────────────────────────────────────────────
+
+function hexPath(cx, cy, rx, ry) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 3 * i - Math.PI / 6;
+    const px = cx + Math.cos(a) * rx;
+    const py = cy + Math.sin(a) * ry;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
 function drawTank(e) {
-  const x = e.x, y = e.y;
-  ctx.fillStyle = '#5a5a3a';
-  roundRect(ctx, x - e.w / 2, y - e.h / 2, e.w, e.h, 3);
+  const x = e.x, y = e.y, hw = e.w / 2, hh = e.h / 2;
+  // Lambda-class shuttle — delta shape from top
+  ctx.fillStyle = '#667';
+  ctx.beginPath();
+  ctx.moveTo(x, y - hh);           // nose
+  ctx.lineTo(x - hw * 1.2, y + hh); // left wingtip
+  ctx.lineTo(x + hw * 1.2, y + hh); // right wingtip
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#445';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+  // Center body
+  ctx.fillStyle = '#778';
+  ctx.fillRect(x - hw * 0.3, y - hh * 0.5, hw * 0.6, hh * 1.2);
+  // Cockpit
+  ctx.fillStyle = '#4af';
+  ctx.beginPath();
+  ctx.arc(x, y - hh * 0.3, hw * 0.15, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#4a4a2a';
-  ctx.fillRect(x - e.w * 0.15, y - e.h / 2 - 4, e.w * 0.3, 6);
-  ctx.fillRect(x + e.w * 0.05, y - e.h / 2 - 2, 3, 6);
-  if (e.hp > 1) { ctx.fillStyle = '#f44'; ctx.fillRect(x - e.w / 3, y + e.h / 2 - 5, e.w * 0.3, 3); }
+  // Engine glow
+  ctx.fillStyle = `rgba(255,100,50,${0.2 + 0.1 * Math.sin(frameId * 0.15)})`;
+  ctx.fillRect(x - hw * 0.9, y + hh - 4, hw * 0.5, 4);
+  ctx.fillRect(x + hw * 0.4, y + hh - 4, hw * 0.5, 4);
+  if (e.hp > 1) {
+    ctx.fillStyle = '#f44';
+    ctx.fillRect(x - hw * 0.25, y + hh - 3, hw * 0.5, 3);
+  }
 }
 
 function drawTurret(e) {
-  const x = e.x, y = e.y;
-  ctx.fillStyle = '#666';
-  ctx.fillRect(x - e.w / 2, y - e.h / 2, e.w, e.h);
+  const x = e.x, y = e.y, hw = e.w / 2, hh = e.h / 2;
+  // Turbolaser tower
   ctx.fillStyle = '#555';
+  ctx.fillRect(x - hw * 0.4, y - hh * 0.6, hw * 0.8, hh * 1.2);
+  // Dish
+  ctx.fillStyle = '#666';
   ctx.beginPath();
-  ctx.arc(x, y, e.w * 0.3, 0, Math.PI * 2);
+  ctx.arc(x, y - hh * 0.6, hw * 0.5, Math.PI, 0);
   ctx.fill();
   ctx.fillStyle = '#888';
-  ctx.fillRect(x - 2, y - e.h / 2 - 6, 4, 8);
+  ctx.beginPath();
+  ctx.arc(x, y - hh * 0.6, hw * 0.25, Math.PI, 0);
+  ctx.fill();
+  // Barrel
+  ctx.fillStyle = '#777';
+  ctx.fillRect(x - 2, y - hh * 0.6 - 6, 4, 8);
+  // Base
+  ctx.fillStyle = '#444';
+  ctx.fillRect(x - hw * 0.5, y + hh * 0.5, hw, 5);
+  // Glow
+  ctx.fillStyle = `rgba(255,50,50,${0.15 + 0.1 * Math.sin(frameId * 0.1)})`;
+  ctx.beginPath();
+  ctx.arc(x, y - hh * 0.6 - 6, 4, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawFighter(e) {
-  const x = e.x, y = e.y;
-  ctx.fillStyle = e.color || '#c33';
-  ctx.beginPath();
-  ctx.moveTo(x, y + e.h / 2);
-  ctx.lineTo(x - e.w / 2, y - e.h / 2);
-  ctx.lineTo(x + e.w / 2, y - e.h / 2);
-  ctx.closePath();
+  const x = e.x, y = e.y, hw = e.w / 2, hh = e.h / 2;
+  ctx.strokeStyle = '#1a1a1e';
+  ctx.lineWidth = 0.5;
+  // TIE Fighter
+  // Left wing panels
+  ctx.fillStyle = '#2a2a2e';
+  hexPath(x - hw * 0.75, y, hw * 0.65, hh * 0.75);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#1a1a1e';
+  hexPath(x - hw * 0.75, y, hw * 0.45, hh * 0.55);
   ctx.fill();
-  ctx.fillStyle = 'rgba(255,200,50,0.4)';
+  // Right wing panels
+  ctx.fillStyle = '#2a2a2e';
+  hexPath(x + hw * 0.75, y, hw * 0.65, hh * 0.75);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#1a1a1e';
+  hexPath(x + hw * 0.75, y, hw * 0.45, hh * 0.55);
+  ctx.fill();
+  // Struts connecting wings
+  ctx.fillStyle = '#333';
+  ctx.fillRect(x - hw * 0.4, y - 1, hw * 0.8, 2);
+  // Ball cockpit
+  ctx.fillStyle = '#222';
   ctx.beginPath();
-  ctx.arc(x, y + e.h * 0.1, e.w * 0.12, 0, Math.PI * 2);
+  ctx.arc(x, y, hw * 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#444';
+  ctx.beginPath();
+  ctx.arc(x, y, hw * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+  // Window
+  ctx.fillStyle = '#4af';
+  ctx.beginPath();
+  ctx.arc(x, y, hw * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawBomber(e) {
+  const x = e.x, y = e.y, hw = e.w / 2, hh = e.h / 2;
+  // TIE Bomber — bulkier, longer wings
+  ctx.fillStyle = '#2d2d30';
+  // Left wing
+  ctx.beginPath();
+  ctx.moveTo(x - hw * 0.1, y - hh);
+  ctx.lineTo(x - hw * 1.0, y - hh * 0.6);
+  ctx.lineTo(x - hw * 1.0, y + hh * 0.6);
+  ctx.lineTo(x - hw * 0.1, y + hh);
+  ctx.closePath(); ctx.fill();
+  // Right wing
+  ctx.beginPath();
+  ctx.moveTo(x + hw * 0.1, y - hh);
+  ctx.lineTo(x + hw * 1.0, y - hh * 0.6);
+  ctx.lineTo(x + hw * 1.0, y + hh * 0.6);
+  ctx.lineTo(x + hw * 0.1, y + hh);
+  ctx.closePath(); ctx.fill();
+  // Body
+  ctx.fillStyle = '#333';
+  ctx.fillRect(x - hw * 0.2, y - hh * 0.5, hw * 0.4, hh);
+  // Bomb bay
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(x - hw * 0.1, y, hw * 0.2, hh * 0.4);
+  // Cockpit
+  ctx.fillStyle = '#4af';
+  ctx.beginPath();
+  ctx.arc(x, y - hh * 0.3, hw * 0.1, 0, Math.PI * 2);
   ctx.fill();
 }
 
 function drawPara(p) {
   const x = p.x, y = p.y;
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  // Escape pod
+  ctx.fillStyle = '#777';
   ctx.beginPath();
-  ctx.arc(x, y - 6, 7, Math.PI, 0);
+  ctx.ellipse(x, y, 4, 6, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#fff';
+  // Heat shield
+  ctx.fillStyle = '#555';
   ctx.beginPath();
-  ctx.moveTo(x - 7, y - 6);
-  ctx.lineTo(x - 3, y);
-  ctx.lineTo(x + 3, y);
-  ctx.lineTo(x + 7, y - 6);
-  ctx.closePath();
+  ctx.arc(x, y + 4, 4, Math.PI, 0);
   ctx.fill();
-  ctx.strokeStyle = '#999';
-  ctx.lineWidth = 0.5;
-  for (const sx of [-4, 0, 4]) {
-    ctx.beginPath();
-    ctx.moveTo(x + sx, y);
-    ctx.lineTo(x + sx, y + 8);
-    ctx.stroke();
-  }
+  // Window
+  ctx.fillStyle = '#4af';
+  ctx.beginPath();
+  ctx.arc(x, y - 1, 2, 0, Math.PI * 2);
+  ctx.fill();
+  // Retro thrusters
+  ctx.fillStyle = 'rgba(255,150,50,0.4)';
+  ctx.fillRect(x - 3, y + 5, 2, 3);
+  ctx.fillRect(x + 1, y + 5, 2, 3);
   ctx.fillStyle = '#ffd700';
-  ctx.font = '5px sans-serif';
+  ctx.font = '4px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('✦', x, y + 6);
+  ctx.fillText('✦', x, y - 7);
 }
 
 // ─── Pickups ────────────────────────────────────────────
@@ -197,101 +352,16 @@ function burst(x, y, color, n) {
   }
 }
 
-// ─── Ground ─────────────────────────────────────────────
-
-function drawGround(scroll) {
-  // Вид сверху — тёмная трава с сеткой, скроллится
-  ctx.fillStyle = '#1a3a1a';
+// ─── Background — Space ─────────────────────────────────
+function drawBackground() {
+  ctx.fillStyle = '#06060e';
   ctx.fillRect(0, 0, cw, ch);
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-  ctx.lineWidth = 1;
-  const step = 40;
-  for (let x = 0; x < cw + step; x += step) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ch); ctx.stroke();
-  }
-  for (let y = -step + scroll % step; y < ch + step; y += step) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke();
-  }
-  // Случайные тёмные пятна (кусты/камни)
-  ctx.fillStyle = 'rgba(0,0,0,0.05)';
-  for (let i = 0; i < 8; i++) {
-    const px = (i * 97 + scroll * 0.5) % cw;
-    const py = (i * 53 + scroll) % ch;
+  for (const s of stars) {
+    const a = 0.3 + 0.7 * (s.s - 0.3);
+    ctx.fillStyle = `rgba(255,255,255,${a})`;
     ctx.beginPath();
-    ctx.arc(px, py, 6 + (i % 3) * 4, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, s.s * 0.6, 0, Math.PI * 2);
     ctx.fill();
-  }
-}
-function groundTop() { return 0; }
-
-// ─── Terrain Features ────────────────────────────────────
-function initTerrain() {
-  terrainFeatures = [];
-  for (let i = 0; i < NUM_TREES; i++) {
-    terrainFeatures.push({
-      type: 'tree', x: Math.random() * cw, y: Math.random() * ch,
-      size: 0.7 + Math.random() * 0.6, shade: Math.random() * 0.3
-    });
-  }
-  for (let i = 0; i < NUM_ROCKS; i++) {
-    terrainFeatures.push({
-      type: 'rock', x: Math.random() * cw, y: Math.random() * ch,
-      size: 0.6 + Math.random() * 0.8, shade: Math.random() * 0.3
-    });
-  }
-  for (let i = 0; i < NUM_LAKES; i++) {
-    terrainFeatures.push({
-      type: 'lake', x: Math.random() * cw, y: Math.random() * ch,
-      w: 40 + Math.random() * 40, h: 25 + Math.random() * 25,
-      hasShip: Math.random() < 0.5
-    });
-  }
-}
-
-function drawTree(f) {
-  const s = f.size, x = f.x, y = f.y;
-  ctx.fillStyle = '#5a3a1a';
-  ctx.fillRect(x - 1.5 * s, y - 4 * s, 3 * s, 10 * s);
-  ctx.fillStyle = `rgb(${30 - f.shade * 20}, ${80 - f.shade * 20}, ${30 - f.shade * 20})`;
-  ctx.beginPath(); ctx.arc(x, y - 12 * s, 10 * s, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = `rgb(${38 - f.shade * 20}, ${100 - f.shade * 20}, ${38 - f.shade * 20})`;
-  ctx.beginPath(); ctx.arc(x - 3 * s, y - 8 * s, 7 * s, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x + 4 * s, y - 9 * s, 8 * s, 0, Math.PI * 2); ctx.fill();
-}
-
-function drawRock(f) {
-  const s = f.size, x = f.x, y = f.y;
-  const b = 100 + Math.floor(f.shade * 60);
-  ctx.fillStyle = `rgb(${b}, ${b - 10}, ${b - 20})`;
-  ctx.beginPath(); ctx.ellipse(x, y, 8 * s, 6 * s, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = `rgb(${b + 30}, ${b + 20}, ${b + 10})`;
-  ctx.beginPath(); ctx.ellipse(x - 2 * s, y - 2 * s, 4 * s, 3 * s, 0.1, 0, Math.PI * 2); ctx.fill();
-}
-
-function drawLake(f) {
-  const x = f.x, y = f.y, w = f.w, h = f.h;
-  ctx.fillStyle = 'rgba(30,80,150,0.35)';
-  ctx.beginPath(); ctx.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(50,120,200,0.2)';
-  ctx.beginPath(); ctx.ellipse(x - w * 0.08, y - h * 0.08, w * 0.4, h * 0.35, 0, 0, Math.PI * 2); ctx.fill();
-  if (f.hasShip) {
-    const sx = x + Math.sin(frameId * 0.02 + f.x) * 3;
-    const sy = y + Math.cos(frameId * 0.03 + f.y) * 2;
-    ctx.fillStyle = '#5a3a1a';
-    ctx.beginPath(); ctx.moveTo(sx - 6, sy + 2); ctx.lineTo(sx + 6, sy + 2);
-    ctx.lineTo(sx + 4, sy + 5); ctx.lineTo(sx - 4, sy + 5); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ddd';
-    ctx.beginPath();
-    ctx.moveTo(sx, sy + 2); ctx.lineTo(sx, sy - 6); ctx.lineTo(sx + 5, sy - 1); ctx.closePath(); ctx.fill();
-  }
-}
-
-function drawTerrain() {
-  for (const f of terrainFeatures) {
-    if (f.y < -80 || f.y > ch + 80) continue;
-    if (f.type === 'tree') drawTree(f);
-    else if (f.type === 'rock') drawRock(f);
-    else if (f.type === 'lake') drawLake(f);
   }
 }
 
@@ -303,12 +373,12 @@ function spawnEnemy() {
   } else if (r < 0.45) {
     enemies.push({ type: 'turret', x: 10 + Math.random() * (cw - 20), y: -20, w: 16, h: 18, hp: 1, shootTimer: 30 + Math.random() * 40 });
   } else {
-    enemies.push({ type: 'fighter', x: Math.random() * cw, y: -20, w: EW, h: EH, hp: 1, vx: (Math.random() - 0.5) * 1.2, vy: 0, color: ['#c33','#c90','#a5a'][Math.floor(Math.random()*3)], shootTimer: 40 + Math.random() * 60 });
+    enemies.push({ type: 'fighter', x: Math.random() * cw, y: -20, w: EW, h: EH, hp: 1, vx: (Math.random() - 0.5) * 1.2, vy: 0, shootTimer: 40 + Math.random() * 60 });
   }
 }
 
 function tryDropPara() {
-  enemies.push({ type: 'bomber', x: Math.random() * cw, y: -20, w: EW * 1.3, h: EH * 0.8, hp: 3, vx: (Math.random() - 0.5) * 1, vy: 0.8, dropTimer: 30, color: '#884400' });
+  enemies.push({ type: 'bomber', x: Math.random() * cw, y: -20, w: EW * 1.3, h: EH * 0.8, hp: 3, vx: (Math.random() - 0.5) * 1, vy: 0.8, dropTimer: 30 });
 }
 
 // ─── Game Loop ─────────────────────────────────────────
@@ -328,11 +398,11 @@ function resetGame() {
   bullets = []; enemyBullets = []; enemies = []; pickups = []; particles = []; paras = [];
   lives = 3; score = 0; wlevel = 1;
   gameOver = false; frameId = 0; fireTimer = 0; invulnTimer = 0;
-  scrollY = 0; spawnTimer = 0; paraDropTimer = 0;
+  spawnTimer = 0; paraDropTimer = 0;
   touchX = null; touchY = null;
   overlay.classList.add('hidden');
   if (animId) { cancelAnimationFrame(animId); animId = null; }
-  initTerrain();
+  initStars();
   loop();
 }
 
@@ -342,18 +412,7 @@ function loop() {
   const dt = 1;
 
   if (invulnTimer > 0) invulnTimer -= dt;
-  scrollY += 0.8;
 
-  for (const f of terrainFeatures) {
-    f.y += 0.8;
-    if (f.y > ch + 80) {
-      f.y = -80 - Math.random() * 40;
-      f.x = 20 + Math.random() * (cw - 40);
-      if (f.type === 'lake') { f.w = 40 + Math.random() * 40; f.h = 25 + Math.random() * 25; f.hasShip = Math.random() < 0.5; }
-      else if (f.type === 'tree') { f.size = 0.7 + Math.random() * 0.6; f.shade = Math.random() * 0.3; }
-      else if (f.type === 'rock') { f.size = 0.6 + Math.random() * 0.8; f.shade = Math.random() * 0.3; }
-    }
-  }
   for (const s of stars) { s.y += s.sp; if (s.y > ch) { s.y = -2; s.x = Math.random() * cw; } }
 
   // Player follow touch
@@ -404,7 +463,7 @@ function loop() {
     if (frameId > 300 && Math.random() < 0.08) tryDropPara();
   }
 
-  // Move enemies — скорость растёт с каждыми 1000 очков
+  // Move enemies
   const speedBonus = Math.floor(score / 1000) * 0.1;
   const scrollSpeed = Math.min(0.6 + speedBonus, 1.8);
   for (let i = enemies.length - 1; i >= 0; i--) {
@@ -455,7 +514,7 @@ function loop() {
       if (Math.abs(b.x - e.x) < e.w / 2 + 3 && Math.abs(b.y - e.y) < e.h / 2 + 4) {
         bullets.splice(i, 1);
         e.hp -= b.dmg;
-        burst(e.x, e.y, '#ff0', 4);
+        burst(e.x, e.y, '#0f0', 4);
         if (e.hp <= 0) {
           score += 10 + frameId * 0.05;
           burst(e.x, e.y, '#f44', 12);
@@ -470,7 +529,7 @@ function loop() {
     }
   }
 
-  // Enemy/para bullet → player
+  // Enemy bullets → player
   if (invulnTimer <= 0) {
     for (let i = enemyBullets.length - 1; i >= 0; i--) {
       const b = enemyBullets[i];
@@ -530,23 +589,29 @@ function hitPlayer() {
 
 function draw() {
   ctx.clearRect(0, 0, cw, ch);
-  drawGround(scrollY);
-  drawTerrain();
+  drawBackground();
 
   for (const p of pickups) drawPickup(p);
   for (const p of paras) drawPara(p);
   for (const b of enemyBullets) {
-    ctx.fillStyle = '#ff6644';
+    ctx.fillStyle = '#ff3333';
+    ctx.shadowColor = '#ff3333';
+    ctx.shadowBlur = 6;
     ctx.fillRect(b.x - 1.5, b.y - 2.5, 3, 5);
+    ctx.shadowBlur = 0;
   }
   for (const e of enemies) {
     if (e.type === 'tank') drawTank(e);
     else if (e.type === 'turret') drawTurret(e);
+    else if (e.type === 'bomber') drawBomber(e);
     else drawFighter(e);
   }
   for (const b of bullets) {
-    ctx.fillStyle = b.dmg > 1 ? '#ffaa00' : '#4eff4e';
+    ctx.fillStyle = b.dmg > 1 ? '#ffaa00' : '#33ff33';
+    ctx.shadowColor = b.dmg > 1 ? '#ffaa00' : '#33ff33';
+    ctx.shadowBlur = 6;
     ctx.fillRect(b.x - 1.5, b.y - 4, 3, 8);
+    ctx.shadowBlur = 0;
   }
   for (const p of particles) {
     ctx.globalAlpha = p.life / p.max;
@@ -575,7 +640,7 @@ function roundRect(ctx, x, y, w, h, r) {
 
 function initStars() {
   stars = [];
-  for (let i = 0; i < 30; i++) stars.push({ x: Math.random() * cw, y: Math.random() * ch, s: 0.5 + Math.random() * 1.5, sp: 0.3 + Math.random() * 0.6 });
+  for (let i = 0; i < 40; i++) stars.push({ x: Math.random() * cw, y: Math.random() * ch, s: 0.4 + Math.random() * 1.8, sp: 0.2 + Math.random() * 0.8 });
 }
 
 function updateHUD() {
@@ -625,12 +690,10 @@ function resize() {
   canvas.style.height = ch + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   calcSizes();
-  initTerrain();
   initStars();
 }
 window.addEventListener('resize', resize);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 
 // ─── Start ──────────────────────────────────────────────
-initStars();
 resetGame();
