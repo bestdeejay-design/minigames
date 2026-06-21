@@ -21,6 +21,7 @@ function calcSizes() {
 
 // ─── State ──────────────────────────────────────────────
 let score = 0, lives = 3, wlevel = 1;
+let shield = 100, maxShield = 100, shieldCooldown = 0;
 let player = { x: 0, y: 0 };
 let bullets = [], enemyBullets = [];
 let enemies = [], pickups = [], particles = [], paras = [];
@@ -132,6 +133,19 @@ function drawShip(x, y) {
   ctx.beginPath();
   ctx.arc(x + hw * 0.14, y + hh * 0.05, hw * 0.03, 0, Math.PI * 2);
   ctx.fill();
+
+  // Shield glow
+  if (shield > 0) {
+    ctx.fillStyle = `rgba(50,150,255,${0.06 + 0.04 * Math.sin(frameId * 0.1)})`;
+    ctx.beginPath();
+    ctx.arc(x, y, PW * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(50,150,255,${0.12 + 0.08 * Math.sin(frameId * 0.08)})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y, PW * 1.1, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   ctx.restore();
 }
@@ -275,6 +289,91 @@ function drawBomber(e) {
   ctx.fill();
 }
 
+function drawInterceptor(e) {
+  const x = e.x, y = e.y, hw = e.w / 2, hh = e.h / 2;
+  // TIE Interceptor — синие острые крылья
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 0.5;
+  ctx.fillStyle = '#2a2a44';
+  ctx.beginPath();
+  ctx.moveTo(x - hw * 0.1, y - hh);
+  ctx.lineTo(x - hw * 1.1, y - hh * 0.1);
+  ctx.lineTo(x - hw * 0.9, y + hh * 0.5);
+  ctx.lineTo(x - hw * 0.1, y + hh);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x + hw * 0.1, y - hh);
+  ctx.lineTo(x + hw * 1.1, y - hh * 0.1);
+  ctx.lineTo(x + hw * 0.9, y + hh * 0.5);
+  ctx.lineTo(x + hw * 0.1, y + hh);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#1a1a2e';
+  ctx.beginPath();
+  ctx.arc(x, y, hw * 0.25, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#66f';
+  ctx.beginPath();
+  ctx.arc(x, y, hw * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawDefender(e) {
+  const x = e.x, y = e.y, hw = e.w / 2, hh = e.h / 2;
+  ctx.fillStyle = '#2a2a2e';
+  ctx.strokeStyle = '#1a1a1e';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i < 3; i++) {
+    const a = i * 2.094;
+    const wx = x + Math.sin(a) * hh * 0.3;
+    const wy = y - Math.cos(a) * hh * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(wx - Math.cos(a) * hw * 0.6, wy - Math.sin(a) * hw * 0.6);
+    ctx.lineTo(wx + Math.cos(a) * hw * 0.6, wy + Math.sin(a) * hw * 0.6);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.fillStyle = '#333';
+  ctx.beginPath();
+  ctx.arc(x, y, hw * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#4af';
+  ctx.beginPath();
+  ctx.arc(x, y, hw * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+  // Shield shimmer
+  ctx.strokeStyle = `rgba(50,150,255,${0.15 + 0.1 * Math.sin(frameId * 0.12)})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, hw * 0.5, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function drawProbe(e) {
+  const x = e.x, y = e.y, hw = e.w / 2, hh = e.h / 2;
+  ctx.fillStyle = '#555';
+  ctx.beginPath();
+  ctx.arc(x, y, hw * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#666';
+  ctx.beginPath();
+  ctx.arc(x, y, hw * 0.45, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#4af';
+  ctx.beginPath();
+  ctx.arc(x, y, hw * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(x, y - hh * 0.7);
+  ctx.lineTo(x + hw * 0.3, y - hh * 1.1);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x + hw * 0.3, y - hh * 1.1, 2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+
 function drawPara(p) {
   const x = p.x, y = p.y;
   // Escape pod
@@ -368,12 +467,18 @@ function drawBackground() {
 // ─── Spawning ───────────────────────────────────────────
 function spawnEnemy() {
   const r = Math.random();
-  if (r < 0.25) {
-    enemies.push({ type: 'tank', x: 10 + Math.random() * (cw - 20), y: -20, w: 22, h: 14, hp: 2, maxHp: 2, shootTimer: 60 + Math.random() * 80 });
-  } else if (r < 0.45) {
+  if (r < 0.18) {
+    enemies.push({ type: 'tank', x: 10 + Math.random() * (cw - 20), y: -20, w: 22, h: 14, hp: 2, shootTimer: 60 + Math.random() * 80 });
+  } else if (r < 0.30) {
     enemies.push({ type: 'turret', x: 10 + Math.random() * (cw - 20), y: -20, w: 16, h: 18, hp: 1, shootTimer: 30 + Math.random() * 40 });
-  } else {
+  } else if (r < 0.50) {
     enemies.push({ type: 'fighter', x: Math.random() * cw, y: -20, w: EW, h: EH, hp: 1, vx: (Math.random() - 0.5) * 1.2, vy: 0, shootTimer: 40 + Math.random() * 60 });
+  } else if (r < 0.65) {
+    enemies.push({ type: 'interceptor', x: Math.random() * cw, y: -20, w: EW * 0.85, h: EH * 0.85, hp: 1, vx: (Math.random() - 0.5) * 2.5, vy: 0, shootTimer: 25 + Math.random() * 35 });
+  } else if (r < 0.78) {
+    enemies.push({ type: 'defender', x: 10 + Math.random() * (cw - 20), y: -20, w: 24, h: 16, hp: 3, shootTimer: 50 + Math.random() * 40 });
+  } else {
+    enemies.push({ type: 'probe', x: Math.random() * cw, y: -20, w: 14, h: 14, hp: 1, vx: (Math.random() - 0.5) * 1.5, vy: 0, shootTimer: 30 + Math.random() * 30 });
   }
 }
 
@@ -396,7 +501,7 @@ function resetGame() {
 
   player.x = cw / 2; player.y = ch * 0.7;
   bullets = []; enemyBullets = []; enemies = []; pickups = []; particles = []; paras = [];
-  lives = 3; score = 0; wlevel = 1;
+  lives = 3; score = 0; wlevel = 1; shield = maxShield; shieldCooldown = 0;
   gameOver = false; frameId = 0; fireTimer = 0; invulnTimer = 0;
   spawnTimer = 0; paraDropTimer = 0;
   touchX = null; touchY = null;
@@ -412,6 +517,8 @@ function loop() {
   const dt = 1;
 
   if (invulnTimer > 0) invulnTimer -= dt;
+  if (shieldCooldown > 0) shieldCooldown -= dt;
+  else if (shield < maxShield) shield = Math.min(maxShield, shield + 0.2);
 
   for (const s of stars) { s.y += s.sp; if (s.y > ch) { s.y = -2; s.x = Math.random() * cw; } }
 
@@ -469,11 +576,12 @@ function loop() {
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
     e.y += scrollSpeed;
-    if (e.type === 'tank' || e.type === 'turret') {
+    if (e.type === 'tank' || e.type === 'turret' || e.type === 'defender') {
       e.shootTimer -= dt;
       if (e.shootTimer <= 0) {
-        const spd = e.type === 'turret' ? 2.5 : 1.5;
+        const spd = e.type === 'turret' ? 2.5 : e.type === 'defender' ? 2 : 1.5;
         if (e.type === 'turret') e.shootTimer = 25 + Math.random() * 20;
+        else if (e.type === 'defender') e.shootTimer = 50 + Math.random() * 40;
         else e.shootTimer = 70 + Math.random() * 40;
         const dx = player.x - e.x, dy = player.y - e.y;
         const d = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -483,7 +591,9 @@ function loop() {
       e.x += e.vx || 0;
       e.shootTimer -= dt;
       if (e.shootTimer <= 0) {
-        e.shootTimer = 50 + Math.random() * 40;
+        if (e.type === 'interceptor') e.shootTimer = 30 + Math.random() * 25;
+        else if (e.type === 'probe') e.shootTimer = 40 + Math.random() * 30;
+        else e.shootTimer = 50 + Math.random() * 40;
         enemyBullets.push({ x: e.x, y: e.y + EH / 2, vx: (Math.random() - 0.5) * 0.3, vy: 2, w: 3, h: 5 });
       }
       if (e.type === 'bomber' && --e.dropTimer <= 0) {
@@ -520,8 +630,8 @@ function loop() {
           burst(e.x, e.y, '#f44', 12);
       const r = Math.random();
       if (r < 0.15) pickups.push({ x: e.x, y: e.y, type: 'coin' });
-      else if (r < 0.25) pickups.push({ x: e.x, y: e.y, type: 'life' });
-      else if (r < 0.40) pickups.push({ x: e.x, y: e.y, type: 'upgrade' });
+      else if (r < 0.33) pickups.push({ x: e.x, y: e.y, type: 'life' });
+      else if (r < 0.48) pickups.push({ x: e.x, y: e.y, type: 'upgrade' });
           enemies.splice(j, 1);
         }
         break;
@@ -530,20 +640,20 @@ function loop() {
   }
 
   // Enemy bullets → player
-  if (invulnTimer <= 0) {
+  if (shieldCooldown <= 0 && invulnTimer <= 0) {
     for (let i = enemyBullets.length - 1; i >= 0; i--) {
       const b = enemyBullets[i];
       if (Math.abs(b.x - player.x) < PW / 2 + 3 && Math.abs(b.y - player.y) < PH / 2 + 4) {
         enemyBullets.splice(i, 1);
-        hitPlayer();
+        hitPlayer(25);
         if (gameOver) { draw(); showGameOver(); return; }
         break;
       }
     }
-    if (invulnTimer <= 0) {
+    if (shieldCooldown <= 0 && invulnTimer <= 0) {
       for (const e of enemies) {
         if (Math.abs(e.x - player.x) < PW / 2 + e.w / 2 && Math.abs(e.y - player.y) < PH / 2 + e.h / 2) {
-          hitPlayer();
+          hitPlayer(35);
           e.hp--;
           if (e.hp <= 0) { score += 5; enemies.splice(enemies.indexOf(e), 1); }
           if (gameOver) { draw(); showGameOver(); return; }
@@ -578,10 +688,16 @@ function loop() {
   animId = requestAnimationFrame(loop);
 }
 
-function hitPlayer() {
+function hitPlayer(dmg) {
+  if (shield > 0) {
+    shield = Math.max(0, shield - (dmg || 25));
+    shieldCooldown = 15;
+    burst(player.x, player.y, '#4af', 8);
+    return;
+  }
   lives--;
   invulnTimer = 90;
-  burst(player.x, player.y, '#4af', 10);
+  burst(player.x, player.y, '#f44', 10);
   if (lives <= 0) { gameOver = true; burst(player.x, player.y, '#f44', 30); }
 }
 
@@ -604,6 +720,9 @@ function draw() {
     if (e.type === 'tank') drawTank(e);
     else if (e.type === 'turret') drawTurret(e);
     else if (e.type === 'bomber') drawBomber(e);
+    else if (e.type === 'interceptor') drawInterceptor(e);
+    else if (e.type === 'defender') drawDefender(e);
+    else if (e.type === 'probe') drawProbe(e);
     else drawFighter(e);
   }
   for (const b of bullets) {
@@ -649,6 +768,7 @@ function updateHUD() {
   for (let i = 0; i < lives; i++) h += '❤️';
   livesEl.textContent = h || '💀';
   wlevelEl.textContent = wlevel;
+  document.getElementById('shield-fill').style.width = (shield / maxShield * 100) + '%';
 }
 
 function showGameOver() {
