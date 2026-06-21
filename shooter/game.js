@@ -197,47 +197,39 @@ function burst(x, y, color, n) {
 }
 
 // ─── Ground ─────────────────────────────────────────────
-const GROUND_H = 0.35;
-
-function initGround() {
-  groundTrees = [];
-  for (let i = 0; i < 20; i++) {
-    groundTrees.push({ x: Math.random() * cw, y: Math.random() * ch, h: 6 + Math.random() * 10, w: 3 + Math.random() * 3 });
-  }
-}
 
 function drawGround(scroll) {
-  const gh = ch * GROUND_H;
-  const gy = ch - gh;
-  ctx.fillStyle = '#2a5a2a';
-  ctx.fillRect(0, gy, cw, gh);
-  ctx.fillStyle = '#3a6a2a';
-  for (let y = -20 + scroll % 40; y < ch + 20; y += 20) {
-    ctx.fillRect(0, gy + y, cw, 1);
+  // Вид сверху — тёмная трава с сеткой, скроллится
+  ctx.fillStyle = '#1a3a1a';
+  ctx.fillRect(0, 0, cw, ch);
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  const step = 40;
+  for (let x = 0; x < cw + step; x += step) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ch); ctx.stroke();
   }
-  ctx.fillStyle = '#1a4a1a';
-  ctx.fillRect(0, gy, cw, 2);
-  for (const t of groundTrees) {
-    const ty = gy + ((t.y + scroll * 0.3) % gh);
-    ctx.fillStyle = '#3a2a1a';
-    ctx.fillRect(t.x - 1, ty - t.h, 2, t.h);
-    ctx.fillStyle = '#2a6a2a';
+  for (let y = -step + scroll % step; y < ch + step; y += step) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke();
+  }
+  // Случайные тёмные пятна (кусты/камни)
+  ctx.fillStyle = 'rgba(0,0,0,0.05)';
+  for (let i = 0; i < 8; i++) {
+    const px = (i * 97 + scroll * 0.5) % cw;
+    const py = (i * 53 + scroll) % ch;
     ctx.beginPath();
-    ctx.arc(t.x, ty - t.h, t.w, 0, Math.PI * 2);
+    ctx.arc(px, py, 6 + (i % 3) * 4, 0, Math.PI * 2);
     ctx.fill();
   }
 }
-
-function groundTop() { return ch - ch * GROUND_H; }
+function groundTop() { return 0; } // нет отдельной полосы земли
 
 // ─── Spawning ───────────────────────────────────────────
 function spawnEnemy() {
-  const gt = groundTop();
   const r = Math.random();
   if (r < 0.25) {
-    enemies.push({ type: 'tank', x: 10 + Math.random() * (cw - 20), y: gt + 5, w: 22, h: 14, hp: 2, maxHp: 2, shootTimer: 60 + Math.random() * 80 });
+    enemies.push({ type: 'tank', x: 10 + Math.random() * (cw - 20), y: -20, w: 22, h: 14, hp: 2, maxHp: 2, shootTimer: 60 + Math.random() * 80 });
   } else if (r < 0.45) {
-    enemies.push({ type: 'turret', x: 10 + Math.random() * (cw - 20), y: gt + 5, w: 16, h: 18, hp: 1, shootTimer: 30 + Math.random() * 40 });
+    enemies.push({ type: 'turret', x: 10 + Math.random() * (cw - 20), y: -20, w: 16, h: 18, hp: 1, shootTimer: 30 + Math.random() * 40 });
   } else {
     enemies.push({ type: 'fighter', x: Math.random() * cw, y: -20, w: EW, h: EH, hp: 1, vx: (Math.random() - 0.5) * 1.5, vy: 1 + Math.random() * 1.5, color: ['#c33','#c90','#a5a'][Math.floor(Math.random()*3)], shootTimer: 40 + Math.random() * 60 });
   }
@@ -266,7 +258,6 @@ function resetGame() {
   gameOver = false; frameId = 0; fireTimer = 0; invulnTimer = 0;
   scrollY = 0; spawnTimer = 0; paraDropTimer = 0;
   touchX = null; touchY = null;
-  initGround();
   overlay.classList.add('hidden');
   if (animId) { cancelAnimationFrame(animId); animId = null; }
   loop();
@@ -286,7 +277,7 @@ function loop() {
   // Player follow touch
   if (touchX !== null && touchY !== null) {
     const tx = Math.max(PW / 2, Math.min(cw - PW / 2, touchX));
-    const ty = Math.max(PH / 2, Math.min(groundTop() - PH / 2, touchY));
+    const ty = Math.max(PH / 2, Math.min(ch - PH / 2, touchY));
     player.x += (tx - player.x) * 0.15;
     player.y += (ty - player.y) * 0.15;
   }
@@ -331,51 +322,41 @@ function loop() {
     if (frameId > 300 && Math.random() < 0.08) tryDropPara();
   }
 
-  // Move enemies
-  const gt = groundTop();
+  // Move enemies — все едут вниз (вид сверху)
+  const scrollSpeed = 0.8 + frameId * 0.002;
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
-    if (e.type === 'tank') {
+    e.y += scrollSpeed;
+    if (e.type === 'tank' || e.type === 'turret') {
       e.shootTimer -= dt;
       if (e.shootTimer <= 0) {
-        e.shootTimer = 70 + Math.random() * 40;
-        enemyBullets.push({ x: e.x, y: e.y - 8, vx: (Math.random() - 0.5) * 0.5, vy: -1.5, w: 3, h: 5 });
-      }
-      if (e.y > ch + 30) { enemies.splice(i, 1); continue; }
-    } else if (e.type === 'turret') {
-      e.shootTimer -= dt;
-      if (e.shootTimer <= 0) {
-        e.shootTimer = 25 + Math.random() * 20;
+        const spd = e.type === 'turret' ? 2.5 : 1.5;
+        if (e.type === 'turret') e.shootTimer = 25 + Math.random() * 20;
+        else e.shootTimer = 70 + Math.random() * 40;
         const dx = player.x - e.x, dy = player.y - e.y;
         const d = Math.sqrt(dx * dx + dy * dy) || 1;
-        enemyBullets.push({ x: e.x, y: e.y - 10, vx: dx / d * 2.5, vy: dy / d * 2.5, w: 3, h: 5 });
+        enemyBullets.push({ x: e.x, y: e.y + 5, vx: dx / d * spd, vy: dy / d * spd, w: 3, h: 5 });
       }
-    } else if (e.type === 'fighter') {
-      e.x += e.vx; e.y += e.vy;
-      if (e.x < -20 || e.x > cw + 20 || e.y > ch + 30) { enemies.splice(i, 1); continue; }
+    } else {
+      e.x += e.vx || 0;
       e.shootTimer -= dt;
       if (e.shootTimer <= 0) {
         e.shootTimer = 50 + Math.random() * 40;
         enemyBullets.push({ x: e.x, y: e.y + EH / 2, vx: (Math.random() - 0.5) * 0.3, vy: 2, w: 3, h: 5 });
       }
-    } else if (e.type === 'bomber') {
-      e.x += e.vx; e.y += e.vy;
-      if (e.y > ch + 30) { enemies.splice(i, 1); continue; }
-      if (--e.dropTimer <= 0) {
+      if (e.type === 'bomber' && --e.dropTimer <= 0) {
         e.dropTimer = 50;
-        const py = e.y + EH / 2;
-        if (py < groundTop()) {
-          paras.push({ x: e.x + (Math.random() - 0.5) * 10, y: py, vy: 0.6 });
-        }
+        paras.push({ x: e.x + (Math.random() - 0.5) * 10, y: e.y + EH / 2, vy: 0.6 });
       }
     }
+    if (e.y > ch + 40) { enemies.splice(i, 1); }
   }
 
   // Paratroopers
   for (let i = paras.length - 1; i >= 0; i--) {
     const p = paras[i];
     p.y += p.vy;
-    if (p.y > gt - 4) { paras.splice(i, 1); continue; }
+    if (p.y > ch + 10) { paras.splice(i, 1); continue; }
     if (Math.abs(p.x - player.x) < PW / 2 + 6 && Math.abs(p.y - player.y) < PH / 2 + 6) {
       score += 50;
       burst(p.x, p.y, '#ffd700', 8);
@@ -396,9 +377,9 @@ function loop() {
           score += 10 + frameId * 0.05;
           burst(e.x, e.y, '#f44', 12);
       const r = Math.random();
-      if (r < 0.12) pickups.push({ x: e.x, y: e.y, type: 'coin' });
-      else if (r < 0.20) pickups.push({ x: e.x, y: e.y, type: 'life' });
-      else if (r < 0.28) pickups.push({ x: e.x, y: e.y, type: 'upgrade' });
+      if (r < 0.15) pickups.push({ x: e.x, y: e.y, type: 'coin' });
+      else if (r < 0.25) pickups.push({ x: e.x, y: e.y, type: 'life' });
+      else if (r < 0.40) pickups.push({ x: e.x, y: e.y, type: 'upgrade' });
           enemies.splice(j, 1);
         }
         break;
@@ -466,14 +447,6 @@ function hitPlayer() {
 
 function draw() {
   ctx.clearRect(0, 0, cw, ch);
-  ctx.fillStyle = '#0a0a1a';
-  ctx.fillRect(0, 0, cw, ch);
-
-  for (const s of stars) {
-    ctx.fillStyle = `rgba(255,255,255,${0.2 + 0.6 * s.s / 2})`;
-    ctx.fillRect(s.x, s.y, s.s, s.s);
-  }
-
   drawGround(scrollY);
 
   for (const p of pickups) drawPickup(p);
@@ -483,12 +456,9 @@ function draw() {
     ctx.fillRect(b.x - 1.5, b.y - 2.5, 3, 5);
   }
   for (const e of enemies) {
-    if (e.type === 'tank' || e.type === 'turret') {
-      e.y = groundTop() + 5;
-      if (e.type === 'tank') drawTank(e); else drawTurret(e);
-    } else {
-      drawFighter(e);
-    }
+    if (e.type === 'tank') drawTank(e);
+    else if (e.type === 'turret') drawTurret(e);
+    else drawFighter(e);
   }
   for (const b of bullets) {
     ctx.fillStyle = b.dmg > 1 ? '#ffaa00' : '#4eff4e';
