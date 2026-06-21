@@ -43,7 +43,7 @@ let animId = null;
 
 function numColor(n) {
   if (n === 0) return '#27ae60';
-  return REDS.has(n) ? '#c0392b' : '#111';
+  return REDS.has(n) ? '#c0392b' : '#1e1e3a';
 }
 
 function numBetKey(n) { return 'n' + n; }
@@ -132,19 +132,40 @@ function drawWheel() {
   const cx = cw / 2, cy = ch / 2;
   const outerR = Math.min(cw, ch) * 0.46;
 
-  // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.beginPath();
-  ctx.arc(cx + 2, cy + 2, outerR + 6, 0, Math.PI * 2);
-  ctx.fill();
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath();
+    ctx.arc(cx + 2, cy + 2, outerR + 6, 0, Math.PI * 2);
+    ctx.fill();
 
-  // Outer ring
-  ctx.beginPath();
-  ctx.arc(cx, cy, outerR + 4, 0, Math.PI * 2);
-  ctx.fillStyle = '#333';
-  ctx.fill();
+    // Outer ring (white diamonds on real wheel)
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR + 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#333';
+    ctx.fill();
+    // Diamonds (8 шт) — вращаются вместе с колесом
+    const diamondR = outerR + 2;
+    for (let i = 0; i < 8; i++) {
+      const da = i * Math.PI / 4 + wheelAngle;
+      const dx = cx + Math.cos(da) * diamondR;
+      const dy = cy + Math.sin(da) * diamondR;
+      ctx.fillStyle = '#ffd700';
+      ctx.beginPath();
+      ctx.moveTo(dx, dy - 3);
+      ctx.lineTo(dx + 2, dy);
+      ctx.lineTo(dx, dy + 3);
+      ctx.lineTo(dx - 2, dy);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Outer track rim
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR + 1, 0, Math.PI * 2);
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1;
+    ctx.stroke();
 
-  // Sectors
+    // Sectors
   for (let i = 0; i < SECTOR_COUNT; i++) {
     const a0 = i * SECTOR_ANGLE + wheelAngle;
     const a1 = a0 + SECTOR_ANGLE;
@@ -169,6 +190,16 @@ function drawWheel() {
   ctx.strokeStyle = '#444';
   ctx.lineWidth = 2;
   ctx.stroke();
+  // Rotating accent dots on inner rim
+  for (let i = 0; i < 12; i++) {
+    const da = i * Math.PI / 6 + wheelAngle;
+    const dx = cx + Math.cos(da) * (innerR - 2);
+    const dy = cy + Math.sin(da) * (innerR - 2);
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,215,0,0.15)';
+    ctx.beginPath();
+    ctx.arc(dx, dy, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // Center hub
   const hubR = innerR * 0.55;
@@ -230,13 +261,23 @@ function drawBall(progress) {
     const br = outerR * (0.88 - progress * 0.22);
     const bx = cx + Math.cos(ballAngle) * br;
     const by = cy + Math.sin(ballAngle) * br;
-    const size = outerR * 0.04;
+    const size = outerR * 0.055;
+    // Trail
+    for (let t = 1; t <= 3; t++) {
+      const ta = ballAngle - t * 0.15;
+      const tx = cx + Math.cos(ta) * br;
+      const ty = cy + Math.sin(ta) * br;
+      ctx.beginPath();
+      ctx.arc(tx, ty, size * (1 - t * 0.2), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${0.2 - t * 0.05})`;
+      ctx.fill();
+    }
     ctx.beginPath();
     ctx.arc(bx, by, size, 0, Math.PI * 2);
     ctx.fillStyle = '#fff';
     ctx.fill();
-    ctx.strokeStyle = '#ddd';
-    ctx.lineWidth = 0.5;
+    ctx.strokeStyle = '#ffd700';
+    ctx.lineWidth = 1;
     ctx.stroke();
   } else if (result !== null) {
     // Ball on result sector
@@ -399,9 +440,10 @@ outsideBtns.forEach(btn => {
 
 btnSpin.addEventListener('click', startSpin);
 
-// Long-press to clear
+// Long-press on canvas to clear
 let clearTimer = null;
-document.addEventListener('touchstart', () => {
+document.addEventListener('touchstart', (e) => {
+  if (e.target.closest('button') || e.target.closest('#chip-row')) return;
   clearTimer = setTimeout(clearBets, 800);
 });
 document.addEventListener('touchend', () => {
