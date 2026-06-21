@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Бильярд</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="gameCanvas"></canvas>
+  <div id="hud">
+    <span>🎯 <span id="score">0</span></span>
+    <span>🔫 <span id="shots">0</span></span>
+    <span>🏁 <span id="level">1</span></span>
+  </div>
+  <div id="overlay" class="hidden">
+    <div id="overlay-title"></div>
+    <div id="overlay-sub"></div>
+    <button id="btn-next">Старт!</button>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>

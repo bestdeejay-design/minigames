@@ -1,0 +1,27 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; touch-action: none; user-select: none; }
+#app { position: relative; width: 100%; height: 100%; }
+canvas { display: block; width: 100%; height: 100%; }
+#hud {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between;
+  padding: 8px 14px;
+  font: bold 14px sans-serif; color: #fff;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+#overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.7);
+  z-index: 10;
+}
+#overlay.hidden { display: none; }
+#overlay-title { font: bold 26px sans-serif; color: #ffd700; margin-bottom: 8px; }
+#overlay-sub { font: 16px sans-serif; color: #ccc; margin-bottom: 20px; text-align: center; }
+#btn-next {
+  padding: 12px 40px; font: bold 20px sans-serif;
+  background: #2d8a4e; color: #fff; border: none; border-radius: 10px;
+  cursor: pointer;
+}
