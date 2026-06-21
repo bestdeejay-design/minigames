@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Три в ряд</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;touch-action:none}
+body{background:linear-gradient(135deg,#0a0a2e,#1a0a3e);color:#eee;font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center}
+#app{width:100%;max-width:420px;height:100vh;height:100dvh;display:flex;flex-direction:column;position:relative}
+/* Welcome */
+#welcome{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;background:linear-gradient(135deg,#0a0a2e,#2a0a4e);gap:16px;padding:24px}
+#welcome h1{font-size:2.2rem;background:linear-gradient(135deg,#f88,#4af,#f8f);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+#welcome p{text-align:center;color:#aaa;max-width:280px;line-height:1.4;font-size:0.9rem}
+#welcome button{padding:14px 56px;border:none;border-radius:10px;background:linear-gradient(135deg,#e94560,#c73a50);color:#fff;font-size:1.2rem;font-weight:bold;cursor:pointer;margin-top:8px}
+/* Game */
+#game{display:flex;flex-direction:column;flex:1;overflow:hidden}
+#game.hidden{display:none}
+#hud{flex-shrink:0;padding:6px 8px 4px;background:rgba(0,0,0,0.3)}
+.hud-row{display:flex;justify-content:space-between;font-size:0.7rem;flex-wrap:wrap;gap:2px}
+.hud-row span{white-space:nowrap}
+#total-score,#level-score{color:#ffd700}
+#moves-left{color:#4af}
+#progress-wrap{height:3px;background:#1a1a3a;border-radius:2px;margin-top:4px;overflow:hidden}
+#progress-fill{height:100%;background:linear-gradient(90deg,#4af,#8cf);width:0%;border-radius:2px;transition:width 0.15s}
+#canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:4px}
+#gc{display:block}
+#bottom{display:flex;justify-content:space-around;padding:6px 8px;flex-shrink:0;gap:6px}
+#bottom button{padding:8px 12px;border:none;border-radius:6px;background:#1a1a3a;color:#ccc;font-size:0.75rem;cursor:pointer;flex:1}
+#bottom button:active{background:#2a2a4a}
+/* Modal */
+#modal{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:15;background:rgba(0,0,0,0.85);gap:12px;padding:24px}
+#modal.hidden{display:none}
+#modal-title{font-size:1.6rem;font-weight:bold}
+#modal-score{font-size:1rem;color:#aaa}
+#modal-btn{padding:14px 48px;border:none;border-radius:8px;font-size:1.1rem;font-weight:bold;cursor:pointer;margin-top:4px}
+.modal-win #modal-btn{background:linear-gradient(135deg,#44cc88,#228855);color:#fff}
+.modal-lose #modal-btn{background:linear-gradient(135deg,#e94560,#c73a50);color:#fff}
+#modal-btn:active{opacity:0.8}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="welcome">
+    <h1>✦ Три в ряд ✦</h1>
+    <p>Меняйте фигуры местами, собирайте линии из трёх и больше одинаковых, набирайте очки и проходите 15 уровней!</p>
+    <button id="btn-play">Играть</button>
+  </div>
+  <div id="game" class="hidden">
+    <div id="hud">
+      <div class="hud-row">
+        <span>Ур. <span id="level-num">1</span></span>
+        <span>Σ <span id="total-score">0</span></span>
+        <span>★ <span id="level-score">0</span></span>
+        <span>⬡ <span id="moves-left">30</span></span>
+      </div>
+      <div id="progress-wrap"><div id="progress-fill"></div></div>
+    </div>
+    <div id="canvas-wrap">
+      <canvas id="gc"></canvas>
+    </div>
+    <div id="bottom">
+      <button id="btn-new">🔄 Новая</button>
+      <button id="btn-retry">↩️ Повтор</button>
+      <button id="btn-sound">🔊</button>
+    </div>
+  </div>
+  <div id="modal" class="hidden">
+    <div id="modal-title"></div>
+    <div id="modal-score"></div>
+    <button id="modal-btn"></button>
+  </div>
+</div>
+<script>
+// ======================== CONSTANTS ========================
+const LEVELS = [
+  { grid:6, types:4, target:100, moves:30 },
+  { grid:6, types:4, target:150, moves:28 },
+  { grid:6, types:5, target:200, moves:30 },
+  { grid:7, types:5, target:250, moves:30 },
+  { grid:7, types:5, target:300, moves:28 },
+  { grid:8, types:5, target:350, moves:30 },
+  { grid:8, types:5, target:400, moves:28 },
+  { grid:8, types:6, target:450, moves:30 },
+  { grid:9, types:6, target:500, moves:30 },
+  { grid:9, types:6, target:550, moves:28 },
+  { grid:10,types:6, target:600, moves:30 },
+  { grid:10,types:6, target:650, moves:28 },
+  { grid:11,types:6, target:700, moves:30 },
+  { grid:11,types:6, target:750, moves:28 },
+  { grid:12,types:6, target:800, moves:30 }
+];
+
+const GEM_COLORS = [
+  ['#ff4444','#cc0000'], // 0 red circle
+  ['#4488ff','#0044cc'], // 1 blue square
+  ['#44cc44','#008800'], // 2 green triangle
+  ['#ffdd44','#ccaa00'], // 3 yellow diamond
+  ['#cc44ff','#8800cc'], // 4 purple star
+  ['#ff8844','#cc5500']  // 5 orange hexagon
+];
+
+const SCORE_3 = 10, SCORE_4 = 20, SCORE_5P = 30;
+const SWAP_DURATION = 150, MATCH_DURATION = 200, FALL_DURATION = 180;
+const SAVE_KEY = 'match3_progress';
+
+// ======================== DOM ========================
+const canvas = document.getElementById('gc');
+const ctx = canvas.getContext('2d');
+const welcomeEl = document.getElementById('welcome');
+const gameEl = document.getElementById('game');
+const modalEl = document.getElementById('modal');
+const modalTitle = document.getElementById('modal-title');
+const modalScore = document.getElementById('modal-score');
+const modalBtn = document.getElementById('modal-btn');
+const levelNum = document.getElementById('level-num');
+const totalScoreEl = document.getElementById('total-score');
+const levelScoreEl = document.getElementById('level-score');
+const movesLeftEl = document.getElementById('moves-left');
+const progressFill = document.getElementById('progress-fill');
+
+let cw, ch, cellSize, dpr = window.devicePixelRatio || 1;
+
+// ======================== STATE ========================
+let currentLevel = 0, totalScore = 0, levelScore = 0, movesLeft = 0;
+let grid = [], gridSize = 0, gemTypes = 0;
+let animState = 'idle'; // idle | swap | match | fall
+let animType = '', animData = null, animStart = 0, animDuration = 0;
+let selectedR = -1, selectedC = -1;
+let soundOn = true, levelTarget = 0;
+let locked = false;
+
+// ======================== AUDIO ========================
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function playTone(freq, dur, type, vol) {
+  if (!soundOn) return;
+  try {
+    const ac = getAudioCtx();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol || 0.12, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur);
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.start(); osc.stop(ac.currentTime + dur);
+  } catch(e){}
+}
+function sndClick() { playTone(660, 0.06, 'sine', 0.08); }
+function sndSwap() { playTone(520, 0.08, 'sine', 0.1); }
+function sndMatch() { playTone(880, 0.12, 'sine', 0.1); setTimeout(()=>playTone(1100,0.1,'sine',0.08),80); }
+function sndBad() { playTone(220, 0.15, 'square', 0.06); }
+function sndWin() {
+  [0,100,200,300].forEach((d,i)=>setTimeout(()=>playTone(660+i*110,0.15,'sine',0.1),d));
+}
+function sndLose() { playTone(330, 0.3, 'sawtooth', 0.05); }
+
+// ======================== SAVE/LOAD ========================
+function saveGame() {
+  localStorage.setItem(SAVE_KEY, JSON.stringify({
+    level: currentLevel, totalScore, highScore: Math.max(totalScore, parseInt(localStorage.getItem(SAVE_KEY) ? JSON.parse(localStorage.getItem(SAVE_KEY)).highScore || 0 : 0))
+  }));
+}
+function loadGame() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (d && d.level !== undefined) { currentLevel = d.level; totalScore = d.totalScore || 0; }
+  } catch(e){}
+}
+
+// ======================== GRID ========================
+function initGrid() {
+  grid = [];
+  for (let r = 0; r < gridSize; r++) {
+    grid[r] = [];
+    for (let c = 0; c < gridSize; c++) {
+      let t;
+      do {
+        t = Math.floor(Math.random() * gemTypes);
+      } while (
+        (r >= 2 && grid[r-1][c] === t && grid[r-2][c] === t) ||
+        (c >= 2 && grid[r][c-1] === t && grid[r][c-2] === t)
+      );
+      grid[r][c] = t;
+    }
+  }
+}
+
+function findMatches() {
+  const set = new Set();
+  for (let r = 0; r < gridSize; r++) {
+    let c = 0;
+    while (c < gridSize) {
+      const t = grid[r][c];
+      if (t < 0) { c++; continue; }
+      let len = 1;
+      while (c + len < gridSize && grid[r][c+len] === t) len++;
+      if (len >= 3) for (let i = 0; i < len; i++) set.add(r * gridSize + (c + i));
+      c += len;
+    }
+  }
+  for (let c = 0; c < gridSize; c++) {
+    let r = 0;
+    while (r < gridSize) {
+      const t = grid[r][c];
+      if (t < 0) { r++; continue; }
+      let len = 1;
+      while (r + len < gridSize && grid[r+len][c] === t) len++;
+      if (len >= 3) for (let i = 0; i < len; i++) set.add((r + i) * gridSize + c);
+      r += len;
+    }
+  }
+  return [...set].map(v => ({ r: Math.floor(v / gridSize), c: v % gridSize }));
+}
+
+function hasValidMoves() {
+  for (let r = 0; r < gridSize; r++) {
+    for (let c = 0; c < gridSize; c++) {
+      if (c + 1 < gridSize) {
+        [grid[r][c], grid[r][c+1]] = [grid[r][c+1], grid[r][c]];
+        if (findMatches().length) { [grid[r][c], grid[r][c+1]] = [grid[r][c+1], grid[r][c]]; return true; }
+        [grid[r][c], grid[r][c+1]] = [grid[r][c+1], grid[r][c]];
+      }
+      if (r + 1 < gridSize) {
+        [grid[r][c], grid[r+1][c]] = [grid[r+1][c], grid[r][c]];
+        if (findMatches().length) { [grid[r][c], grid[r+1][c]] = [grid[r+1][c], grid[r][c]]; return true; }
+        [grid[r][c], grid[r+1][c]] = [grid[r+1][c], grid[r][c]];
+      }
+    }
+  }
+  return false;
+}
+
+function shuffleGrid() {
+  const flat = grid.flat().filter(v => v >= 0);
+  for (let i = flat.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [flat[i], flat[j]] = [flat[j], flat[i]];
+  }
+  let idx = 0;
+  for (let r = 0; r < gridSize; r++)
+    for (let c = 0; c < gridSize; c++)
+      grid[r][c] = flat[idx++];
+  if (findMatches().length || !hasValidMoves()) shuffleGrid();
+}
+
+// ======================== ANIMATION ========================
+function startAnim(type, data, duration, callback) {
+  animState = 'anim';
+  animType = type;
+  animData = data;
+  animDuration = duration;
+  animStart = performance.now();
+  animCallback = callback;
+}
+
+let animCallback = null;
+
+function updateAnim() {
+  if (animState !== 'anim') return;
+  const elapsed = performance.now() - animStart;
+  const raw = Math.min(elapsed / animDuration, 1);
+  const t = raw < 1 ? raw * (2 - raw) : 1; // easeOutQuad
+  animProgress = t;
+  if (raw >= 1) {
+    animState = 'idle';
+    if (animCallback) { const cb = animCallback; animCallback = null; cb(); }
+  }
+}
+
+let animProgress = 0;
+
+// ======================== GAME FLOW ========================
+function startLevel() {
+  const lv = LEVELS[currentLevel];
+  gridSize = lv.grid; gemTypes = lv.types; levelTarget = lv.target;
+  movesLeft = lv.moves; levelScore = 0;
+  initGrid();
+  if (!hasValidMoves()) shuffleGrid();
+  animState = 'idle'; animType = ''; animData = null; locked = false;
+  selectedR = -1; selectedC = -1;
+  resizeCanvas();
+  updateHUD();
+  modalEl.classList.add('hidden');
+  gameEl.classList.remove('hidden');
+}
+
+function doSwap(r1, c1, r2, c2) {
+  locked = true;
+  [grid[r1][c1], grid[r2][c2]] = [grid[r2][c2], grid[r1][c1]];
+  const matches = findMatches();
+  if (matches.length === 0) {
+    [grid[r1][c1], grid[r2][c2]] = [grid[r2][c2], grid[r1][c1]];
+    startAnim('swap_back', { r1,c1,r2,c2 }, SWAP_DURATION, () => {
+      sndBad(); locked = false;
+    });
+    return;
+  }
+  movesLeft--;
+  sndSwap();
+  updateHUD();
+  startAnim('swap', { r1,c1,r2,c2 }, SWAP_DURATION, () => processMatches(matches));
+}
+
+function processMatches(prevMatches) {
+  const matches = prevMatches || findMatches();
+  if (!matches.length) { afterCascade(); return; }
+
+  const groups = groupMatches(matches);
+  let pts = 0;
+  for (const g of groups) {
+    if (g.length === 3) pts += SCORE_3;
+    else if (g.length === 4) pts += SCORE_4;
+    else pts += SCORE_5P;
+  }
+  levelScore += pts; totalScore += pts;
+  sndMatch();
+  updateHUD();
+
+  startAnim('match', { cells: matches }, MATCH_DURATION, () => {
+    for (const { r, c } of matches) grid[r][c] = -1;
+    const falls = applyGravity();
+    fillEmpty();
+    startAnim('fall', { falls }, FALL_DURATION, () => {
+      processMatches(null);
+    });
+  });
+}
+
+function afterCascade() {
+  if (levelScore >= levelTarget) {
+    sndWin(); saveGame(); showModal('🎉 Уровень пройден!', `Очки: ${levelScore}`, 'Далее', () => {
+      if (currentLevel < LEVELS.length - 1) { currentLevel++; totalScore = Math.max(totalScore, levelScore); startLevel(); }
+      else showVictory();
+    }, 'win');
+  } else if (movesLeft <= 0) {
+    sndLose(); showModal('💔 Уровень провален', `Нужно было ${levelTarget}, набрано ${levelScore}`, 'Повторить', () => startLevel(), 'lose');
+  } else if (!hasValidMoves()) {
+    shuffleGrid();
+    processMatches(null);
+  } else {
+    locked = false;
+  }
+}
+
+function groupMatches(matches) {
+  const groups = [], used = new Set();
+  for (const m of matches) {
+    const key = m.r * gridSize + m.c;
+    if (used.has(key)) continue;
+    const g = [m]; used.add(key);
+    // extend horizontally
+    for (let dc = 1; m.c + dc < gridSize && grid[m.r][m.c+dc] === grid[m.r][m.c]; dc++) {
+      const k = m.r * gridSize + (m.c + dc);
+      if (!used.has(k) && matches.some(x => x.r === m.r && x.c === m.c + dc)) { g.push({r:m.r,c:m.c+dc}); used.add(k); }
+    }
+    for (let dc = 1; m.c - dc >= 0 && grid[m.r][m.c-dc] === grid[m.r][m.c]; dc++) {
+      const k = m.r * gridSize + (m.c - dc);
+      if (!used.has(k) && matches.some(x => x.r === m.r && x.c === m.c - dc)) { g.push({r:m.r,c:m.c-dc}); used.add(k); }
+    }
+    if (g.length >= 3) groups.push(g);
+  }
+  // vertical groups
+  for (const m of matches) {
+    const key = m.r * gridSize + m.c;
+    if (used.has(key)) continue;
+    const g = [m]; used.add(key);
+    for (let dr = 1; m.r + dr < gridSize && grid[m.r+dr][m.c] === grid[m.r][m.c]; dr++) {
+      const k = (m.r + dr) * gridSize + m.c;
+      if (!used.has(k) && matches.some(x => x.r === m.r + dr && x.c === m.c)) { g.push({r:m.r+dr,c:m.c}); used.add(k); }
+    }
+    for (let dr = 1; m.r - dr >= 0 && grid[m.r-dr][m.c] === grid[m.r][m.c]; dr++) {
+      const k = (m.r - dr) * gridSize + m.c;
+      if (!used.has(k) && matches.some(x => x.r === m.r - dr && x.c === m.c)) { g.push({r:m.r-dr,c:m.c}); used.add(k); }
+    }
+    if (g.length >= 3) groups.push(g);
+  }
+  return groups;
+}
+
+function applyGravity() {
+  const falls = [];
+  for (let c = 0; c < gridSize; c++) {
+    let wr = gridSize - 1;
+    for (let r = gridSize - 1; r >= 0; r--) {
+      if (grid[r][c] >= 0) {
+        if (r !== wr) { falls.push({ r: wr, c, type: grid[r][c], fromR: r }); grid[wr][c] = grid[r][c]; grid[r][c] = -1; }
+        wr--;
+      }
+    }
+  }
+  return falls;
+}
+
+function fillEmpty() {
+  for (let r = 0; r < gridSize; r++)
+    for (let c = 0; c < gridSize; c++)
+      if (grid[r][c] < 0) grid[r][c] = Math.floor(Math.random() * gemTypes);
+}
+
+// ======================== RENDERING ========================
+function drawBackground() {
+  const grd = ctx.createRadialGradient(cw/2, ch/2, 0, cw/2, ch/2, cw*0.7);
+  grd.addColorStop(0, 'rgba(30,20,60,0.3)');
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, cw, ch);
+}
+
+function drawGem(cellC, cellR, type, scale, alpha) {
+  if (type < 0 || type >= GEM_COLORS.length) return;
+  const x = cellC * cellSize + cellSize / 2;
+  const y = cellR * cellSize + cellSize / 2;
+  const sz = cellSize * 0.38 * scale;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const grad = ctx.createRadialGradient(x - sz*0.3, y - sz*0.3, 0, x, y, sz);
+  grad.addColorStop(0, GEM_COLORS[type][0]);
+  grad.addColorStop(1, GEM_COLORS[type][1]);
+  ctx.fillStyle = grad;
+  ctx.shadowColor = 'rgba(0,0,0,0.4)';
+  ctx.shadowBlur = 3;
+
+  switch (type) {
+    case 0: // circle
+      ctx.beginPath(); ctx.arc(x, y, sz, 0, Math.PI*2); ctx.fill(); break;
+    case 1: // square
+      ctx.fillRect(x - sz, y - sz, sz*2, sz*2); break;
+    case 2: // triangle
+      ctx.beginPath(); ctx.moveTo(x, y - sz); ctx.lineTo(x + sz, y + sz); ctx.lineTo(x - sz, y + sz); ctx.closePath(); ctx.fill(); break;
+    case 3: // diamond
+      ctx.beginPath(); ctx.moveTo(x, y - sz); ctx.lineTo(x + sz, y); ctx.lineTo(x, y + sz); ctx.lineTo(x - sz, y); ctx.closePath(); ctx.fill(); break;
+    case 4: // star
+      drawStar(ctx, x, y, sz, sz*0.45, 5); ctx.fill(); break;
+    case 5: // hexagon
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = Math.PI/3 * i - Math.PI/6;
+        const px = x + Math.cos(a) * sz;
+        const py = y + Math.sin(a) * sz;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.fill(); break;
+  }
+  ctx.restore();
+}
+
+function drawStar(ctx, cx, cy, outerR, innerR, points) {
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const a = Math.PI / points * i - Math.PI / 2;
+    const x = cx + Math.cos(a) * r;
+    const y = cy + Math.sin(a) * r;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+
+function drawCell(c, r) {
+  const x = c * cellSize, y = r * cellSize;
+  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  ctx.beginPath();
+  ctx.roundRect(x + 1, y + 1, cellSize - 2, cellSize - 2, 3);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.roundRect(x + 1, y + 1, cellSize - 2, cellSize - 2, 3);
+  ctx.stroke();
+}
+
+function render() {
+  ctx.clearRect(0, 0, cw, ch);
+  drawBackground();
+  const isAnim = animState === 'anim';
+
+  // Draw cells and gems
+  for (let r = 0; r < gridSize; r++) {
+    for (let c = 0; c < gridSize; c++) {
+      drawCell(c, r);
+      if (isAnim && animType === 'swap' && (r === animData.r1 && c === animData.c1 || r === animData.r2 && c === animData.c2)) continue;
+      if (isAnim && animType === 'swap_back' && (r === animData.r1 && c === animData.c1 || r === animData.r2 && c === animData.c2)) continue;
+      if (isAnim && animType === 'match' && animData.cells.some(m => m.r === r && m.c === c)) {
+        const scale = 1 - animProgress;
+        const alpha = 1 - animProgress * 0.7;
+        if (scale > 0.01) drawGem(c, r, grid[r][c], scale, alpha);
+        continue;
+      }
+      if (isAnim && animType === 'fall') {
+        const fall = animData.falls.find(f => f.r === r && f.c === c);
+        if (fall) continue;
+      }
+      if (grid[r][c] >= 0) drawGem(c, r, grid[r][c], 1, 1);
+    }
+  }
+
+  // Swap animation
+  if (isAnim && (animType === 'swap' || animType === 'swap_back')) {
+    const { r1, c1, r2, c2 } = animData;
+    const t = animType === 'swap' ? animProgress : 1 - animProgress;
+    const x1 = c1 * cellSize + cellSize/2 + (c2 - c1) * cellSize * t;
+    const y1 = r1 * cellSize + cellSize/2 + (r2 - r1) * cellSize * t;
+    const x2 = c2 * cellSize + cellSize/2 + (c1 - c2) * cellSize * t;
+    const y2 = r2 * cellSize + cellSize/2 + (r1 - r2) * cellSize * t;
+    // draw at interpolated positions
+    ctx.save();
+    const t1 = grid[r1][c1], t2 = grid[r2][c2];
+    drawGemAtPos(x1, y1, t2, 1, 1);
+    drawGemAtPos(x2, y2, t1, 1, 1);
+    ctx.restore();
+  }
+
+  // Fall animation
+  if (isAnim && animType === 'fall') {
+    for (const f of animData.falls) {
+      const fromY = (f.fromR) * cellSize + cellSize/2;
+      const toY = f.r * cellSize + cellSize/2;
+      const y = fromY + (toY - fromY) * animProgress;
+      drawGemAtPos(f.c * cellSize + cellSize/2, y, grid[f.r][f.c], 1, 1);
+    }
+  }
+
+  // Selection
+  if (selectedR >= 0 && selectedC >= 0 && grid[selectedR] && grid[selectedR][selectedC] >= 0) {
+    const x = selectedC * cellSize, y = selectedR * cellSize;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgba(255,255,255,0.5)';
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.roundRect(x + 2, y + 2, cellSize - 4, cellSize - 4, 4);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+}
+
+function drawGemAtPos(x, y, type, scale, alpha) {
+  if (type < 0 || type >= GEM_COLORS.length) return;
+  const sz = cellSize * 0.38 * scale;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const grad = ctx.createRadialGradient(x - sz*0.3, y - sz*0.3, 0, x, y, sz);
+  grad.addColorStop(0, GEM_COLORS[type][0]);
+  grad.addColorStop(1, GEM_COLORS[type][1]);
+  ctx.fillStyle = grad;
+  ctx.shadowColor = 'rgba(0,0,0,0.4)';
+  ctx.shadowBlur = 3;
+  switch (type) {
+    case 0: ctx.beginPath(); ctx.arc(x, y, sz, 0, Math.PI*2); ctx.fill(); break;
+    case 1: ctx.fillRect(x - sz, y - sz, sz*2, sz*2); break;
+    case 2: ctx.beginPath(); ctx.moveTo(x, y - sz); ctx.lineTo(x + sz, y + sz); ctx.lineTo(x - sz, y + sz); ctx.closePath(); ctx.fill(); break;
+    case 3: ctx.beginPath(); ctx.moveTo(x, y - sz); ctx.lineTo(x + sz, y); ctx.lineTo(x, y + sz); ctx.lineTo(x - sz, y); ctx.closePath(); ctx.fill(); break;
+    case 4: drawStar(ctx, x, y, sz, sz*0.45, 5); ctx.fill(); break;
+    case 5: ctx.beginPath();
+      for (let i = 0; i < 6; i++) { const a = Math.PI/3*i-Math.PI/6; const px=x+Math.cos(a)*sz, py=y+Math.sin(a)*sz; i===0?ctx.moveTo(px,py):ctx.lineTo(px,py); }
+      ctx.closePath(); ctx.fill(); break;
+  }
+  ctx.restore();
+}
+
+// ======================== HUD ========================
+function updateHUD() {
+  levelNum.textContent = currentLevel + 1;
+  totalScoreEl.textContent = totalScore;
+  levelScoreEl.textContent = levelScore;
+  movesLeftEl.textContent = movesLeft;
+  const pct = Math.min(levelScore / levelTarget * 100, 100);
+  progressFill.style.width = pct + '%';
+}
+
+function showModal(title, score, btnText, onClick, cls) {
+  modalTitle.textContent = title;
+  modalScore.textContent = score;
+  modalBtn.textContent = btnText;
+  modalBtn.onclick = onClick;
+  modalEl.className = cls === 'win' ? 'modal-win' : 'modal-lose';
+  modalEl.classList.remove('hidden');
+}
+
+function showVictory() {
+  modalTitle.textContent = '🏆 Победа!';
+  modalScore.textContent = 'Все 15 уровней пройдены! Общий счёт: ' + totalScore;
+  modalBtn.textContent = 'Сыграть снова';
+  modalBtn.onclick = () => { currentLevel = 0; totalScore = 0; localStorage.removeItem(SAVE_KEY); startLevel(); };
+  modalEl.className = 'modal-win';
+  modalEl.classList.remove('hidden');
+}
+
+// ======================== CANVAS SIZING ========================
+function resizeCanvas() {
+  const maxW = Math.min(window.innerWidth, 420);
+  const wrap = document.getElementById('canvas-wrap');
+  const wrapH = wrap.clientHeight;
+  if (wrapH < 50) { requestAnimationFrame(resizeCanvas); return; }
+  const avail = Math.min(maxW - 16, wrapH - 8);
+  cellSize = Math.floor(avail / gridSize);
+  cw = cellSize * gridSize;
+  ch = cellSize * gridSize;
+  canvas.width = cw * dpr;
+  canvas.height = ch * dpr;
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // roundRect polyfill for older browsers
+  if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+      if (r > w/2) r = w/2; if (r > h/2) r = h/2;
+      this.moveTo(x + r, y); this.lineTo(x + w - r, y);
+      this.quadraticCurveTo(x + w, y, x + w, y + r);
+      this.lineTo(x + w, y + h - r);
+      this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      this.lineTo(x + r, y + h);
+      this.quadraticCurveTo(x, y + h, x, y + h - r);
+      this.lineTo(x, y + r);
+      this.quadraticCurveTo(x, y, x + r, y);
+    };
+  }
+}
+
+// ======================== INPUT ========================
+function getGridCell(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+  const c = Math.floor(x / cellSize);
+  const r = Math.floor(y / cellSize);
+  if (r < 0 || r >= gridSize || c < 0 || c >= gridSize) return null;
+  return { r, c };
+}
+
+let touchStartR = -1, touchStartC = -1, touchStartX = 0, touchStartY = 0, hasSwiped = false;
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (locked || animState !== 'idle') return;
+  const t = e.touches[0];
+  const cell = getGridCell(t.clientX, t.clientY);
+  if (!cell) return;
+  touchStartR = cell.r; touchStartC = cell.c;
+  touchStartX = t.clientX; touchStartY = t.clientY;
+  hasSwiped = false;
+});
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (hasSwiped || locked || animState !== 'idle') return;
+  const t = e.touches[0];
+  const dx = t.clientX - touchStartX, dy = t.clientY - touchStartY;
+  const thresh = cellSize * 0.3;
+  if (Math.abs(dx) > thresh || Math.abs(dy) > thresh) {
+    let dr = 0, dc = 0;
+    if (Math.abs(dx) > Math.abs(dy)) dc = dx > 0 ? 1 : -1;
+    else dr = dy > 0 ? 1 : -1;
+    const nr = touchStartR + dr, nc = touchStartC + dc;
+    if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
+      sndClick();
+      doSwap(touchStartR, touchStartC, nr, nc);
+    }
+    hasSwiped = true; selectedR = -1; selectedC = -1;
+  }
+});
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  if (locked) return;
+  if (!hasSwiped && touchStartR >= 0 && animState === 'idle') {
+    if (selectedR === touchStartR && selectedC === touchStartC) {
+      selectedR = -1; selectedC = -1;
+    } else if (selectedR >= 0 && Math.abs(selectedR - touchStartR) + Math.abs(selectedC - touchStartC) === 1) {
+      sndClick();
+      doSwap(selectedR, selectedC, touchStartR, touchStartC);
+      selectedR = -1; selectedC = -1;
+    } else {
+      selectedR = touchStartR; selectedC = touchStartC;
+    }
+  }
+  touchStartR = -1;
+});
+
+// Mouse support for desktop testing
+canvas.addEventListener('mousedown', (e) => {
+  if (locked || animState !== 'idle') return;
+  const cell = getGridCell(e.clientX, e.clientY);
+  if (!cell) return;
+  if (selectedR === cell.r && selectedC === cell.c) {
+    selectedR = -1; selectedC = -1;
+  } else if (selectedR >= 0 && Math.abs(selectedR - cell.r) + Math.abs(selectedC - cell.c) === 1) {
+    sndClick();
+    doSwap(selectedR, selectedC, cell.r, cell.c);
+    selectedR = -1; selectedC = -1;
+  } else {
+    selectedR = cell.r; selectedC = cell.c;
+  }
+});
+
+// ======================== GAME LOOP ========================
+function loop() {
+  updateAnim();
+  render();
+  requestAnimationFrame(loop);
+}
+
+// ======================== INIT ========================
+loadGame();
+document.getElementById('btn-play').onclick = () => {
+  welcomeEl.style.display = 'none';
+  startLevel();
+};
+document.getElementById('btn-new').onclick = () => {
+  if (confirm('Начать новую игру? Весь прогресс будет сброшен.')) {
+    currentLevel = 0; totalScore = 0; localStorage.removeItem(SAVE_KEY); startLevel();
+  }
+};
+document.getElementById('btn-retry').onclick = () => startLevel();
+document.getElementById('btn-sound').onclick = function() {
+  soundOn = !soundOn; this.textContent = soundOn ? '🔊' : '🔇';
+};
+window.addEventListener('resize', () => {
+  if (gameEl.classList.contains('hidden')) return;
+  resizeCanvas();
+});
+loop();
+</script>
+</body>
+</html>
