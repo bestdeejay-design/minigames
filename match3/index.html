@@ -133,12 +133,13 @@ let locked = false;
 
 // ======================== AUDIO ========================
 let audioCtx = null;
-let audioReady = false;
 
 function initAudio() {
+  if (audioCtx) return;
   try {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    // iOS: unlock by playing silence synchronously in user gesture
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    // Play silent buffer to unlock iOS
     const buf = audioCtx.createBuffer(1, 1, 22050);
     const src = audioCtx.createBufferSource();
     src.buffer = buf;
@@ -146,65 +147,38 @@ function initAudio() {
     g.gain.value = 0.001;
     src.connect(g); g.connect(audioCtx.destination);
     src.start();
+  } catch(e) {}
+}
+
+function playNote(freq, dur, vol, type, delay, sweepTo) {
+  if (!soundOn) return;
+  try {
+    if (!audioCtx) initAudio();
+    if (!audioCtx) return;
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    audioReady = true;
-  } catch(e) {}
-}
-
-function playNote(freq, dur, vol, type, delay) {
-  if (!audioReady || !soundOn) return;
-  try {
-    const ac = audioCtx;
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
+    const t = (delay || 0) + audioCtx.currentTime + 0.02;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
     osc.type = type || 'sine';
-    osc.frequency.value = freq;
-    const t = (delay || 0) + ac.currentTime;
+    if (sweepTo) {
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.exponentialRampToValueAtTime(sweepTo, t + dur);
+    } else {
+      osc.frequency.value = freq;
+    }
     gain.gain.setValueAtTime(vol || 0.1, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    osc.connect(gain); gain.connect(ac.destination);
-    osc.start(t); osc.stop(t + dur);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur + 0.01);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(t); osc.stop(t + dur + 0.01);
   } catch(e) {}
 }
 
-function sndClick() { playNote(880, 0.04, 0.08); }
-function sndSwap() {
-  if (!audioReady || !soundOn) return;
-  try {
-    const ac = audioCtx;
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(350, ac.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(700, ac.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.1, ac.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
-    osc.connect(gain); gain.connect(ac.destination);
-    osc.start(); osc.stop(ac.currentTime + 0.12);
-  } catch(e) {}
-}
-function sndMatch() {
-  [523, 659, 784].forEach((f, i) => playNote(f, 0.18, 0.12, 'sine', i * 0.07));
-}
-function sndBad() { playNote(160, 0.2, 0.08, 'sawtooth'); }
-function sndWin() {
-  [523, 659, 784, 1047].forEach((f, i) => playNote(f, 0.3, 0.14, 'sine', i * 0.15));
-}
-function sndLose() {
-  if (!audioReady || !soundOn) return;
-  try {
-    const ac = audioCtx;
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(400, ac.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(100, ac.currentTime + 0.5);
-    gain.gain.setValueAtTime(0.08, ac.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.5);
-    osc.connect(gain); gain.connect(ac.destination);
-    osc.start(); osc.stop(ac.currentTime + 0.5);
-  } catch(e) {}
-}
+function sndClick() { playNote(880, 0.05, 0.1); }
+function sndSwap() { playNote(350, 0.12, 0.12, 'sine', 0, 700); }
+function sndMatch() { [523, 659, 784].forEach((f, i) => playNote(f, 0.18, 0.14, 'sine', i * 0.07)); }
+function sndBad() { playNote(160, 0.2, 0.1, 'sawtooth'); }
+function sndWin() { [523, 659, 784, 1047].forEach((f, i) => playNote(f, 0.3, 0.16, 'sine', i * 0.15)); }
+function sndLose() { playNote(400, 0.5, 0.1, 'sawtooth', 0, 100); }
 
 // ======================== SAVE/LOAD ========================
 function saveGame() {
