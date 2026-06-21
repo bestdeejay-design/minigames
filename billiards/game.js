@@ -73,9 +73,9 @@ function genLevel(lv) {
   const tt = TABLE.top(), tb = TABLE.bottom();
   const ctrX = (tl + tr) * 0.5;
 
-  // Кий — внизу, в зоне «дома» (как в настоящем пуле)
+  // Кий — за головной линией ("kitchen"), 18% от нижнего борта
   const cueX = ctrX;
-  const cueY = tb - BALL_R - 12;
+  const cueY = tb - (tb - tt) * 0.18;
   ballsOut.push({ x: cueX, y: cueY, r: BALL_R, vx: 0, vy: 0, cue: true, color: '#fff', label: '', active: true });
 
   // Пирамида шаров в верхней части стола
@@ -348,6 +348,17 @@ function draw() {
   ctx.fillStyle = '#3BA85E';
   roundRect(ctx, TABLE.left() + railW + 4, TABLE.top() + railW + 4, TABLE.right() - TABLE.left() - railW * 2 - 8, TABLE.bottom() - TABLE.top() - railW * 2 - 8, 2);
   ctx.fill();
+
+  // Head string (головная линия)
+  const hsY = TABLE.bottom() - (TABLE.bottom() - TABLE.top()) * 0.25;
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(TABLE.left() + railW + 4, hsY);
+  ctx.lineTo(TABLE.right() - railW - 4, hsY);
+  ctx.stroke();
+  ctx.setLineDash([]);
 
   // Foot spot (место пирамиды)
   const fsX = TABLE.left() + (TABLE.right() - TABLE.left()) * 0.5;
