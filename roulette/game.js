@@ -427,6 +427,8 @@ function resize() {
   canvas.style.width = cw + 'px';
   canvas.style.height = ch + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Запас для браузеров без dvh
+  document.getElementById('app').style.height = vh + 'px';
   draw();
 }
 window.addEventListener('resize', resize);
