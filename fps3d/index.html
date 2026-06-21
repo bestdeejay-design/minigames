@@ -102,7 +102,7 @@ canvas { display:block; }
   <div class="keys">
     <span class="key">W A S D</span>
     <span class="key">🖱 мышь</span>
-    <span class="key">ЛКМ стрельба</span>
+    <span class="key">Пробел / тап</span>
     <span class="key">R перезарядка</span>
   </div>
   <button class="btn" id="startBtn">НАЧАТЬ ИГРУ</button>
@@ -235,6 +235,7 @@ function init() {
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('keyup', onKeyUp);
   renderer.domElement.addEventListener('mousedown', onShoot);
+  renderer.domElement.addEventListener('touchstart', (e) => { e.preventDefault(); doShoot(); }, { passive: false });
 
   document.getElementById('startBtn').addEventListener('click', startGame);
   document.getElementById('restartBtn').addEventListener('click', restartGame);
@@ -419,35 +420,9 @@ function onLockChange() {
   isLocked = document.pointerLockElement === renderer.domElement;
 }
 
-function onKeyDown(e) {
-  const k = e.key.toLowerCase();
-  if (k === 'r' && player.alive && !gameOver) startReload();
-  if (k === 'w' || k === 'a' || k === 's' || k === 'd') keys[k] = true;
-  if (k === ' ' && player.alive && !gameOver && !isLocked) {
-    renderer.domElement.requestPointerLock();
-  }
-}
-
-function onKeyUp(e) {
-  const k = e.key.toLowerCase();
-  if (k === 'w' || k === 'a' || k === 's' || k === 'd') keys[k] = false;
-}
-
-function startReload() {
-  if (reloading || ammo === maxAmmo || !player.alive || gameOver) return;
-  reloading = true; reloadTimer = reloadTime;
-  document.getElementById('reload-hint').style.opacity = '1';
-  document.getElementById('reload-hint').textContent = 'ПЕРЕЗАРЯДКА...';
-  sfx('reload');
-}
-
-function onShoot(e) {
-  if (e.button !== 0) return;
-  if (!isLocked && !gameOver && player.alive) {
-    renderer.domElement.requestPointerLock();
-    return;
-  }
+function doShoot() {
   if (!player.alive || gameOver || reloading) return;
+  if (!isLocked) { renderer.domElement.requestPointerLock(); return; }
   if (fireCooldown > 0) return;
   if (ammo <= 0) { startReload(); return; }
 
@@ -500,6 +475,31 @@ function onShoot(e) {
       }
     }
   }
+}
+
+function onKeyDown(e) {
+  const k = e.key.toLowerCase();
+  if (k === 'r' && player.alive && !gameOver) startReload();
+  if (k === 'w' || k === 'a' || k === 's' || k === 'd') keys[k] = true;
+  if (k === ' ') { e.preventDefault(); doShoot(); }
+}
+
+function onKeyUp(e) {
+  const k = e.key.toLowerCase();
+  if (k === 'w' || k === 'a' || k === 's' || k === 'd') keys[k] = false;
+}
+
+function startReload() {
+  if (reloading || ammo === maxAmmo || !player.alive || gameOver) return;
+  reloading = true; reloadTimer = reloadTime;
+  document.getElementById('reload-hint').style.opacity = '1';
+  document.getElementById('reload-hint').textContent = 'ПЕРЕЗАРЯДКА...';
+  sfx('reload');
+}
+
+function onShoot(e) {
+  if (e.button !== 0) return;
+  doShoot();
 }
 
 function addKillFeed() {
