@@ -66,58 +66,36 @@ let settling = false;
 
 // ─── Auto-generate Level ────────────────────────────────
 function genLevel(lv) {
-  const numBalls = Math.min(2 + lv, 12);
+  const numTargets = Math.min(1 + lv, 11);
+  const totalBalls = numTargets + 1;
   const ballsOut = [];
-  const placed = [];
   const tl = TABLE.left(), tr = TABLE.right();
   const tt = TABLE.top(), tb = TABLE.bottom();
+  const ctrX = (tl + tr) * 0.5;
 
-  function randPos() {
-    // Шары в центральной зоне, подальше от бортов и луз
-    const cx = tl + (tr - tl) * 0.5;
-    const cy = tt + (tb - tt) * 0.5;
-    const halfW = (tr - tl) * 0.25;
-    const halfH = (tb - tt) * 0.25;
-    for (let attempt = 0; attempt < 100; attempt++) {
-      const x = cx - halfW + Math.random() * halfW * 2;
-      const y = cy - halfH + Math.random() * halfH * 2;
-      let ok = true;
-      for (const p of placed) {
-        const dx = x - p.x, dy = y - p.y;
-        if (dx * dx + dy * dy < (BALL_R * 2 + 8) * (BALL_R * 2 + 8)) { ok = false; break; }
-      }
-      for (const pk of POCKETS) {
-        const px = pk.x(), py = pk.y();
-        const dx = x - px, dy = y - py;
-        if (dx * dx + dy * dy < (POCKET_R + BALL_R + 8) * (POCKET_R + BALL_R + 8)) { ok = false; break; }
-      }
-      if (ok) return { x, y };
+  // Кий — внизу, в зоне «дома» (как в настоящем пуле)
+  const cueX = ctrX;
+  const cueY = tb - BALL_R - 12;
+  ballsOut.push({ x: cueX, y: cueY, r: BALL_R, vx: 0, vy: 0, cue: true, color: '#fff', label: '', active: true });
+
+  // Пирамида шаров в верхней части стола
+  const apexX = ctrX;
+  const apexY = tt + BALL_R + 20 + (tb - tt) * 0.08;
+  const spacing = BALL_R * 2 + 1;
+  const rowSpacing = BALL_R * Math.sqrt(3);
+  let placed = 0, row = 0;
+
+  while (placed < numTargets) {
+    for (let col = 0; col <= row && placed < numTargets; col++) {
+      const x = apexX + (col - row / 2) * spacing;
+      const y = apexY + row * rowSpacing;
+      ballsOut.push({ x, y, r: BALL_R, vx: 0, vy: 0, cue: false, color: BALL_COLORS[placed % BALL_COLORS.length], label: String(placed + 1), active: true });
+      placed++;
     }
-    // fallback — в центре
-    return { x: cx, y: cy };
+    row++;
   }
 
-  // Кий всегда внизу по центру
-  const cueX = TABLE.left() + (TABLE.right() - TABLE.left()) * 0.5;
-  const cueY = TABLE.bottom() - BALL_R - 8;
-  placed.push({ x: cueX, y: cueY });
-  ballsOut.push({
-    x: cueX, y: cueY, r: BALL_R, vx: 0, vy: 0,
-    cue: true, color: '#fff', label: '', active: true,
-  });
-
-  for (let i = 1; i < numBalls; i++) {
-    const pos = randPos();
-    placed.push(pos);
-    ballsOut.push({
-      x: pos.x, y: pos.y, r: BALL_R, vx: 0, vy: 0,
-      cue: false,
-      color: BALL_COLORS[(i - 1) % BALL_COLORS.length],
-      label: String(i),
-      active: true,
-    });
-  }
-  return { balls: ballsOut, shots: numBalls };
+  return { balls: ballsOut, shots: totalBalls };
 }
 
 // ─── Load Level ─────────────────────────────────────────
@@ -369,6 +347,19 @@ function draw() {
   // Felt (bright green)
   ctx.fillStyle = '#3BA85E';
   roundRect(ctx, TABLE.left() + railW + 4, TABLE.top() + railW + 4, TABLE.right() - TABLE.left() - railW * 2 - 8, TABLE.bottom() - TABLE.top() - railW * 2 - 8, 2);
+  ctx.fill();
+
+  // Foot spot (место пирамиды)
+  const fsX = TABLE.left() + (TABLE.right() - TABLE.left()) * 0.5;
+  const fsY = TABLE.top() + BALL_R + 20 + (TABLE.bottom() - TABLE.top()) * 0.08;
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  const ds = 4;
+  ctx.beginPath();
+  ctx.moveTo(fsX, fsY - ds);
+  ctx.lineTo(fsX + ds, fsY);
+  ctx.lineTo(fsX, fsY + ds);
+  ctx.lineTo(fsX - ds, fsY);
+  ctx.closePath();
   ctx.fill();
 
   // Pocket cutouts on rails
