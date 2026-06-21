@@ -23,26 +23,27 @@ resize();
 window.addEventListener('resize', resize);
 
 // ─── Constants ──────────────────────────────────────────
-const BALL_R = 10;
-const POCKET_R = 17;
+const BALL_R = 11;
+const POCKET_R = 18;
 const FRICTION = 0.988;
 const WALL_BOUNCE = 0.75;
-const MAX_POWER = 18;
+const MAX_POWER = 16;
 
 const TABLE = {
-  left: () => cw * 0.06,
-  right: () => cw * 0.94,
+  left: () => cw * 0.10,
+  right: () => cw * 0.90,
   top: () => ch * 0.10,
   bottom: () => ch * 0.90,
 };
 
+// Портрет: центральные лузы по бокам (длинные борта)
 const POCKETS = [
-  { x: () => cw * 0.07, y: () => ch * 0.11, pts: 3 },
-  { x: () => cw * 0.50, y: () => ch * 0.09, pts: 7 },
-  { x: () => cw * 0.93, y: () => ch * 0.11, pts: 3 },
-  { x: () => cw * 0.07, y: () => ch * 0.89, pts: 3 },
-  { x: () => cw * 0.50, y: () => ch * 0.91, pts: 7 },
-  { x: () => cw * 0.93, y: () => ch * 0.89, pts: 3 },
+  { x: () => cw * 0.08, y: () => ch * 0.10, pts: 3 },
+  { x: () => cw * 0.92, y: () => ch * 0.10, pts: 3 },
+  { x: () => cw * 0.06, y: () => ch * 0.50, pts: 7 },
+  { x: () => cw * 0.94, y: () => ch * 0.50, pts: 7 },
+  { x: () => cw * 0.08, y: () => ch * 0.90, pts: 3 },
+  { x: () => cw * 0.92, y: () => ch * 0.90, pts: 3 },
 ];
 
 const BALL_COLORS = [
@@ -89,16 +90,23 @@ function genLevel(lv) {
     return { x: tl + BALL_R + Math.random() * (tr - tl - BALL_R * 2), y: tt + BALL_R + Math.random() * (tb - tt - BALL_R * 2) };
   }
 
-  for (let i = 0; i < numBalls; i++) {
+  // Кий всегда внизу по центру
+  const cueX = TABLE.left() + (TABLE.right() - TABLE.left()) * 0.5;
+  const cueY = TABLE.bottom() - BALL_R - 8;
+  placed.push({ x: cueX, y: cueY });
+  ballsOut.push({
+    x: cueX, y: cueY, r: BALL_R, vx: 0, vy: 0,
+    cue: true, color: '#fff', label: '', active: true,
+  });
+
+  for (let i = 1; i < numBalls; i++) {
     const pos = randPos();
-    const isCue = i === 0;
     placed.push(pos);
     ballsOut.push({
-      x: pos.x, y: pos.y, r: BALL_R,
-      vx: 0, vy: 0,
-      cue: isCue,
-      color: isCue ? '#fff' : BALL_COLORS[(i - 1) % BALL_COLORS.length],
-      label: isCue ? '' : String(i),
+      x: pos.x, y: pos.y, r: BALL_R, vx: 0, vy: 0,
+      cue: false,
+      color: BALL_COLORS[(i - 1) % BALL_COLORS.length],
+      label: String(i),
       active: true,
     });
   }
@@ -281,38 +289,42 @@ function draw() {
 
   // Table shadow
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  roundRect(ctx, TABLE.left() + 4, TABLE.top() + 4, TABLE.right() - TABLE.left(), TABLE.bottom() - TABLE.top(), 8);
+  roundRect(ctx, TABLE.left() + 3, TABLE.top() + 3, TABLE.right() - TABLE.left(), TABLE.bottom() - TABLE.top(), 6);
   ctx.fill();
 
-  // Table border (rail)
+  // Outer rail (wood)
   ctx.fillStyle = '#5C3A1E';
-  roundRect(ctx, TABLE.left(), TABLE.top(), TABLE.right() - TABLE.left(), TABLE.bottom() - TABLE.top(), 6);
+  roundRect(ctx, TABLE.left(), TABLE.top(), TABLE.right() - TABLE.left(), TABLE.bottom() - TABLE.top(), 5);
   ctx.fill();
 
-  // Inner rail
-  const inner = 6;
-  ctx.fillStyle = '#3D6B34';
-  roundRect(ctx, TABLE.left() + inner, TABLE.top() + inner, TABLE.right() - TABLE.left() - inner * 2, TABLE.bottom() - TABLE.top() - inner * 2, 4);
+  // Inner rail (dark green)
+  const railW = 8;
+  ctx.fillStyle = '#2E7D4E';
+  roundRect(ctx, TABLE.left() + railW, TABLE.top() + railW, TABLE.right() - TABLE.left() - railW * 2, TABLE.bottom() - TABLE.top() - railW * 2, 3);
   ctx.fill();
 
-  // Felt
-  ctx.fillStyle = '#2D8A4E';
-  roundRect(ctx, TABLE.left() + inner + 4, TABLE.top() + inner + 4, TABLE.right() - TABLE.left() - inner * 2 - 8, TABLE.bottom() - TABLE.top() - inner * 2 - 8, 3);
+  // Felt (bright green)
+  ctx.fillStyle = '#3BA85E';
+  roundRect(ctx, TABLE.left() + railW + 4, TABLE.top() + railW + 4, TABLE.right() - TABLE.left() - railW * 2 - 8, TABLE.bottom() - TABLE.top() - railW * 2 - 8, 2);
   ctx.fill();
 
-  // Pockets
+  // Pocket cutouts on rails
   for (const p of POCKETS) {
     const px = p.x(), py = p.y();
+    const r = POCKET_R + 2;
+    // Dark hole
     ctx.fillStyle = '#111';
     ctx.beginPath();
-    ctx.arc(px, py, POCKET_R, 0, Math.PI * 2);
+    ctx.arc(px, py, r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#333';
+    // Inner shadow
+    ctx.fillStyle = '#222';
     ctx.beginPath();
-    ctx.arc(px, py, POCKET_R - 3, 0, Math.PI * 2);
+    ctx.arc(px, py, r - 3, 0, Math.PI * 2);
     ctx.fill();
+    // Point label
     ctx.fillStyle = '#ffd700';
-    ctx.font = 'bold 8px sans-serif';
+    ctx.font = 'bold 9px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('+' + p.pts, px, py + 1);
@@ -364,8 +376,8 @@ function draw() {
       const angle = Math.atan2(dy, dx);
       const power = (pull / 120) * MAX_POWER;
 
-      // Cue stick
-      const stickLen = 60 + pull * 0.5;
+      // Cue stick (короче для портрета)
+      const stickLen = 40 + pull * 0.35;
       ctx.strokeStyle = '#8B4513';
       ctx.lineWidth = 5;
       ctx.beginPath();
@@ -414,22 +426,26 @@ function draw() {
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.font = '14px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('👆 Оттяни от шара и отпусти', cw / 2, ch * 0.96);
+    ctx.fillText('👆 Оттяни от шара и отпусти', cw / 2, ch * 0.97);
   }
 }
 
 function drawPowerBar(ratio) {
-  const barW = 8, barH = 80;
-  const bx = 14, by = ch * 0.5 - barH / 2;
+  const barW = 100, barH = 8;
+  const bx = cw * 0.5 - barW / 2, by = ch * 0.06;
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
-  const fillH = barH * ratio;
-  const grad = ctx.createLinearGradient(bx, by + barH, bx, by);
-  grad.addColorStop(0, '#2ecc71');
-  grad.addColorStop(0.5, '#f39c12');
-  grad.addColorStop(1, '#e74c3c');
-  ctx.fillStyle = grad;
-  ctx.fillRect(bx, by + barH - fillH, barW, fillH);
+  roundRect(ctx, bx - 2, by - 2, barW + 4, barH + 4, 4);
+  ctx.fill();
+  const fillW = barW * ratio;
+  if (fillW > 0) {
+    const grad = ctx.createLinearGradient(bx, by, bx + barW, by);
+    grad.addColorStop(0, '#2ecc71');
+    grad.addColorStop(0.5, '#f39c12');
+    grad.addColorStop(1, '#e74c3c');
+    ctx.fillStyle = grad;
+    roundRect(ctx, bx, by, fillW, barH, 3);
+    ctx.fill();
+  }
 }
 
 function roundRect(ctx, x, y, w, h, r) {
