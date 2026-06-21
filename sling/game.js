@@ -28,7 +28,7 @@ const GRAVITY = 0.28;
 const MAX_PULL = 100;
 const SLING_X = () => cw / 2;
 const SLING_Y = () => ch * 0.72;
-const POWER_MULT = 0.18;
+const POWER_MULT = 0.22;
 
 // Препятствия всегда ниже рогатки (y=0.78 > sling_y=0.72).
 // Снаряд летит вверх свободно, препятствия ловят только
@@ -44,7 +44,7 @@ const LEVELS = [
   // 3
   { targets: [
     { x: 0.15, y: 0.16, w: 40, h: 40, points: 10 },
-    { x: 0.50, y: 0.06, w: 40, h: 40, points: 15 },
+    { x: 0.50, y: 0.09, w: 40, h: 40, points: 15 },
     { x: 0.82, y: 0.14, w: 40, h: 40, points: 20 },
   ], obstacles: [
     { x: 0, y: 0.78, w: 0.10, h: 6 },
@@ -68,7 +68,7 @@ const LEVELS = [
   { targets: [
     { x: 0.18, y: 0.12, w: 32, h: 32, points: 15, moving: true, moveRange: 22, moveSpeed: 0.025 },
     { x: 0.80, y: 0.13, w: 32, h: 32, points: 15, moving: true, moveRange: 22, moveSpeed: 0.025 },
-    { x: 0.48, y: 0.06, w: 32, h: 32, points: 25, moving: true, moveRange: 12, moveSpeed: 0.03 },
+    { x: 0.48, y: 0.09, w: 32, h: 32, points: 25, moving: true, moveRange: 12, moveSpeed: 0.03 },
   ], obstacles: [
     { x: 0, y: 0.78, w: 0.12, h: 6 },
     { x: 0.88, y: 0.78, w: 0.12, h: 6 },
@@ -87,7 +87,7 @@ const LEVELS = [
   ], shots: 6 },
   // 8
   { targets: [
-    { x: 0.15, y: 0.08, w: 28, h: 28, points: 15 },
+    { x: 0.15, y: 0.10, w: 28, h: 28, points: 15 },
     { x: 0.83, y: 0.10, w: 28, h: 28, points: 15 },
     { x: 0.48, y: 0.28, w: 28, h: 28, points: 20, moving: true, moveRange: 16, moveSpeed: 0.02 },
   ], obstacles: [
@@ -97,7 +97,7 @@ const LEVELS = [
   // 9 — движущиеся + нижние
   { targets: [
     { x: 0.18, y: 0.20, w: 20, h: 20, points: 12, moving: true, moveRange: 35, moveSpeed: 0.03 },
-    { x: 0.50, y: 0.08, w: 22, h: 22, points: 18, moving: true, moveRange: 20, moveSpeed: 0.035 },
+    { x: 0.50, y: 0.10, w: 22, h: 22, points: 18, moving: true, moveRange: 20, moveSpeed: 0.035 },
     { x: 0.80, y: 0.20, w: 20, h: 20, points: 12, moving: true, moveRange: 35, moveSpeed: 0.03 },
     { x: 0.35, y: 0.34, w: 22, h: 22, points: 10 },
     { x: 0.65, y: 0.34, w: 22, h: 22, points: 10 },
@@ -110,7 +110,7 @@ const LEVELS = [
   { targets: [
     { x: 0.10, y: 0.10, w: 22, h: 22, points: 10 },
     { x: 0.28, y: 0.30, w: 22, h: 22, points: 10, moving: true, moveRange: 20, moveSpeed: 0.025 },
-    { x: 0.45, y: 0.05, w: 24, h: 24, points: 20 },
+    { x: 0.45, y: 0.09, w: 24, h: 24, points: 20 },
     { x: 0.60, y: 0.28, w: 22, h: 22, points: 15, moving: true, moveRange: 22, moveSpeed: 0.03 },
     { x: 0.78, y: 0.10, w: 22, h: 22, points: 10 },
     { x: 0.90, y: 0.24, w: 22, h: 22, points: 10, moving: true, moveRange: 14, moveSpeed: 0.02 },
@@ -121,9 +121,9 @@ const LEVELS = [
   ], shots: 7 },
   // ─── 11 — три больших на разной высоте ───
   { targets: [
-    { x: 0.12, y: 0.08, w: 36, h: 36, points: 15 },
+    { x: 0.12, y: 0.10, w: 36, h: 36, points: 15 },
     { x: 0.50, y: 0.22, w: 36, h: 36, points: 15 },
-    { x: 0.85, y: 0.08, w: 36, h: 36, points: 15 },
+    { x: 0.85, y: 0.10, w: 36, h: 36, points: 15 },
   ], obstacles: [
     { x: 0, y: 0.78, w: 0.08, h: 6 },
     { x: 0.92, y: 0.78, w: 0.08, h: 6 },
@@ -162,11 +162,11 @@ const LEVELS = [
   ], shots: 5 },
   // ─── 15 — финал: всё сразу ───
   { targets: [
-    { x: 0.08, y: 0.06, w: 20, h: 20, points: 10 },
+    { x: 0.08, y: 0.09, w: 20, h: 20, points: 10 },
     { x: 0.22, y: 0.30, w: 20, h: 20, points: 15, moving: true, moveRange: 18, moveSpeed: 0.03 },
-    { x: 0.40, y: 0.08, w: 22, h: 22, points: 20 },
+    { x: 0.40, y: 0.10, w: 22, h: 22, points: 20 },
     { x: 0.55, y: 0.28, w: 20, h: 20, points: 15, moving: true, moveRange: 20, moveSpeed: 0.03 },
-    { x: 0.72, y: 0.06, w: 20, h: 20, points: 10 },
+    { x: 0.72, y: 0.09, w: 20, h: 20, points: 10 },
     { x: 0.88, y: 0.24, w: 20, h: 20, points: 10, moving: true, moveRange: 14, moveSpeed: 0.025 },
   ], obstacles: [
     { x: 0, y: 0.78, w: 0.08, h: 6 },
