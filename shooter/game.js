@@ -314,7 +314,7 @@ function loop() {
   }
 
   // Spawn
-  const spawnInterval = Math.max(50, 110 - Math.floor(score / 500) * 8);
+  const spawnInterval = Math.max(60, 120 - Math.floor(score / 1000) * 8);
   spawnTimer += dt;
   if (spawnTimer >= spawnInterval) {
     spawnTimer = 0;
@@ -322,9 +322,9 @@ function loop() {
     if (frameId > 300 && Math.random() < 0.08) tryDropPara();
   }
 
-  // Move enemies — все едут вниз, скорость растёт с каждыми 500 очками
-  const speedBonus = Math.floor(score / 500) * 0.2;
-  const scrollSpeed = Math.min(0.6 + speedBonus, 2.5);
+  // Move enemies — скорость растёт с каждыми 1000 очков
+  const speedBonus = Math.floor(score / 1000) * 0.1;
+  const scrollSpeed = Math.min(0.6 + speedBonus, 1.8);
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
     e.y += scrollSpeed;
