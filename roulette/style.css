@@ -1,0 +1,81 @@
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+html, body { width: 100%; height: 100%; overflow: hidden; touch-action: manipulation; }
+body { background: #0a0a1a; color: #eee; font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; }
+#app { width: 100%; max-width: 420px; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+
+#hud {
+  display: flex; justify-content: space-around; align-items: center;
+  padding: 6px 10px; background: #12122a; font-size: 0.85rem;
+  flex-shrink: 0; min-height: 36px;
+}
+#hud #result-label { font-weight: bold; font-size: 0.9rem; min-width: 80px; text-align: center; }
+
+canvas { display: block; width: 100%; flex: 0 0 auto; touch-action: none; }
+
+#betting {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  background: #0f0f24;
+}
+
+#num-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px;
+  padding: 4px; flex-shrink: 0;
+}
+#num-grid button {
+  aspect-ratio: 1; border: none; border-radius: 3px;
+  font-size: 0.7rem; font-weight: bold; color: #fff;
+  cursor: pointer; touch-action: manipulation;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+#num-grid button .chip-count {
+  position: absolute; top: 1px; right: 2px;
+  font-size: 0.55rem; color: #ffd700; font-weight: bold;
+}
+#num-grid button.b-red { background: #c0392b; }
+#num-grid button.b-black { background: #1a1a2e; color: #ccc; border: 1px solid #333; }
+#num-grid button.b-green { background: #27ae60; }
+
+#outside-bets {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px;
+  padding: 3px 4px; flex-shrink: 0;
+}
+#outside-bets button {
+  padding: 6px 0; border: none; border-radius: 4px;
+  font-size: 0.7rem; font-weight: bold; cursor: pointer;
+  color: #fff; touch-action: manipulation;
+}
+#outside-bets button.b-red { background: #c0392b; }
+#outside-bets button.b-black { background: #222; border: 1px solid #555; }
+
+#chip-row {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 6px; flex-shrink: 0;
+  background: #12122a;
+}
+#chip-row span { font-size: 0.75rem; color: #888; white-space: nowrap; }
+.chip-btn {
+  width: 36px; height: 28px; border: 1px solid #555; border-radius: 14px;
+  background: #1a1a3a; color: #ffd700; font-size: 0.7rem; font-weight: bold;
+  cursor: pointer; touch-action: manipulation;
+}
+.chip-btn.active { background: #ffd700; color: #1a1a3a; border-color: #ffd700; }
+#btn-spin {
+  margin-left: auto; padding: 6px 18px; border: none; border-radius: 6px;
+  background: #e94560; color: #fff; font-size: 0.85rem; font-weight: bold;
+  cursor: pointer; touch-action: manipulation;
+}
+#btn-spin:disabled { opacity: 0.4; }
+
+#overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 10; gap: 12px;
+}
+#overlay.hidden { display: none; }
+#overlay-title { font-size: 1.6rem; font-weight: bold; }
+#overlay-sub { font-size: 0.9rem; color: #aaa; }
+#overlay button {
+  padding: 12px 40px; border: none; border-radius: 8px;
+  background: #e94560; color: #fff; font-size: 1rem; font-weight: bold; cursor: pointer;
+}

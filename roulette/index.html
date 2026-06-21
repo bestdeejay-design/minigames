@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Рулетка</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <span>💰 <span id="balance">1000</span></span>
+    <span>🎲 <span id="bet-total">0</span></span>
+    <span id="result-label"></span>
+  </div>
+  <canvas id="gameCanvas"></canvas>
+  <div id="betting">
+    <div id="num-grid"></div>
+    <div id="outside-bets">
+      <button data-bet="1-18">1-18</button>
+      <button data-bet="19-36">19-36</button>
+      <button data-bet="red" class="b-red">Красное</button>
+      <button data-bet="black" class="b-black">Чёрное</button>
+      <button data-bet="odd">Нечёт</button>
+      <button data-bet="even">Чёт</button>
+    </div>
+    <div id="chip-row">
+      <span>Ставка:</span>
+      <button class="chip-btn active" data-val="10">10</button>
+      <button class="chip-btn" data-val="25">25</button>
+      <button class="chip-btn" data-val="100">100</button>
+      <button id="btn-spin">КРУТИТЬ!</button>
+    </div>
+  </div>
+  <div id="overlay" class="hidden">
+    <div id="overlay-title"></div>
+    <div id="overlay-sub"></div>
+    <button id="btn-next">Ещё!</button>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
