@@ -314,20 +314,26 @@ function draw() {
 
 // ─── Spin Animation ─────────────────────────────────────
 
+let _rawAngle = 0; // absolute angle accumulator (keeps growing across spins)
+
 function startSpin() {
-  if (totalBet === 0) return;
+  if (totalBet === 0 || spinning) return;
 
   const resultNum = Math.floor(Math.random() * 37);
   result = resultNum;
 
   const idx = WHEEL_ORDER.indexOf(resultNum);
   const sectorMid = (idx + 0.5) * SECTOR_ANGLE;
+  // Target: sectorMid at 12 o'clock position (−π/2)
   const finalAngle = -Math.PI / 2 - sectorMid;
+  // Normalize to [0, 2π)
+  const finalNorm = ((finalAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
 
   const fullTurns = 5 + Math.floor(Math.random() * 4);
-  spinStartAngle = wheelAngle;
-  spinTargetAngle = finalAngle + fullTurns * Math.PI * 2;
-  while (spinTargetAngle <= spinStartAngle) spinTargetAngle += Math.PI * 2;
+  spinStartAngle = _rawAngle;
+  // Ровно fullTurns оборотов от текущей позиции + доворот до результата
+  const extra = finalNorm - (spinStartAngle % (Math.PI * 2));
+  spinTargetAngle = spinStartAngle + fullTurns * Math.PI * 2 + (extra >= 0 ? extra : extra + Math.PI * 2);
 
   spinStartTime = performance.now();
   spinProgress = 0;
@@ -339,18 +345,21 @@ function startSpin() {
 }
 
 function animateSpin() {
+  if (!spinning) return; // safety guard
+
   const elapsed = performance.now() - spinStartTime;
-  const raw = elapsed / spinDuration;
-  spinProgress = Math.min(raw, 1);
+  spinProgress = Math.min(elapsed / spinDuration, 1);
   const eased = 1 - Math.pow(1 - spinProgress, 3);
 
-  wheelAngle = spinStartAngle + (spinTargetAngle - spinStartAngle) * eased;
+  _rawAngle = spinStartAngle + (spinTargetAngle - spinStartAngle) * eased;
+  wheelAngle = _rawAngle % (Math.PI * 2);
   draw();
 
   if (spinProgress < 1) {
-    animId = requestAnimationFrame(animateSpin);
+    requestAnimationFrame(animateSpin);
   } else {
-    wheelAngle = spinTargetAngle;
+    _rawAngle = spinTargetAngle;
+    wheelAngle = spinTargetAngle % (Math.PI * 2);
     spinning = false;
     draw();
     payOut();
@@ -439,6 +448,7 @@ outsideBtns.forEach(btn => {
 });
 
 btnSpin.addEventListener('click', startSpin);
+btnSpin.addEventListener('touchstart', (e) => { e.preventDefault(); startSpin(); }, { passive: false });
 
 // Long-press on canvas to clear
 let clearTimer = null;
