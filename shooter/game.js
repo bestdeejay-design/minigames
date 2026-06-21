@@ -231,7 +231,7 @@ function spawnEnemy() {
   } else if (r < 0.45) {
     enemies.push({ type: 'turret', x: 10 + Math.random() * (cw - 20), y: -20, w: 16, h: 18, hp: 1, shootTimer: 30 + Math.random() * 40 });
   } else {
-    enemies.push({ type: 'fighter', x: Math.random() * cw, y: -20, w: EW, h: EH, hp: 1, vx: (Math.random() - 0.5) * 1.5, vy: 1 + Math.random() * 1.5, color: ['#c33','#c90','#a5a'][Math.floor(Math.random()*3)], shootTimer: 40 + Math.random() * 60 });
+    enemies.push({ type: 'fighter', x: Math.random() * cw, y: -20, w: EW, h: EH, hp: 1, vx: (Math.random() - 0.5) * 1.2, vy: 0, color: ['#c33','#c90','#a5a'][Math.floor(Math.random()*3)], shootTimer: 40 + Math.random() * 60 });
   }
 }
 
@@ -313,17 +313,18 @@ function loop() {
     if (b.y > ch + 20 || b.x < -20 || b.x > cw + 20) enemyBullets.splice(i, 1);
   }
 
-  // Spawn ground/air enemies
-  const interval = Math.max(40, 120 - frameId * 0.02);
+  // Spawn
+  const spawnInterval = Math.max(50, 110 - Math.floor(score / 500) * 8);
   spawnTimer += dt;
-  if (spawnTimer >= interval) {
+  if (spawnTimer >= spawnInterval) {
     spawnTimer = 0;
     spawnEnemy();
     if (frameId > 300 && Math.random() < 0.08) tryDropPara();
   }
 
-  // Move enemies — все едут вниз (вид сверху)
-  const scrollSpeed = 0.8 + frameId * 0.002;
+  // Move enemies — все едут вниз, скорость растёт с каждыми 500 очками
+  const speedBonus = Math.floor(score / 500) * 0.2;
+  const scrollSpeed = Math.min(0.6 + speedBonus, 2.5);
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
     e.y += scrollSpeed;
@@ -358,7 +359,7 @@ function loop() {
     p.y += p.vy;
     if (p.y > ch + 10) { paras.splice(i, 1); continue; }
     if (Math.abs(p.x - player.x) < PW / 2 + 6 && Math.abs(p.y - player.y) < PH / 2 + 6) {
-      score += 50;
+      score += 100;
       burst(p.x, p.y, '#ffd700', 8);
       paras.splice(i, 1);
     }
