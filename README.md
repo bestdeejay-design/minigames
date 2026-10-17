@@ -17,7 +17,7 @@
 | 💠 Кристаллы | merge-drop: физика слияний, вызов дня | [играть](https://bestdeejay-design.github.io/minigames/crystals/) |
 | 🎯 FPS Corridor | 3D-шутер от первого лица | [играть](https://bestdeejay-design.github.io/minigames/fps3d/) |
 | 🧩 Три в ряд | головоломка | [играть](https://bestdeejay-design.github.io/minigames/match3/) |
-| 🏃 Mini Platformer | платформер | [играть](https://bestdeejay-design.github.io/minigames/platformer/) |
+| 🏃 Mini Platformer | платформер: 8 уровней, шипы, движущиеся платформы, рекорд | [играть](https://bestdeejay-design.github.io/minigames/platformer/) |
 | 🏎 Гонка | аркадные гонки | [играть](https://bestdeejay-design.github.io/minigames/race/) |
 | 🎰 Рулетка | демо казино без риска | [играть](https://bestdeejay-design.github.io/minigames/roulette/) |
 | 🚀 Шутер | космический шутер | [играть](https://bestdeejay-design.github.io/minigames/shooter/) |
