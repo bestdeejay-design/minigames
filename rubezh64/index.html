@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071218">
+  <meta name="description" content="Рубеж 64 — оригинальная браузерная стратегия в реальном времени. Добывай минералы, строй базу и победи противника. Без установки и сервера.">
+  <link rel="canonical" href="https://bestdeejay-design.github.io/minigames/rubezh64/"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:url" content="https://bestdeejay-design.github.io/minigames/rubezh64/"/>
+  <meta property="og:title" content="Рубеж 64 — мини-игра | AXIIOM"/>
+  <meta property="og:description" content="Оригинальная браузерная RTS: минералы, база, волны противника. Мини-игра от AXIIOM."/>
+  <meta property="og:locale" content="ru_RU"/>
+  <title>Рубеж 64 — мини-игра | AXIIOM</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b2028'/%3E%3Cpath d='M12 12h40v40H12z' fill='none' stroke='%2376e3d7' stroke-width='3'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='24' fill='%23c5fff1'%3ER%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./js/main.js"></script>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="topbar">
+      <div class="identity"><span class="identity-mark">R<span>/</span>64</span><span class="identity-name">РУБЕЖ <b>64</b><small>ТАКТИЧЕСКАЯ ОПЕРАЦИЯ</small></span></div>
+      <div class="resource-strip" aria-label="Ресурсы">
+        <div class="resource mineral-resource"><span class="resource-icon">◆</span><span class="resource-name">МИНЕРАЛЫ</span><strong id="minerals-count">240</strong></div>
+        <div class="resource supply-resource"><span class="resource-icon">▣</span><span class="resource-name">НАСЕЛЕНИЕ</span><strong id="supply-count">6 / 10</strong></div>
+        <div class="resource wave-resource"><span class="resource-icon">◷</span><span class="resource-name">СЛЕД. ВОЛНА</span><strong id="wave-timer">—</strong></div>
+      </div>
+      <div class="top-actions">
+        <button id="sound-button" type="button" class="top-button" aria-label="Включить звук" aria-pressed="false">ЗВУК <span>ВЫКЛ</span></button>
+        <button id="help-button" type="button" class="top-button" aria-label="Открыть управление">?</button>
+        <button id="pause-button" type="button" class="top-button" aria-label="Пауза" disabled>Ⅱ</button>
+        <a href="../" class="catalog-link">← КАТАЛОГ</a>
+      </div>
+    </header>
+
+    <main class="battlefield" id="battlefield">
+      <canvas id="game-canvas" aria-label="Поле стратегии. Левой кнопкой выделяйте юнитов, правой отдавайте приказы.">Для игры нужен браузер с поддержкой Canvas.</canvas>
+      <div class="world-label" aria-hidden="true"><span>СЕКТОР 01 / ПОГРАНИЧЬЕ</span><span id="coordinates">X 00 · Y 00</span></div>
+      <div id="mission-hint" class="mission-hint">Инженеры добывают минералы. Выделите одного и постройте казарму.</div>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+      <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="start-title">
+        <section id="start-panel" class="overlay-card start-panel">
+          <div class="overlay-eyebrow"><span class="live-dot"></span> ОПЕРАЦИЯ 01 · РЕАЛЬНОЕ ВРЕМЯ</div>
+          <h1 id="start-title">РУБЕЖ <em>64</em></h1>
+          <p class="overlay-lead">Колония на краю карты. Минералы — единственный ресурс. Построй армию и уничтожь все здания противника, пока он не сделал то же самое.</p>
+          <div class="briefing-grid">
+            <div><span>01</span><strong>ДОБЫВАЙ</strong><small>Инженеры приносят минералы в штаб</small></div>
+            <div><span>02</span><strong>СТРОЙ</strong><small>Модули расширяют лимит, казармы готовят бойцов</small></div>
+            <div><span>03</span><strong>АТАКУЙ</strong><small>Уничтожь все вражеские постройки</small></div>
+          </div>
+          <p class="quick-controls">ЛКМ — выделить · ПКМ — приказ · стрелки / край экрана — камера</p>
+          <button id="start-button" type="button" class="primary-button">НАЧАТЬ ОПЕРАЦИЮ <span>→</span></button>
+          <small class="overlay-footnote">Оригинальная 2D-стратегия · полностью работает без сети</small>
+        </section>
+        <section id="pause-panel" class="overlay-card compact-panel" hidden>
+          <div class="overlay-eyebrow">ОПЕРАЦИЯ ПРИОСТАНОВЛЕНА</div>
+          <h2 id="pause-title">Пауза<span class="title-dot">.</span></h2>
+          <p class="overlay-lead">Время и действия противника остановлены.</p>
+          <button id="resume-button" type="button" class="primary-button">ПРОДОЛЖИТЬ <span>→</span></button>
+          <button id="restart-button" type="button" class="secondary-button">НАЧАТЬ ЗАНОВО</button>
+        </section>
+        <section id="help-panel" class="overlay-card help-panel" hidden>
+          <div class="overlay-eyebrow">ПОЛЕВОЕ РУКОВОДСТВО</div>
+          <h2 id="help-title">Управление<span class="title-dot">.</span></h2>
+          <div class="help-list">
+            <p><kbd>ЛКМ</kbd> Выделить юнита или здание; удерживать и тянуть — рамка.</p>
+            <p><kbd>ПКМ</kbd> Двигаться, атаковать врага, добывать минералы. ПКМ по строящемуся зданию — продолжить постройку.</p>
+            <p><kbd>Ctrl</kbd> + <kbd>1–9</kbd> Запомнить группу; <kbd>1–9</kbd> выбрать её. Повторное нажатие центрирует камеру.</p>
+            <p><kbd>← ↑ → ↓</kbd> или указатель у края поля — камера; миникарта тоже перемещает камеру.</p>
+            <p><kbd>Esc</kbd> Отменить размещение здания; <kbd>Пробел</kbd> пауза. Кнопки внизу показывают горячие клавиши.</p>
+          </div>
+          <button id="help-close-button" type="button" class="primary-button">ПОНЯТНО <span>✓</span></button>
+        </section>
+        <section id="result-panel" class="overlay-card compact-panel" hidden>
+          <div class="overlay-eyebrow" id="result-kicker">ОПЕРАЦИЯ ЗАВЕРШЕНА</div>
+          <h2 id="result-title">Победа<span class="title-dot">.</span></h2>
+          <p id="result-description" class="overlay-lead"></p>
+          <div class="result-stats"><div><span>ВРЕМЯ</span><strong id="result-time">00:00</strong></div><div><span>ПОТЕРИ</span><strong id="result-losses">0</strong></div><div><span>ЛУЧШЕЕ ВРЕМЯ</span><strong id="result-best">—</strong></div></div>
+          <button id="again-button" type="button" class="primary-button">ИГРАТЬ СНОВА <span>↻</span></button>
+        </section>
+      </div>
+    </main>
+
+    <footer class="command-deck">
+      <div class="minimap-column">
+        <div class="minimap-frame" id="minimap-frame"><canvas id="minimap-canvas" aria-label="Миникарта. Нажмите, чтобы переместить камеру."></canvas></div>
+        <div class="mini-caption"><span class="mini-dot"></span> КАРТА 64 × 64</div>
+      </div>
+      <section class="selection-panel" aria-label="Выделенные объекты">
+        <div class="panel-label">ОТРЯД / ИНФОРМАЦИЯ <span id="selection-count"></span></div>
+        <div id="selection-content" class="selection-content"><div class="empty-selection"><span class="empty-symbol">⌖</span><strong>Нет выделения</strong><small>Выберите инженера, бойца или здание на поле.</small></div></div>
+      </section>
+      <section class="orders-panel" aria-label="Панель команд">
+        <div class="panel-label">КОМАНДЫ <span id="command-mode">ОЖИДАНИЕ</span></div>
+        <div id="command-buttons" class="command-grid"></div>
+        <p id="command-hint" class="command-hint">ЛКМ — выделить · ПКМ — приказ</p>
+      </section>
+    </footer>
+  </div>
+  <noscript>Включите JavaScript, чтобы играть в «Рубеж 64».</noscript>
+</body>
+</html>
