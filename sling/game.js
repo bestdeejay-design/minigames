@@ -8,6 +8,45 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlaySub = document.getElementById('overlay-sub');
 const btnNext = document.getElementById('btn-next');
+/* ── audio (WebAudio) ── */
+let actx = null;
+let muted = localStorage.getItem('sling.muted') === '1';
+function audio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (actx && actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(freq, dur, type = 'square', vol = 0.05, slide = 0) {
+  if (muted) return;
+  const ac = audio(); if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, ac.currentTime);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), ac.currentTime + dur);
+  g.gain.setValueAtTime(vol, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime + dur + 0.02);
+}
+const sfx = {
+  launch: () => { tone(300, .18, 'square', .05, 240); tone(150, .12, 'sine', .04, 80); },
+  hit:    (pts) => { tone(420 + Math.min(pts, 8) * 55, .1, 'triangle', .06, 60); setTimeout(() => tone(640 + Math.min(pts, 8) * 55, .08, 'sine', .04), 45); },
+  win:    () => [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, .16, 'sine', .06), i * 95)),
+  over:   () => [330, 262, 196].forEach((f, i) => setTimeout(() => tone(f, .2, 'sine', .05), i * 140)),
+  record: () => [659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, .18, 'sine', .06), i * 105)),
+  click:  () => tone(600, .05, 'square', .03),
+};
+
+// ─── Mute ─────────────────────────────────────────────────
+function updateMuteBtn() { const b = document.getElementById('btn-mute'); if (b) b.textContent = muted ? '\ud83d\udd07' : '\ud83d\udd0a'; }
+updateMuteBtn();
+const _muteBtn = document.getElementById('btn-mute');
+if (_muteBtn) _muteBtn.addEventListener('click', () => {
+  muted = !muted;
+  localStorage.setItem('sling.muted', muted ? '1' : '0');
+  updateMuteBtn(); if (!muted) { audio(); tone(600, .05, 'square', .03); }
+});
+['keydown', 'pointerdown', 'touchstart'].forEach(ev => document.addEventListener(ev, audio, { passive: true }));
+
 
 function slingBest() {
   var best = 0;
@@ -248,6 +287,7 @@ function fireProjectile(vx, vy) {
   };
   gameState = 'flying';
   shotsLeft--;
+  sfx.launch();
   powerRatio = 0;
   updateHUD();
 }
@@ -304,6 +344,7 @@ function update() {
         proj.y + proj.r > t.y && proj.y - proj.r < t.y + t.h) {
       t.hit = true;
       score += t.points;
+      sfx.hit(t.points);
       updateHUD();
     }
   }
@@ -331,6 +372,9 @@ function endShot() {
     const bonus = shotsLeft * 25;
     if (bonus > 0) score += bonus;
     gameState = 'done';
+    sfx.win();
+    const rec = slingBest();
+    if (rec.isNew && score > 0) { toast('🏆 Новый рекорд: ' + score + '!'); sfx.record(); }
     overlay.classList.remove('hidden');
     overlayTitle.textContent = '🎉 Уровень пройден!';
     const nextIdx = level + 1;
@@ -349,6 +393,7 @@ function endShot() {
     gameState = 'done';
     overlay.classList.remove('hidden');
     overlayTitle.textContent = '💥 Нет выстрелов';
+    sfx.over();
     overlaySub.textContent = 'Счёт: ' + score + ' | Рекорд: ' + slingBest().best + ' | Осталось целей: ' + targets.filter(t => !t.hit).length;
     btnNext.textContent = 'Повторить';
     btnNext.onclick = () => { loadLevel(level); };
@@ -649,3 +694,27 @@ function releaseShot() {
 // ─── Start ───────────────────────────────────────────────
 loadLevel(0);
 loop();
+
+// ─── Toast container (created lazily) ─────────────────────
+function toast(msg) {
+  let box = document.getElementById('toast-container');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'toast-container';
+    document.body.appendChild(box);
+  }
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  box.appendChild(t);
+  setTimeout(() => t.classList.add('out'), 1900);
+  setTimeout(() => t.remove(), 2300);
+}
+
+// ─── Debug hooks (headless) ───────────────────────────────
+window.__sl = {
+  get state() { return gameState; },
+  get score() { return score; },
+  get level() { return level; },
+  get targetsLeft() { return targets.filter(t => !t.hit).length; },
+  get best() { return +(localStorage.getItem('sling.best') || 0); },
+};

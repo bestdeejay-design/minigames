@@ -25,3 +25,37 @@ canvas{display:block;width:100%;max-width:400px;aspect-ratio:4/3;background:var(
 #btn-reset:hover{filter:brightness(1.08)}
 #btn-reset:active{transform:translateY(1px)}
 @media (min-width:700px){body{padding-top:44px}}
+
+/* ── stats bar ── */
+#stats{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.stat{font-size:.72rem;color:var(--clr-muted);background:var(--clr-surface);border:1px solid var(--clr-border);border-radius:8px;padding:5px 10px;letter-spacing:.3px}
+.stat b{color:var(--clr-accent);font-weight:700}
+
+/* ── canvas holder + level intro ── */
+#canvas-holder{position:relative;width:100%;max-width:400px}
+#level-intro{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,10,15,.82);border-radius:12px;z-index:5;font-size:1.5rem;font-weight:700;color:var(--clr-heading);letter-spacing:.5px;pointer-events:none;opacity:1;transition:opacity .45s}
+#level-intro small{font-size:.78rem;font-weight:500;color:var(--clr-accent);margin-top:6px;letter-spacing:1px}
+#level-intro.fade{opacity:0}
+
+/* ── actions row ── */
+#actions{display:flex;gap:10px;align-items:center}
+#btn-mute{width:42px;height:42px;border:1px solid var(--clr-border-hover);border-radius:10px;background:var(--clr-surface);color:var(--clr-heading);font-size:1.05rem;cursor:pointer;transition:border-color .2s}
+#btn-mute:hover{border-color:rgba(212,165,116,.45)}
+
+/* ── toast ── */
+#toast-container{position:fixed;top:56px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:80;pointer-events:none;width:min(90vw,360px)}
+.toast{background:var(--clr-surface);border:1px solid rgba(212,165,116,.4);border-radius:12px;padding:10px 16px;font-size:.82rem;color:var(--clr-heading);text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:toast-in .3s ease}
+.toast.out{animation:toast-out .35s ease forwards}
+@keyframes toast-in{from{opacity:0;transform:translateY(-8px) scale(.95)}to{opacity:1;transform:none}}
+@keyframes toast-out{to{opacity:0;transform:translateY(-8px) scale(.95)}}
+
+/* ── modal ── */
+#modal-overlay{position:fixed;inset:0;background:rgba(5,5,8,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:90;padding:20px}
+#modal{background:var(--clr-surface);border:1px solid rgba(212,165,116,.35);border-radius:18px;padding:26px 24px;width:100%;max-width:320px;text-align:center;animation:modal-in .35s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes modal-in{from{opacity:0;transform:scale(.85) translateY(14px)}to{opacity:1;transform:none}}
+#modal-icon{font-size:2.4rem;margin-bottom:6px}
+#modal h2{font-size:1.2rem;color:var(--clr-heading);margin-bottom:8px}
+#modal-body{font-size:.85rem;color:var(--clr-muted);line-height:1.65;margin-bottom:16px}
+#modal-body b{color:var(--clr-accent)}
+#modal-btn{padding:11px 30px;border:none;border-radius:10px;background:var(--clr-accent);color:#14100B;font-family:inherit;font-size:.9rem;font-weight:700;letter-spacing:.4px;cursor:pointer;transition:filter .2s}
+#modal-btn:hover{filter:brightness(1.08)}

@@ -29,6 +29,49 @@ let enemies = [], pickups = [], particles = [], paras = [];
 let stars = [];
 let gameOver = false, gameState = 'playing';
 let frameId = 0, fireTimer = 0, invulnTimer = 0;
+/* ── audio (WebAudio) ── */
+let actx = null;
+let muted = localStorage.getItem('shooter.muted') === '1';
+function audio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (actx && actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(freq, dur, type = 'square', vol = 0.05, slide = 0) {
+  if (muted) return;
+  const ac = audio(); if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, ac.currentTime);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), ac.currentTime + dur);
+  g.gain.setValueAtTime(vol, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime + dur + 0.02);
+}
+const sfx = {
+  shoot: () => { if (frameId - _lastShootSfx < 4) return; _lastShootSfx = frameId; tone(880 + wlevel * 60, .06, 'square', .028, -300); },
+  boom:  () => { tone(140, .3, 'sawtooth', .07, -80); tone(70, .35, 'square', .045, -30); },
+  hit:   () => tone(300, .07, 'triangle', .04, -100),
+  hurt:  () => { tone(200, .25, 'sawtooth', .07, -90); tone(90, .3, 'square', .04, -30); },
+  coin:  () => { tone(980, .07, 'sine', .045); setTimeout(() => tone(1470, .09, 'sine', .04), 45); },
+  power: () => [520, 660, 880].forEach((f, i) => setTimeout(() => tone(f, .08, 'triangle', .04), i * 50)),
+  over:  () => [330, 262, 196].forEach((f, i) => setTimeout(() => tone(f, .22, 'sine', .05), i * 150)),
+  record:() => [659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, .18, 'sine', .06), i * 105)),
+  click: () => tone(600, .05, 'square', .03),
+};
+let _lastShootSfx = -99;
+
+// ─── Mute ─────────────────────────────────────────────────
+function updateMuteBtn() { const b = document.getElementById('btn-mute'); if (b) b.textContent = muted ? '\ud83d\udd07' : '\ud83d\udd0a'; }
+updateMuteBtn();
+const _muteBtn = document.getElementById('btn-mute');
+if (_muteBtn) _muteBtn.addEventListener('click', () => {
+  muted = !muted;
+  localStorage.setItem('shooter.muted', muted ? '1' : '0');
+  updateMuteBtn(); if (!muted) { audio(); tone(600, .05, 'square', .03); }
+});
+['keydown', 'pointerdown', 'touchstart'].forEach(ev => document.addEventListener(ev, audio, { passive: true }));
+
 let spawnTimer = 0, paraDropTimer = 0;
 let touchX = null, touchY = null;
 let animId = null;
@@ -536,6 +579,7 @@ function loop() {
   if (++fireTimer >= w.rate) {
     fireTimer = 0;
     if (w.count === 1) {
+      sfx.shoot();
       bullets.push({ x: player.x, y: player.y - PH / 2, vx: 0, vy: -w.speed, w: 3, h: 8, dmg: w.dmg });
     } else {
       const n = w.count - (w.side > 0 ? 2 : 0);
@@ -628,6 +672,7 @@ function loop() {
         burst(e.x, e.y, '#0f0', 4);
         if (e.hp <= 0) {
           score += 10 + frameId * 0.05;
+          sfx.boom();
           burst(e.x, e.y, '#f44', 12);
       const r = Math.random();
       if (r < 0.15) pickups.push({ x: e.x, y: e.y, type: 'coin' });
@@ -670,8 +715,8 @@ function loop() {
     p.y += 1.2;
     if (p.y > ch + 20) { pickups.splice(i, 1); continue; }
     if (Math.abs(p.x - player.x) < PW / 2 + 10 && Math.abs(p.y - player.y) < PH / 2 + 10) {
-      if (p.type === 'coin') { score += 100; burst(p.x, p.y, '#ffd700', 8); }
-      if (p.type === 'life') { lives = Math.min(5, lives + 1); burst(p.x, p.y, '#f44', 10); }
+      if (p.type === 'coin') { score += 100; sfx.coin(); burst(p.x, p.y, '#ffd700', 8); }
+      if (p.type === 'life') { lives = Math.min(5, lives + 1); sfx.power(); burst(p.x, p.y, '#f44', 10); }
       if (p.type === 'upgrade') { wlevel = Math.min(9, wlevel + 1); burst(p.x, p.y, '#4af', 10); }
       pickups.splice(i, 1);
     }
@@ -699,7 +744,7 @@ function hitPlayer(dmg) {
   lives--;
   invulnTimer = 90;
   burst(player.x, player.y, '#f44', 10);
-  if (lives <= 0) { gameOver = true; burst(player.x, player.y, '#f44', 30); }
+  if (lives <= 0) { gameOver = true; sfx.hurt(); sfx.over(); burst(player.x, player.y, '#f44', 30); }
 }
 
 // ─── Drawing ────────────────────────────────────────────
@@ -781,6 +826,7 @@ function showGameOver() {
   if (isRec) { best = fs; try { localStorage.setItem('shooter.best', String(best)); } catch (e) {} }
   overlayTitle.textContent = isRec ? '🏆 Новый рекорд!' : '💥 Game Over';
   overlaySub.textContent = 'Счёт: ' + fs + ' | Уровень оружия: ' + wlevel + ' | Рекорд: ' + best;
+  if (isRec) sfx.record();
   btnNext.textContent = 'Заново';
   btnNext.onclick = resetGame;
   overlay.classList.remove('hidden');
@@ -823,3 +869,9 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', resi
 
 // ─── Start ──────────────────────────────────────────────
 resetGame();
+
+// ─── Mute handled above ───────────────────────────────────
+// record toast mid-run
+let _shBest = +(localStorage.getItem('shooter.best') || 0);
+let _shRecBeaten = false;
+const _shOrigShowGO = showGameOver;

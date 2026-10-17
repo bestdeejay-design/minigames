@@ -10,6 +10,56 @@ const shopEl = document.getElementById('shop');
 var tycBest = 0;
 try { tycBest = +(localStorage.getItem('tycoon.floors') || 0); } catch (e) {}
 
+/* ── audio (WebAudio) ── */
+let actx = null;
+let muted = localStorage.getItem('tycoon.muted') === '1';
+function audio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (actx && actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(freq, dur, type = 'square', vol = 0.05, slide = 0) {
+  if (muted) return;
+  const ac = audio(); if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, ac.currentTime);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), ac.currentTime + dur);
+  g.gain.setValueAtTime(vol, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime + dur + 0.02);
+}
+const sfx = {
+  build: () => { tone(180, .18, 'square', .05, 90); setTimeout(() => tone(320, .14, 'square', .04, 60), 110); },
+  buy:   () => { tone(660, .09, 'sine', .05); setTimeout(() => tone(880, .12, 'sine', .05), 60); },
+  earn:  () => tone(1180, .07, 'sine', .028),
+  record:() => [659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, .18, 'sine', .06), i * 105)),
+  click: () => tone(600, .05, 'square', .03),
+};
+function updateMuteBtn() { document.getElementById('btn-mute').textContent = muted ? '\uD83D\uDD07' : '\uD83D\uDD0A'; }
+document.getElementById('btn-mute').addEventListener('click', () => {
+  muted = !muted;
+  localStorage.setItem('tycoon.muted', muted ? '1' : '0');
+  updateMuteBtn(); if (!muted) sfx.click();
+});
+updateMuteBtn();
+['keydown', 'pointerdown', 'touchstart'].forEach(ev => document.addEventListener(ev, audio, { passive: true }));
+
+const toastBox = document.getElementById('toast-container');
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  toastBox.appendChild(t);
+  setTimeout(() => t.classList.add('out'), 1900);
+  setTimeout(() => t.remove(), 2300);
+}
+
+/* floating +$ labels on canvas */
+let floaters = [];
+function floatText(x, y, text, color = '#E8B04B') {
+  floaters.push({ x, y, text, color, life: 50, max: 50 });
+}
+
 let W, H;
 
 function resize() {
@@ -238,6 +288,10 @@ function update() {
         ch.gaveTip = true;
         ch.state = 'leaving';
         ch.timer = 1200;
+        sfx.earn();
+        const fy = getFloorY(ch.targetFloor) + floorH / 2;
+        floatText(cw - 90 - Math.random() * 40, fy - 6, '+$' + Math.round(earn));
+        moneyEl.classList.remove('earn-pulse'); void moneyEl.offsetWidth; moneyEl.classList.add('earn-pulse');
       }
     }
     if (ch.state === 'leaving') {
@@ -248,6 +302,13 @@ function update() {
 
   chars = chars.filter(c => c.state !== 'gone');
   totalPop = chars.length;
+
+  // floaters
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i];
+    f.y -= 0.55; f.life--;
+    if (f.life <= 0) floaters.splice(i, 1);
+  }
 }
 
 // ─── Draw ────────────────────────────────────────────────
@@ -356,6 +417,16 @@ function draw() {
     wx += 20;
     if (wx > shaftX - 10) break;
   }
+
+  // floaters
+  for (const f of floaters) {
+    ctx.globalAlpha = Math.max(0, f.life / f.max);
+    ctx.fillStyle = f.color;
+    ctx.font = 'bold 12px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
 }
 
 // ─── Loop ────────────────────────────────────────────────
@@ -376,9 +447,11 @@ btnBuild.addEventListener('click', () => {
   const cost = getBuildCost();
   if (money < cost) return;
   money -= cost;
+  sfx.build();
   const newId = floors.length;
   floors.push({ id: newId, business: null, label: String(newId + 1) });
   if (floors.length - 1 > tycBest) {
+    if (tycBest > 0) { toast('\uD83C\uDFC6 Новый рекорд: ' + (floors.length - 1) + ' этажей!'); sfx.record(); }
     tycBest = floors.length - 1;
     try { localStorage.setItem('tycoon.floors', String(tycBest)); } catch (e) {}
   }
@@ -439,6 +512,10 @@ function updateShop() {
       if (money < biz.cost || target.business) return;
       money -= biz.cost;
       target.business = biz.id;
+      sfx.buy();
+      toast(biz.emoji + ' ' + biz.name + ' \u2014 открыто! +$' + biz.income + '/визит');
+      const fy = getFloorY(target.id) + floorH / 2;
+      floatText(cw / 2, fy - 4, biz.emoji, '#8B9D83');
       selectedFloor = null;
       updateShop();
     });
@@ -448,3 +525,19 @@ function updateShop() {
 updateShop();
 
 loop();
+
+// ─── Debug hooks (headless) ─────────────────────────────
+window.__ty = {
+  get money() { return money; },
+  get floors() { return floors.length - 1; },
+  get best() { return tycBest; },
+  build() { money = Math.max(money, getBuildCost() + 10); btnBuild.click(); },
+  buyCheapest() {
+    const f = floors.find(f => f.id > 0 && !f.business);
+    if (!f) return 'no floor';
+    selectedFloor = f; updateShop();
+    const btn = shopEl.querySelector('.shop-btn:not(:disabled)');
+    if (btn) { btn.click(); return 'bought'; }
+    return 'none affordable';
+  },
+};

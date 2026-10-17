@@ -31,3 +31,12 @@ canvas{display:block;width:100%;flex:1;min-height:0;touch-action:none;background
 #overlay button{padding:13px 44px;border:none;border-radius:10px;background:var(--clr-accent);color:#14100B;font-family:inherit;font-size:.95rem;font-weight:700;letter-spacing:.5px;cursor:pointer;transition:filter .2s,transform .1s}
 #overlay button:hover{filter:brightness(1.08)}
 #overlay button:active{transform:translateY(1px)}
+
+/* mute + toast */
+#btn-mute{background:transparent;border:none;font-size:.95rem;cursor:pointer;padding:0 2px;opacity:.75;flex-shrink:0}
+#btn-mute:hover{opacity:1}
+#toast-container{position:fixed;top:92px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:70;pointer-events:none;width:min(90vw,340px)}
+.toast{background:var(--clr-surface);border:1px solid rgba(212,165,116,.4);border-radius:12px;padding:10px 16px;font-size:.82rem;color:var(--clr-heading);text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:toast-in .3s ease}
+.toast.out{animation:toast-out .35s ease forwards}
+@keyframes toast-in{from{opacity:0;transform:translateY(-8px) scale(.95)}to{opacity:1;transform:none}}
+@keyframes toast-out{to{opacity:0;transform:translateY(-8px) scale(.95)}}

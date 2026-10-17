@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Mini Platformer — мини-игра | AXIIOM</title>
-  <meta name="description" content="Платформер с прыжками и препятствиями: собирайте бонусы и добирайтесь до финиша. Бесплатная мини-игра от AXIIOM.">
+  <meta name="description" content="Платформер на 8 уровней: собирайте монеты, избегайте шипов и добирайтесь до финиша. Рекорды, эффекты и звук. Бесплатная мини-игра от AXIIOM.">
   <link rel="canonical" href="https://bestdeejay-design.github.io/minigames/platformer/">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bestdeejay-design.github.io/minigames/platformer/">
   <meta property="og:title" content="Mini Platformer — мини-игра | AXIIOM">
-  <meta property="og:description" content="Платформер с прыжками и препятствиями: собирайте бонусы и добирайтесь до финиша. Бесплатная мини-игра от AXIIOM.">
+  <meta property="og:description" content="Платформер на 8 уровней: собирайте монеты, избегайте шипов и добирайтесь до финиша. Рекорды, эффекты и звук. Бесплатная мини-игра от AXIIOM.">
   <meta property="og:image" content="https://axiiom.ru/og-image.png">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Mini Platformer — мини-игра | AXIIOM">
-  <meta name="twitter:description" content="Платформер с прыжками и препятствиями: собирайте бонусы и добирайтесь до финиша. Бесплатная мини-игра от AXIIOM.">
+  <meta name="twitter:description" content="Платформер на 8 уровней: собирайте монеты, избегайте шипов и добирайтесь до финиша. Рекорды, эффекты и звук. Бесплатная мини-игра от AXIIOM.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🏃</text></svg>">
   <meta name="theme-color" content="#0A0A0F">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,14 +31,34 @@
   </header>
   <div id="game-wrapper">
     <h1>Mini Platformer</h1>
-    <canvas id="gameCanvas"></canvas>
-    <div id="touch-controls">
-      <button id="btn-left" class="ctrl-btn">←</button>
-      <button id="btn-right" class="ctrl-btn">→</button>
-      <button id="btn-jump" class="ctrl-btn">↑</button>
+    <div id="stats">
+      <span class="stat">Уровень <b id="st-level">1</b>/8</span>
+      <span class="stat">🏆 <b id="st-score">0</b></span>
+      <span class="stat">🪙 <b id="st-coins">0</b></span>
+      <span class="stat">💀 <b id="st-deaths">0</b></span>
     </div>
-    <p id="status">Собери монетку!</p>
-    <button id="btn-reset">Заново</button>
+    <div id="canvas-holder">
+      <canvas id="gameCanvas"></canvas>
+      <div id="level-intro" class="hidden"></div>
+    </div>
+    <div id="touch-controls">
+      <button id="btn-left" class="ctrl-btn" aria-label="Влево">←</button>
+      <button id="btn-right" class="ctrl-btn" aria-label="Вправо">→</button>
+      <button id="btn-jump" class="ctrl-btn" aria-label="Прыжок">↑</button>
+    </div>
+    <div id="actions">
+      <button id="btn-reset">Заново</button>
+      <button id="btn-mute" aria-label="Звук">🔊</button>
+    </div>
+  </div>
+  <div id="toast-container"></div>
+  <div id="modal-overlay" class="hidden">
+    <div id="modal">
+      <div id="modal-icon">🏆</div>
+      <h2 id="modal-title">Новый рекорд!</h2>
+      <div id="modal-body"></div>
+      <button id="modal-btn">Играть снова</button>
+    </div>
   </div>
   <script src="game.js"></script>
 </body>

@@ -308,6 +308,39 @@ function spawnItem() {
   items.push(new Item(pickType()));
 }
 
+
+/* ── audio (WebAudio) ── */
+let actx = null;
+let muted = localStorage.getItem('cointap.muted') === '1';
+function audio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (actx && actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(freq, dur, type = 'square', vol = 0.05, slide = 0) {
+  if (muted) return;
+  const ac = audio(); if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, ac.currentTime);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), ac.currentTime + dur);
+  g.gain.setValueAtTime(vol, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime + dur + 0.02);
+}
+const sfx = {
+  coin:  () => { comboPitch = Math.min(9, comboPitch + 1); tone(760 + comboPitch * 70, .08, 'sine', .05); setTimeout(() => tone(1140 + comboPitch * 70, .09, 'sine', .04), 40); },
+  bomb:  () => { tone(150, .35, 'sawtooth', .09, -90); tone(75, .4, 'square', .05, -35); },
+  power: () => [520, 660, 880].forEach((f, i) => setTimeout(() => tone(f, .09, 'triangle', .045), i * 55)),
+  shield:( ) => tone(980, .14, 'triangle', .05, 220),
+  win:   () => [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, .16, 'sine', .06), i * 95)),
+  over:  () => [392, 330, 262, 196].forEach((f, i) => setTimeout(() => tone(f, .2, 'sine', .05), i * 130)),
+  record:() => [659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, .18, 'sine', .06), i * 105)),
+  click: () => tone(600, .05, 'square', .03),
+};
+let comboPitch = 0;
+function updateMuteBtn() { const b = document.getElementById('btn-mute'); if (b) b.textContent = muted ? '\uD83D\uDD07' : '\uD83D\uDD0A'; }
+
 // ─── Tap Handling ────────────────────────────────────────
 function handleTap(x, y) {
   if (!gameRunning || stunTimer > 0) return;
@@ -324,6 +357,7 @@ function handleTap(x, y) {
       score += pts;
       if (score > cfg.target) score = cfg.target;
       pops.push(new Pop(item.x, item.y, TYPES[type].color));
+      sfx.coin();
       updateHUD();
 
       if (score >= cfg.target) {
@@ -334,11 +368,13 @@ function handleTap(x, y) {
       if (hasShield) {
         hasShield = false;
         pops.push(new Pop(item.x, item.y, '#2ecc71'));
+        sfx.shield();
         screenShake(4);
       } else {
         lives--;
         screenShake(8);
         stunTimer = 20;
+        sfx.bomb();
         updateHUD();
         pops.push(new Pop(item.x, item.y, '#ff4444'));
         if (lives <= 0) {
@@ -348,9 +384,11 @@ function handleTap(x, y) {
       }
     } else if (type === 'magnet') {
       effects.magnet = { timer: 180 };
+      sfx.power();
       pops.push(new Pop(item.x, item.y, TYPES.magnet.color));
     } else if (type === 'slow') {
       effects.slow = { timer: 180 };
+      sfx.power();
       pops.push(new Pop(item.x, item.y, TYPES.slow.color));
     } else if (type === 'curse') {
       effects.curse = { timer: 180 };
@@ -360,6 +398,7 @@ function handleTap(x, y) {
       pops.push(new Pop(item.x, item.y, TYPES.speed.color));
     } else if (type === 'shield') {
       hasShield = true;
+      sfx.shield();
       pops.push(new Pop(item.x, item.y, TYPES.shield.color));
     }
 
@@ -392,6 +431,7 @@ function showLevelStart() {
 
 function startLevel() {
   overlay.classList.add('hidden');
+  comboPitch = 0;
   score = 0;
   items = [];
   pops = [];
@@ -404,6 +444,8 @@ function startLevel() {
 
 function levelComplete() {
   gameRunning = false;
+  comboPitch = 0;
+  sfx.win();
   overlay.classList.remove('hidden');
   overlayTitle.textContent = `Уровень ${level} пройден! 🎉`;
   overlaySub.textContent = '';
@@ -421,9 +463,11 @@ function gameOver() {
   try { bestL = +(localStorage.getItem('cointap.level') || 0); } catch (e) {}
   var isRec = level > bestL;
   if (isRec) { bestL = level; try { localStorage.setItem('cointap.level', String(level)); } catch (e) {} }
+  comboPitch = 0;
   overlay.classList.remove('hidden');
   overlayTitle.textContent = isRec ? '🏆 Новый рекорд!' : '💀 Игра окончена';
   overlaySub.textContent = 'Дошёл до уровня ' + level + ' | Рекорд: ' + bestL;
+  if (isRec) sfx.record(); else sfx.over();
   overlayItems.innerHTML = '';
   btnNext.textContent = 'Заново с 1 уровня';
   btnNext.onclick = () => {
@@ -529,3 +573,21 @@ canvas.addEventListener('mousedown', (e) => {
 // ─── Start ───────────────────────────────────────────────
 showLevelStart();
 loop();
+
+// ─── Mute ─────────────────────────────────────────────────
+updateMuteBtn();
+document.getElementById('btn-mute').addEventListener('click', () => {
+  muted = !muted;
+  localStorage.setItem('cointap.muted', muted ? '1' : '0');
+  updateMuteBtn(); if (!muted) sfx.click();
+});
+['keydown', 'pointerdown', 'touchstart'].forEach(ev => document.addEventListener(ev, audio, { passive: true }));
+
+// ─── Debug hooks (headless) ───────────────────────────────
+window.__ct = {
+  get state() { return gameRunning ? 'play' : 'ui'; },
+  get level() { return level; },
+  get score() { return score; },
+  get lives() { return lives; },
+  tap(x, y) { handleTap(x, y); },
+};

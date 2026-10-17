@@ -26,6 +26,65 @@ const outsideBtns = document.querySelectorAll('#outside-bets button');
 let cw, ch;
 let dpr = window.devicePixelRatio || 1;
 
+/* ── audio (WebAudio) ── */
+let actx = null;
+let muted = localStorage.getItem('roulette.muted') === '1';
+function audio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (actx && actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(freq, dur, type = 'square', vol = 0.05, slide = 0) {
+  if (muted) return;
+  const ac = audio(); if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, ac.currentTime);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), ac.currentTime + dur);
+  g.gain.setValueAtTime(vol, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime + dur + 0.02);
+}
+const sfx = {
+  chip:  () => tone(1400, .05, 'triangle', .05, -400),
+  spin:  () => tone(220, .5, 'sawtooth', .03, 160),
+  tick:  () => tone(1900, .03, 'square', .02),
+  win:   () => [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, .17, 'sine', .06), i * 90)),
+  lose:  () => tone(220, .35, 'sine', .04, -90),
+  record:() => [659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, .18, 'sine', .06), i * 105)),
+  click: () => tone(600, .05, 'square', .03),
+};
+function updateMuteBtn() { document.getElementById('btn-mute').textContent = muted ? '\uD83D\uDD07' : '\uD83D\uDD0A'; }
+document.getElementById('btn-mute').addEventListener('click', () => {
+  muted = !muted;
+  localStorage.setItem('roulette.muted', muted ? '1' : '0');
+  updateMuteBtn(); if (!muted) sfx.click();
+});
+updateMuteBtn();
+['keydown', 'pointerdown', 'touchstart'].forEach(ev => document.addEventListener(ev, audio, { passive: true }));
+
+const toastBox = document.getElementById('toast-container');
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  toastBox.appendChild(t);
+  setTimeout(() => t.classList.add('out'), 1900);
+  setTimeout(() => t.remove(), 2300);
+}
+
+/* win confetti on canvas */
+let sparks = [];
+function confetti() {
+  const cx = cw / 2, cy = ch / 2;
+  const outerR = Math.min(cw, ch) * 0.46;
+  for (let i = 0; i < 34; i++) {
+    const a = Math.random() * Math.PI * 2, v = 1.5 + Math.random() * 3.5;
+    sparks.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1.5,
+      life: 44, max: 44, r: 1.5 + Math.random() * 2.5,
+      c: ['#E8B04B', '#D4A574', '#F5D9A8', '#8B9D83'][(Math.random() * 4) | 0] });
+  }
+}
+
 // ─── State ───────────────────────────────────────────────
 let balance = 1000;
 let chipValue = 10;
@@ -81,6 +140,7 @@ function placeBet(key) {
   balance -= chipValue;
   bets[key] = (bets[key] || 0) + chipValue;
   totalBet += chipValue;
+  sfx.chip();
   updateHUD();
   updateGrid();
 }
@@ -310,6 +370,22 @@ function draw() {
 
   drawWheel();
   drawBall(spinProgress);
+
+  // confetti
+  if (sparks.length) {
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.07; p.life--;
+      if (p.life <= 0) { sparks.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.max(0, p.life / p.max);
+      ctx.fillStyle = p.c;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(draw);
+  }
 }
 
 // ─── Spin Animation ─────────────────────────────────────
@@ -340,6 +416,15 @@ function startSpin() {
   spinning = true;
   btnSpin.disabled = true;
   resultLabel.textContent = '';
+  sfx.spin();
+  // rattle ticks while spinning (decreasing rate)
+  let tickN = 0;
+  const rattle = setInterval(() => {
+    tickN++;
+    if (!spinning || muted) { clearInterval(rattle); return; }
+    sfx.tick();
+    if (tickN > 26) clearInterval(rattle);
+  }, 130);
   updateHUD();
   animateSpin();
 }
@@ -403,9 +488,14 @@ function payOut() {
   if (win > 0) {
     overlayTitle.textContent = `🎉 Выигрыш: +${Math.round(win)}`;
     overlaySub.textContent = `Число ${n} (${color}) | Банк: ${Math.round(balance)}${isRec ? ' 🏆' : ''}`;
+    sfx.win();
+    confetti();
+    requestAnimationFrame(draw);
+    if (isRec && bestBank > 1000) { toast(`🏆 Новый рекорд банка: ${bestBank}!`); sfx.record(); }
   } else {
     overlayTitle.textContent = '😔 Проигрыш';
     overlaySub.textContent = `Выпало ${n} (${color}) | Банк: ${Math.round(balance)}${isRec ? ' 🏆' : ''}`;
+    sfx.lose();
   }
   overlay.classList.remove('hidden');
   btnNext.textContent = 'Ещё!';
@@ -463,3 +553,12 @@ btnClear.addEventListener('touchstart', (e) => { e.preventDefault(); clearBets()
 
 resize();
 updateHUD();
+
+// ─── Debug hooks (headless) ─────────────────────────────
+window.__rl = {
+  get balance() { return Math.round(balance); },
+  get spinning() { return spinning; },
+  get result() { return result; },
+  bet(key) { placeBet(key); },
+  spin() { startSpin(); },
+};

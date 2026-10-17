@@ -8,6 +8,47 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlaySub = document.getElementById('overlay-sub');
 const btnNext = document.getElementById('btn-next');
+/* ── audio (WebAudio) ── */
+let actx = null;
+let muted = localStorage.getItem('billiards.muted') === '1';
+function audio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (actx && actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(freq, dur, type = 'square', vol = 0.05, slide = 0) {
+  if (muted) return;
+  const ac = audio(); if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, ac.currentTime);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), ac.currentTime + dur);
+  g.gain.setValueAtTime(vol, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime + dur + 0.02);
+}
+const sfx = {
+  cue:    (p) => tone(220 + p * 160, .08, 'square', .05, -80),
+  click:  (p) => tone(900 + Math.random() * 300, .04, 'triangle', Math.min(.07, .015 + p * .012)),
+  cushion:() => tone(240, .05, 'sine', .03, -60),
+  pocket: () => { tone(520, .1, 'sine', .05, -180); setTimeout(() => tone(260, .16, 'sine', .04, -80), 60); },
+  win:    () => [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, .16, 'sine', .06), i * 95)),
+  foul:   () => tone(196, .3, 'sawtooth', .05, -60),
+  record: () => [659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, .18, 'sine', .06), i * 105)),
+  click:  () => tone(600, .05, 'square', .03),
+};
+
+// ─── Mute ─────────────────────────────────────────────────
+function updateMuteBtn() { const b = document.getElementById('btn-mute'); if (b) b.textContent = muted ? '\ud83d\udd07' : '\ud83d\udd0a'; }
+updateMuteBtn();
+const _muteBtn = document.getElementById('btn-mute');
+if (_muteBtn) _muteBtn.addEventListener('click', () => {
+  muted = !muted;
+  localStorage.setItem('billiards.muted', muted ? '1' : '0');
+  updateMuteBtn(); if (!muted) { audio(); tone(600, .05, 'square', .03); }
+});
+['keydown', 'pointerdown', 'touchstart'].forEach(ev => document.addEventListener(ev, audio, { passive: true }));
+
 
 function billiardsBest() {
   var best = 0;
@@ -135,6 +176,7 @@ function shoot(vx, vy) {
   shotsLeft--;
   powerRatio = 0;
   settling = true;
+  sfx.cue(Math.min(1, Math.hypot(vx, vy) / 14));
   updateHUD();
 }
 
@@ -185,6 +227,7 @@ function update() {
         b.active = false;
         score += b.cue ? 5 : 10;
         score += p.pts;
+        if (b.cue) sfx.foul(); else sfx.pocket();
         updateHUD();
         break;
       }
@@ -292,6 +335,7 @@ function collide(a, b) {
   a.vy += impulse * ny;
   b.vx -= impulse * nx;
   b.vy -= impulse * ny;
+  sfx.click(Math.min(1, Math.abs(relV) / 9));
 }
 
 function endTurn() {
@@ -300,6 +344,9 @@ function endTurn() {
     gameState = 'done';
     overlay.classList.remove('hidden');
     overlayTitle.textContent = '🎉 Уровень пройден!';
+    sfx.win();
+    const rec = billiardsBest();
+    if (rec.isNew && score > 0) { toast('🏆 Новый рекорд: ' + score + '!'); sfx.record(); }
     const nextLv = level + 1;
     let sub = 'Счёт: ' + score + ' | Рекорд: ' + billiardsBest().best;
     if (remaining.length === 0) sub += ' | Все шары забиты!';
@@ -635,3 +682,28 @@ function releaseShot() {
 // ─── Start ───────────────────────────────────────────────
 loadLevel(1);
 loop();
+
+// ─── Toast container (created lazily) ─────────────────────
+function toast(msg) {
+  let box = document.getElementById('toast-container');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'toast-container';
+    document.body.appendChild(box);
+  }
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  box.appendChild(t);
+  setTimeout(() => t.classList.add('out'), 1900);
+  setTimeout(() => t.remove(), 2300);
+}
+
+// ─── Debug hooks (headless) ───────────────────────────────
+window.__bl = {
+  get state() { return gameState; },
+  get score() { return score; },
+  get level() { return level; },
+  get ballsLeft() { return balls.filter(b => b.active && !b.cue).length; },
+  get best() { return +(localStorage.getItem('billiards.best') || 0); },
+  strike(vx, vy) { shoot(vx, vy); },
+};

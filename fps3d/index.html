@@ -88,6 +88,12 @@ canvas{display:block}
 #hit-crosshair span{display:block;width:60px;height:60px;border:3px solid #ff4444;border-radius:50%;transform:scale(0.5);transition:transform .1s}
 
 .tip{position:absolute;bottom:120px;left:50%;transform:translateX(-50%);color:#F5F5F7;font-size:.7rem;opacity:0;transition:opacity .5s;background:rgba(10,10,15,.5);padding:6px 16px;border-radius:20px;white-space:nowrap}
+
+#btn-mute{position:absolute;top:60px;right:14px;z-index:30;background:rgba(10,10,15,0.55);border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:.95rem;cursor:pointer;padding:5px 9px;opacity:.8;backdrop-filter:blur(4px)}
+#btn-mute:hover{opacity:1}
+#fps3d-toast{position:absolute;top:64px;left:50%;transform:translateX(-50%);z-index:30;display:flex;flex-direction:column;gap:8px;pointer-events:none;width:min(90vw,340px)}
+#fps3d-toast .toast{background:#12121A;border:1px solid rgba(212,165,116,.4);border-radius:12px;padding:10px 16px;font-size:.82rem;color:#F5F5F7;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:ftin .3s ease}
+@keyframes ftin{from{opacity:0;transform:translateY(-8px) scale(.95)}to{opacity:1;transform:none}}
 </style>
 </head>
 <body>
@@ -136,6 +142,7 @@ canvas{display:block}
   <div id="ammo-display">12/12</div>
   <div id="reload-hint">R — ПЕРЕЗАРЯДИТЬ</div>
   <div class="tip" id="tip"></div>
+  <button id="btn-mute" aria-label="Звук">🔊</button>
   <div id="hud">
     <span><span class="label">HP</span><span id="health-val">100</span><span id="health-bar"><span id="health-fill" style="width:100%"></span></span></span>
     <span><span class="label">СЧЁТ</span><span id="score-val">0</span></span>
@@ -161,9 +168,17 @@ let ammo=12,maxAmmo=12,reloading=false,reloadTimer=0;
 let fireCD=0;
 let waveTotal=0,spawned=0,killed=0,spawnTimer=0;
 let gameOver=false,audioCtx;
+let muted=localStorage.getItem('fps3d.muted')==='1';
+function toastMsg(t){
+  let box=document.getElementById('fps3d-toast');
+  if(!box){box=document.createElement('div');box.id='fps3d-toast';document.body.appendChild(box);}
+  const el=document.createElement('div');el.className='toast';el.textContent=t;
+  box.appendChild(el);setTimeout(()=>el.remove(),2300);
+}
+
 
 function beep(type){
-  if(!audioCtx)return;
+  if(!audioCtx||muted)return;
   try{
     const c=audioCtx,o=c.createOscillator(),g=c.createGain();
     o.connect(g);g.connect(c.destination);
@@ -390,6 +405,7 @@ function die(){
   var isRec=false;
   try{var b=+(localStorage.getItem('fps3d.best')||0);isRec=score>b;if(isRec)localStorage.setItem('fps3d.best',String(score));}catch(e){}
   document.getElementById('deathScore').textContent=score+' очков'+(isRec?' · 🏆 новый рекорд':'');
+  if(isRec){toastMsg('🏆 Новый рекорд: '+score+'!');}
   document.getElementById('death-screen').classList.remove('hidden');
   try{document.exitPointerLock()}catch(e){}
 }

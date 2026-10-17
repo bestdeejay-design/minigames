@@ -9,6 +9,65 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlaySub = document.getElementById('overlay-sub');
 const btnNext = document.getElementById('btn-next');
+const toastBox = document.getElementById('toast-container');
+
+/* ── audio (WebAudio) ── */
+let actx = null;
+let muted = localStorage.getItem('race.muted') === '1';
+let engOsc = null, engGain = null;
+function audio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (actx && actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(freq, dur, type = 'square', vol = 0.05, slide = 0) {
+  if (muted) return;
+  const ac = audio(); if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, ac.currentTime);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), ac.currentTime + dur);
+  g.gain.setValueAtTime(vol, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime + dur + 0.02);
+}
+function engineStart() {
+  if (muted || engOsc) return;
+  const ac = audio(); if (!ac) return;
+  engOsc = ac.createOscillator(); engGain = ac.createGain();
+  engOsc.type = 'sawtooth'; engOsc.frequency.value = 55;
+  engGain.gain.value = 0.018;
+  const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 240;
+  engOsc.connect(f); f.connect(engGain); engGain.connect(ac.destination);
+  engOsc.start();
+}
+function engineStop() {
+  if (engOsc) { try { engOsc.stop(); } catch (e) {} engOsc = null; engGain = null; }
+}
+const sfx = {
+  crash: () => { tone(160, .35, 'sawtooth', .09, -110); tone(70, .4, 'square', .06, -30); },
+  star:  () => { tone(980, .08, 'sine', .05); setTimeout(() => tone(1470, .1, 'sine', .045), 50); },
+  record:() => [659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, .18, 'sine', .06), i * 105)),
+  click: () => tone(600, .05, 'square', .03),
+};
+function updateMuteBtn() { document.getElementById('btn-mute').textContent = muted ? '🔇' : '🔊'; }
+document.getElementById('btn-mute').addEventListener('click', () => {
+  muted = !muted;
+  localStorage.setItem('race.muted', muted ? '1' : '0');
+  updateMuteBtn();
+  if (muted) engineStop(); else { sfx.click(); if (!gameOver) engineStart(); }
+});
+updateMuteBtn();
+['keydown', 'pointerdown', 'touchstart'].forEach(ev =>
+  document.addEventListener(ev, () => { audio(); if (!gameOver) engineStart(); }, { passive: true }));
+
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  toastBox.appendChild(t);
+  setTimeout(() => t.classList.add('out'), 1900);
+  setTimeout(() => t.remove(), 2300);
+}
 
 let cw, ch, dpr = window.devicePixelRatio || 1;
 
@@ -41,9 +100,13 @@ let pendingSpawn = null;
 let invulnTimer = 0;
 let animId = null;
 let frameId = 0;
+let particles = [];
+let shake = 0;
+let recordBeaten = false;
+let best = +(localStorage.getItem('race.best') || 0);
 
 // ─── Cars ───────────────────────────────────────────────
-const COLORS = ['#e74c3c','#f39c12','#9b59b6','#2ecc71','#3498db','#e67e22','#1abc9c'];
+const COLORS = ['#C96A6A','#8B9D83','#7A6A8F','#A8763E','#5F7E8A','#B0563F','#4F6B5C'];
 
 function drawCar(x, y, w, h, color, isPlayer) {
   const r = w * 0.15;
@@ -130,8 +193,12 @@ function resetGame() {
   pendingSpawn = null;
   invulnTimer = 0;
   frameId = 0;
+  particles = [];
+  shake = 0;
+  recordBeaten = false;
   overlay.classList.add('hidden');
   if (animId) { cancelAnimationFrame(animId); animId = null; }
+  engineStart();
   loop();
 }
 
@@ -147,8 +214,29 @@ function loop() {
 
   const baseSpeed = 2.5 + gameTime * 0.3;
 
+  // engine pitch follows speed
+  if (engOsc && !muted) engOsc.frequency.value = 50 + baseSpeed * 9;
+
   // Invulnerability timer
   if (invulnTimer > 0) invulnTimer -= dt;
+
+  // record toast (once per run)
+  if (!recordBeaten && best > 0 && score > best) {
+    recordBeaten = true;
+    toast('🏆 Рекорд побит: ' + score + '!');
+    sfx.record();
+  }
+
+  // exhaust puffs
+  if (frameId % 5 === 0)
+    particles.push({ x: player.x + (Math.random() - .5) * carW * .4, y: player.y + carH / 2,
+      vx: (Math.random() - .5) * .3, vy: 1.2 + Math.random() * .8,
+      life: 16, max: 16, r: 2 + Math.random() * 2, c: 'rgba(180,180,190,.35)', grav: 0 });
+
+  // speed lines on INSANE
+  if (baseSpeed > 8.6 && frameId % 3 === 0)
+    particles.push({ x: roadL + Math.random() * roadW, y: -8, vx: 0, vy: 9 + Math.random() * 4,
+      life: 14, max: 14, r: 1, c: 'rgba(212,165,116,.4)', grav: 0, line: true });
 
   // Player follow touch
   if (touchX !== null) {
@@ -195,6 +283,12 @@ function loop() {
     const dx = player.x - s.x, dy = player.y - s.y;
     if (Math.abs(dx) < carW / 2 + s.r && Math.abs(dy) < carH / 2 + s.r) {
       score += 15;
+      sfx.star();
+      for (let i = 0; i < 10; i++) {
+        const a = Math.random() * Math.PI * 2, v = 1 + Math.random() * 2;
+        particles.push({ x: s.x, y: s.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+          life: 24, max: 24, r: 1.5 + Math.random() * 1.5, c: '#E8B04B', grav: .05 });
+      }
       stars.splice(i, 1);
     }
   }
@@ -211,9 +305,17 @@ function loop() {
           player.y - ph / 2 < e.y + e.h / 2 && player.y + ph / 2 > e.y - e.h / 2) {
         lives--;
         invulnTimer = 1200;
+        sfx.crash();
+        shake = 9;
+        for (let i = 0; i < 16; i++) {
+          const a = Math.random() * Math.PI * 2, v = 1.5 + Math.random() * 3;
+          particles.push({ x: player.x, y: player.y - carH * .3, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1,
+            life: 30, max: 30, r: 1.5 + Math.random() * 2.5, c: ['#C96A6A', '#E8B04B', '#8E8E93'][(Math.random() * 3) | 0], grav: .1 });
+        }
         enemies.splice(i, 1);
         if (lives <= 0) {
           gameOver = true;
+          engineStop();
           showGameOver();
           return;
         }
@@ -227,22 +329,46 @@ function loop() {
   animId = requestAnimationFrame(loop);
 }
 
+// ─── Particles update ─────────────────────────────────
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy;
+    if (p.grav) p.vy += p.grav;
+    if (--p.life <= 0) particles.splice(i, 1);
+  }
+}
+
 // ─── Drawing ────────────────────────────────────────────
 
 function draw() {
   ctx.clearRect(0, 0, cw, ch);
 
-  ctx.fillStyle = '#1a3a1a';
-  ctx.fillRect(0, 0, cw, ch);
+  // shake
+  const sx = shake > 0.3 ? (Math.random() - .5) * shake * 2 : 0;
+  const sy = shake > 0.3 ? (Math.random() - .5) * shake * 2 : 0;
+  ctx.save();
+  ctx.translate(sx, sy);
 
-  ctx.fillStyle = '#333';
+  // night grass
+  ctx.fillStyle = '#0C1014';
+  ctx.fillRect(0, 0, cw, ch);
+  ctx.fillStyle = 'rgba(139,157,131,.14)';
+  for (let gy = ((frameId * 2.5) % 46) - 46; gy < ch; gy += 46)
+    for (let gx = 6; gx < roadL; gx += 34) {
+      ctx.fillRect(gx, gy, 2, 5);
+      ctx.fillRect(roadL + roadW + (gx % 27) + 8, gy + 20, 2, 5);
+    }
+
+  // road
+  ctx.fillStyle = '#16161E';
   ctx.fillRect(roadL, 0, roadW, ch);
 
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = 'rgba(212,165,116,.45)';
   ctx.fillRect(roadL - 2, 0, 3, ch);
   ctx.fillRect(roadL + roadW - 1, 0, 3, ch);
 
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.fillStyle = 'rgba(212,165,116,.22)';
   const dashH = 30, gapH = 30, totalH = dashH + gapH;
   for (let lane = 1; lane < LANES; lane++) {
     const lx = roadL + lane * laneW - 1;
@@ -290,7 +416,18 @@ function draw() {
   }
 
   // Player
-  drawCar(player.x, player.y, carW, carH, '#4a9eff', true);
+  drawCar(player.x, player.y, carW, carH, '#D4A574', true);
+
+  // particles
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / p.max);
+    ctx.fillStyle = p.c;
+    if (p.line) ctx.fillRect(p.x, p.y, 1.5, 14);
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
 
   // Lives
   ctx.font = `${Math.max(14, cw * 0.04)}px sans-serif`;
@@ -300,6 +437,9 @@ function draw() {
   for (let i = 0; i < lives; i++) livesStr += '❤️';
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.fillText(livesStr || '💀', 8, 6);
+
+  if (shake > 0) shake *= 0.86;
+  updateParticles();
 }
 
 function drawStar(ctx, cx, cy, spikes, outerR, innerR) {
@@ -326,16 +466,30 @@ function updateHUD() {
 
 function showGameOver() {
   draw();
-  var best = 0;
-  try { best = +(localStorage.getItem('race.best') || 0); } catch (e) {}
   var isRec = score > best;
   if (isRec) { best = Math.round(score); try { localStorage.setItem('race.best', String(best)); } catch (e) {} }
   overlayTitle.textContent = isRec ? '🏆 Новый рекорд!' : '💥 Game Over';
   overlaySub.textContent = 'Счёт: ' + score + ' | Звёзд: ' + Math.floor(score / 15) + ' | Рекорд: ' + Math.round(best);
+  if (isRec) sfx.record();
   btnNext.textContent = 'Заново';
   btnNext.onclick = resetGame;
   overlay.classList.remove('hidden');
 }
+
+// ─── Debug hooks (headless) ─────────────────────────────
+window.__rc = {
+  get state() { return gameOver ? 'over' : 'play'; },
+  get score() { return score; },
+  get lives() { return lives; },
+  get best() { return best; },
+  get enemies() { return enemies.length; },
+  crash() {
+    if (!enemies.length) enemies.push({ x: player.x, y: player.y, w: carW, h: carH, speed: 1, color: '#C96A6A' });
+    lives = 1; invulnTimer = 0;
+    enemies[0].x = player.x; enemies[0].y = player.y;
+  },
+  setScore(v) { score = v; },
+};
 
 // ─── Touch / Mouse ─────────────────────────────────────
 
