@@ -90,6 +90,21 @@ export class Sound {
     this.noise(big ? 0.7 : 0.35, big ? 500 : 900, big ? 0.5 : 0.28);
     this.tone(big ? 110 : 160, 35, big ? 0.5 : 0.25, 'sine', big ? 0.4 : 0.18);
   }
+  cannon() {
+    // Тяжёлое орудие: низкий удар + шипение.
+    this.noise(0.3, 700, 0.42);
+    this.tone(95, 32, 0.4, 'sine', 0.4);
+    this.tone(320, 90, 0.1, 'sawtooth', 0.12);
+  }
+  repair() {
+    // Сварка/лащение: короткий металлический «тик».
+    this.tone(900 + Math.random() * 500, 1400, 0.04, 'square', 0.05);
+    this.noise(0.05, 3200, 0.05, 'highpass');
+  }
+  enter() {
+    // Юнит вошёл в бункер/кокон.
+    this.tone(300, 190, 0.12, 'triangle', 0.12);
+  }
   build()  { this.tone(300, 430, 0.12, 'square', 0.11); this.noise(0.12, 1800, 0.08, 'highpass'); }
   ready()  { this.tone(520, 520, 0.07, 'triangle', 0.15); this.tone(780, 780, 0.10, 'triangle', 0.15, 0.08); }
   deposit(){ this.tone(880, 880, 0.05, 'triangle', 0.09); this.tone(1318, 1318, 0.07, 'triangle', 0.09, 0.05); }

@@ -134,7 +134,8 @@ function boxSelect(game, st, box, shift) {
   const y0 = Math.min(box.y0, box.y1), y1 = Math.max(box.y0, box.y1);
   const inR = (x, y) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
   // Приоритет юнитам; если юнитов нет — берём одно здание.
-  let picked = st.units.filter((u) => !u.dead && u.side === 'player' && inR(u.x, u.y));
+  // Сидящие в бункере (u.garrison) не выделяются — они «внутри».
+  let picked = st.units.filter((u) => !u.dead && !u.garrison && u.side === 'player' && inR(u.x, u.y));
   if (!picked.length) {
     picked = st.buildings.filter((b) => !b.dead && b.side === 'player' &&
       b.tx * TILE < x1 && (b.tx + b.w) * TILE > x0 &&

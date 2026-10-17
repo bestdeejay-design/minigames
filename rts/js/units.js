@@ -1,10 +1,14 @@
 // ============================================================
-// units.js — юниты: движение по пути (A*), расталкивание, добыча
-// минералов, стройка, бой с автоагром, снаряды и боевые эффекты.
+// units.js — юниты и техника: движение по пути (A*), расталкивание,
+// добыча минералов, стройка, ремонт, бункеры, бой с автоагром,
+// снаряды (пуля/снаряд с осколками/удар в упор) и эффекты.
 // Единый контракт сущности: kind:'unit'|'building'|'mineral',
 // side:'player'|'enemy', x/y (px мира), hp, dead, cfg.
 // ============================================================
-import { TILE, UNITS, BULLET_SPEED, MINERAL_PER_TRIP, MINE_TIME, COLORS } from './config.js';
+import {
+  TILE, UNITS, BULLET_SPEED, SHELL_SPEED, MINERAL_PER_TRIP, MINE_TIME,
+  REPAIR_HP_PER_MINERAL, COLORS, fname,
+} from './config.js';
 import { pathToPoint, pathToRect, distToRectPx } from './pathfinding.js';
 
 let nextId = 1;
@@ -16,12 +20,13 @@ export class Unit {
     this.side = side;
     this.type = type;
     this.cfg = UNITS[type];
+    this.faction = (st.factions && st.factions[side]) || 'human'; // облик и подписи
     this.x = x; this.y = y;
     this.prevX = x; this.prevY = y;   // для интерполяции между тиками
     this.hp = this.cfg.hp; this.maxHp = this.cfg.hp;
     this.r = this.cfg.r;
     this.angle = side === 'player' ? -Math.PI / 4 : (Math.PI * 3) / 4;
-    this.order = { kind: 'idle' };    // idle|move|attack|gather|build
+    this.order = { kind: 'idle' };    // idle|move|attack|gather|build|repair|garrison
     this.path = null; this.pathI = 0;
     this.moveDir = null;              // намерение движения на этот тик
     this.moving = false;
@@ -32,6 +37,8 @@ export class Unit {
     this.phase = null;                // подстадия добычи
     this.mineT = 0;
     this.flashT = 0;
+    this.garrison = null;             // бункер, в котором сидит юнит
+    this.hidden = false;              // true — сидит в бункере (не рисуем)
     this.visible = side === 'player'; // для врагов считает туман войны
     this.selected = false;
     this.dead = false;
@@ -66,6 +73,7 @@ export class SpatialGrid {
 // Приказы
 // ------------------------------------------------------------
 export function orderMove(st, u, x, y) {
+  if (u.garrison) return; // сидящего в бункере нельзя командовать
   u.order = { kind: 'move', x, y };
   u.path = pathToPoint(st.map, (u.x / TILE) | 0, (u.y / TILE) | 0, x, y);
   u.pathI = 0;
@@ -81,24 +89,57 @@ export function orderMoveGroup(st, units, x, y) {
 }
 
 export function orderAttack(st, u, target) {
+  if (u.garrison) return;
   u.order = { kind: 'attack', target, auto: false };
   u.path = null; u.pathI = 0; u.repathT = 0;
 }
 
 export function orderGather(st, u, crystal, excludeFail) {
+  if (u.garrison) return;
   u.order = { kind: 'gather', target: crystal, phase: u.carrying > 0 ? 'toDrop' : 'toMineral' };
   if (excludeFail) u.lastFailed = crystal;
   u.path = null; u.pathI = 0;
 }
 
 export function orderBuild(st, u, building) {
+  if (u.garrison) return;
   u.order = { kind: 'build', target: building };
+  u.path = null; u.pathI = 0;
+}
+
+// Ремонт: рабочий «сваривает» здание или технику до полного HP.
+export function orderRepair(st, u, target) {
+  if (u.garrison) return;
+  u.order = { kind: 'repair', target };
+  u.path = null; u.pathI = 0;
+}
+
+// Гарнизон: пехота заходит в бункер.
+export function orderGarrison(st, u, bunker) {
+  if (u.garrison) return;
+  u.order = { kind: 'garrison', target: bunker };
   u.path = null; u.pathI = 0;
 }
 
 export function orderStop(u) {
   u.order = { kind: 'idle' };
   u.path = null; u.pathI = 0;
+}
+
+// Выпустить всех из бункера — рядом со стенками.
+export function releaseGarrison(st, b) {
+  if (!b.garrison) return;
+  for (const m of b.garrison) {
+    if (m.dead) continue;
+    m.garrison = null;
+    m.hidden = false;
+    const a = Math.random() * Math.PI * 2;
+    m.x = b.x + Math.cos(a) * (b.w * TILE / 2 + 14);
+    m.y = b.y + Math.sin(a) * (b.h * TILE / 2 + 14);
+    m.prevX = m.x; m.prevY = m.y;
+    orderStop(m);
+  }
+  b.garrison = [];
 }
 
 // Офсоты строя: сетка 3×N, отсортированная по удалённости от центра.
@@ -147,6 +188,7 @@ export function updateUnits(st, dt, grid) {
   for (const u of st.units) {
     if (u.dead) continue;
     u.prevX = u.x; u.prevY = u.y;
+    if (u.garrison) continue; // сидит в бункере — не обновляется
     u.cd = Math.max(0, u.cd - dt);
     u.flashT = Math.max(0, u.flashT - dt);
     u.repathT = Math.max(0, u.repathT - dt);
@@ -154,10 +196,10 @@ export function updateUnits(st, dt, grid) {
     integrate(st, u, dt, grid);
   }
   for (const u of st.units) {
-    if (!u.dead) resolveHard(st, u, grid);
+    if (!u.dead && !u.garrison) resolveHard(st, u, grid);
   }
   for (const u of st.units) {
-    if (!u.dead) resolveBuildings(st, u);
+    if (!u.dead && !u.garrison) resolveBuildings(st, u);
   }
 }
 
@@ -165,8 +207,8 @@ function updateOrderByKind(st, u, dt, grid) {
   const o = u.order;
   switch (o.kind) {
     case 'idle': {
-      // Морпех без приказа сам ищет цель в радиусе обзора.
-      if (u.type === 'marine') {
+      // Бойцы без приказа сами ищут цель в радиусе обзора.
+      if (!u.cfg.canMine) {
         u.scanT -= dt;
         if (u.scanT <= 0) {
           u.scanT = 0.25 + Math.random() * 0.15;
@@ -183,6 +225,8 @@ function updateOrderByKind(st, u, dt, grid) {
     case 'attack': updateAttack(st, u, dt, grid); break;
     case 'gather': updateGather(st, u, dt); break;
     case 'build': updateBuild(st, u, dt); break;
+    case 'repair': updateRepair(st, u, dt); break;
+    case 'garrison': updateGarrison(st, u); break;
   }
 }
 
@@ -244,19 +288,32 @@ function updateAttack(st, u, dt, grid) {
   }
 }
 
-function shoot(st, u, t) {
-  const muzzleX = u.x + Math.cos(u.angle) * (u.r + 4);
-  const muzzleY = u.y + Math.sin(u.angle) * (u.r + 4);
-  addEffect(st, { kind: 'muzzle', x: muzzleX, y: muzzleY, ang: u.angle, t: 0, life: 0.06 });
-  if (u.type === 'marine') {
+// Универсальная стрельба: по cfg.projectile выбираем оружие.
+// Стрелять может и здание (турель) — важно, чтобы был cfg.projectile.
+export function shoot(st, u, t) {
+  const cfg = u.cfg;
+  const reach = u.r || Math.max(cfg.w, cfg.h) * TILE * 0.5;
+  u.angle = Math.atan2(t.y - u.y, t.x - u.x);
+  const muzzleX = u.x + Math.cos(u.angle) * (reach + 4);
+  const muzzleY = u.y + Math.sin(u.angle) * (reach + 4);
+  addEffect(st, { kind: 'muzzle', x: muzzleX, y: muzzleY, ang: u.angle, t: 0, life: cfg.projectile === 'shell' ? 0.1 : 0.06 });
+
+  if (cfg.projectile === 'bullet') {
     st.projectiles.push({
       x: muzzleX, y: muzzleY, tx: t.x, ty: t.y,
-      target: t, speed: BULLET_SPEED, dmg: u.cfg.dmg, src: u, dead: false,
+      target: t, speed: BULLET_SPEED, dmg: cfg.dmg, src: u, dead: false,
     });
     st.game.sound.shot();
+  } else if (cfg.projectile === 'shell') {
+    st.projectiles.push({
+      x: muzzleX, y: muzzleY, tx: t.x, ty: t.y,
+      target: t, speed: SHELL_SPEED, dmg: cfg.dmg, src: u, dead: false,
+      splash: cfg.splash,
+    });
+    st.game.sound.cannon();
   } else {
-    // Рабочий бьёт «в упор» — урон сразу + искра.
-    damageEntity(st, t, u.cfg.dmg, u);
+    // Удар в упор (рабочий) — урон сразу + искра.
+    damageEntity(st, t, cfg.dmg, u);
     addEffect(st, { kind: 'spark', x: t.x, y: t.y, ang: u.angle, t: 0, life: 0.22 });
     st.game.sound.mine();
   }
@@ -375,10 +432,79 @@ function updateBuild(st, u, dt) {
       b.progress = 1; b.done = true; b.hp = b.maxHp;
       if (b.side === 'player') {
         st.game.sound.ready();
-        st.game.ui.toast('Постройка завершена: ' + b.cfg.name);
+        st.game.ui.toast('Постройка завершена: ' + fname(b.cfg, b.faction));
       }
       orderStop(u);
     }
+    return;
+  }
+  if (!u.path) {
+    u.path = pathToRect(st.map, (u.x / TILE) | 0, (u.y / TILE) | 0, { x: b.tx, y: b.ty, w: b.w, h: b.h });
+    u.pathI = 0;
+  }
+  if (followPath(u)) u.path = null;
+}
+
+// Ремонт: рабочий варит повреждённое здание или технику своей стороны.
+// Скорость зависит от цели; минералы тратятся пропорционально HP.
+const REPAIR_RATE = { building: 26, unit: 18 }; // HP/сек
+function updateRepair(st, u, dt) {
+  const t = u.order.target;
+  if (!t || t.dead || t.side !== u.side || t.hp >= t.maxHp) { orderStop(u); return; }
+  const isB = t.kind === 'building';
+  const rx = isB ? t.tx * TILE : t.x - t.r;
+  const ry = isB ? t.ty * TILE : t.y - t.r;
+  const rw = isB ? t.w * TILE : t.r * 2;
+  const rh = isB ? t.h * TILE : t.r * 2;
+  if (distToRectPx(u.x, u.y, rx, ry, rw, rh) <= TILE * 1.1) {
+    u.path = null; u.moving = false;
+    u.angle = Math.atan2(t.y - u.y, t.x - u.x);
+    const rate = REPAIR_RATE[isB ? 'building' : 'unit'];
+    const cost = (rate * dt) / REPAIR_HP_PER_MINERAL;
+    if (st.minerals[u.side] < cost) {
+      // Нет минералов — простой (игроку подсказка не чаще раза в 6 c).
+      if (u.side === 'player' && st.time - (st.lastRepairToast || -99) > 6) {
+        st.lastRepairToast = st.time;
+        st.game.ui.toast('Ремонт остановлен: не хватает минералов', 'error');
+      }
+      return;
+    }
+    st.minerals[u.side] -= cost;
+    t.hp = Math.min(t.maxHp, t.hp + rate * dt);
+    if (Math.random() < dt * 5) {
+      addEffect(st, { kind: 'spark', x: rx + Math.random() * rw, y: ry + Math.random() * rh, ang: Math.random() * Math.PI, t: 0, life: 0.2 });
+    }
+    if (Math.random() < dt * 2.5) st.game.sound.repair();
+    if (t.hp >= t.maxHp && t.side === 'player') {
+      st.game.ui.toast('Ремонт завершён: ' + fname(t.cfg, t.faction));
+    }
+    return;
+  }
+  if (!u.path) {
+    u.path = isB
+      ? pathToRect(st.map, (u.x / TILE) | 0, (u.y / TILE) | 0, { x: t.tx, y: t.ty, w: t.w, h: t.h })
+      : pathToPoint(st.map, (u.x / TILE) | 0, (u.y / TILE) | 0, t.x, t.y);
+    u.pathI = 0;
+  }
+  if (followPath(u)) u.path = null;
+}
+
+// Гарнизон: пехота идёт к бункеру и заходит внутрь.
+function updateGarrison(st, u) {
+  const b = u.order.target;
+  if (!b || b.dead || !b.done) { orderStop(u); return; }
+  const rx = b.tx * TILE, ry = b.ty * TILE, rw = b.w * TILE, rh = b.h * TILE;
+  if (distToRectPx(u.x, u.y, rx, ry, rw, rh) <= TILE * 1.0) {
+    if (b.garrison.length >= b.cfg.garrisonCap) { orderStop(u); return; }
+    // Заход внутрь: юнит исчезает с карты, живёт внутри бункера.
+    u.garrison = b;
+    b.garrison.push(u);
+    u.hidden = true;
+    u.selected = false;
+    st.selection = st.selection.filter((s) => s !== u);
+    u.order = { kind: 'idle' };
+    u.path = null;
+    st.game.sound.enter();
     return;
   }
   if (!u.path) {
@@ -394,7 +520,7 @@ export function acquireTarget(st, u, grid) {
   const R = u.cfg.sightTiles * TILE;
   let best = null, bd = Infinity;
   grid.query(u.x, u.y, R, (e) => {
-    if (e.dead || e.side === u.side) return;
+    if (e.dead || e.side === u.side || e.garrison) return;
     if (u.side === 'player' && !e.visible) return; // туман войны
     const d = Math.hypot(e.x - u.x, e.y - u.y);
     if (d < bd && d <= R) { bd = d; best = e; }
@@ -421,7 +547,7 @@ export function acquireTarget(st, u, grid) {
 function nearestEnemyEntity(st, u, maxD) {
   let best = null, bd = maxD;
   for (const e of st.units) {
-    if (e.dead || e.side === u.side) continue;
+    if (e.dead || e.side === u.side || e.garrison) continue;
     if (u.side === 'player' && !e.visible) continue;
     const d = Math.hypot(e.x - u.x, e.y - u.y);
     if (d < bd) { bd = d; best = e; }
@@ -519,7 +645,9 @@ function hitWall(map, x, y, r) {
 }
 
 // ------------------------------------------------------------
-// Снаряды: самонаводящиеся пули; урон приходит в момент попадания.
+// Снаряды: самонаводящиеся; урон приходит в момент попадания.
+// Снаряд танка («shell») бьёт по площади — осколки задевают всех
+// врагов вокруг точки попадания.
 // ------------------------------------------------------------
 export function updateProjectiles(st, dt) {
   for (const p of st.projectiles) {
@@ -532,6 +660,23 @@ export function updateProjectiles(st, dt) {
       p.dead = true;
       if (p.target && !p.target.dead) damageEntity(st, p.target, p.dmg, p.src);
       addEffect(st, { kind: 'spark', x: p.tx, y: p.ty, ang: Math.random() * Math.PI * 2, t: 0, life: 0.18 });
+      // Осколочный урон по площади.
+      if (p.splash) {
+        const r = p.splash.r, frac = p.splash.frac;
+        for (const e of st.units) {
+          if (e.dead || e.garrison || e === p.target) continue;
+          if (p.src && e.side === p.src.side) continue;
+          if (Math.hypot(e.x - p.tx, e.y - p.ty) <= r) damageEntity(st, e, p.dmg * frac, p.src);
+        }
+        for (const b of st.buildings) {
+          if (b.dead || b === p.target) continue;
+          if (p.src && b.side === p.src.side) continue;
+          if (distToRectPx(p.tx, p.ty, b.tx * TILE, b.ty * TILE, b.w * TILE, b.h * TILE) <= r) {
+            damageEntity(st, b, p.dmg * frac, p.src);
+          }
+        }
+        addEffect(st, { kind: 'boom', x: p.tx, y: p.ty, t: 0, life: 0.5, big: true });
+      }
     } else {
       p.x += (dx / d) * step; p.y += (dy / d) * step;
     }
@@ -543,7 +688,7 @@ export function updateProjectiles(st, dt) {
 // Урон и смерть. Смерть помечает объект — массивы чистятся в тике.
 // ------------------------------------------------------------
 export function damageEntity(st, victim, dmg, attacker) {
-  if (!victim || victim.dead) return;
+  if (!victim || victim.dead || victim.garrison) return; // в бункере неуязвим
   victim.hp -= dmg;
   victim.flashT = 0.14;
   // Тревога для игрока — не чаще раза в 8 секунд.
@@ -560,9 +705,10 @@ function killEntity(st, v, attacker) {
   v.dead = true;
   v.selected = false;
   if (v.kind === 'unit') {
-    addEffect(st, { kind: 'boom', x: v.x, y: v.y, t: 0, life: 0.4, big: false });
-    st.game.sound.boom(false);
+    addEffect(st, { kind: 'boom', x: v.x, y: v.y, t: 0, life: v.cfg.vehicle ? 0.6 : 0.4, big: !!v.cfg.vehicle });
+    st.game.sound.boom(!!v.cfg.vehicle);
   } else {
+    if (v.garrison && v.garrison.length) releaseGarrison(st, v); // выжившие выпрыгивают
     st.map.unmarkBuilding(v);
     st.bcount[v.side]--;
     addEffect(st, { kind: 'boom', x: v.x, y: v.y, t: 0, life: 0.8, big: true });
@@ -597,7 +743,7 @@ export function updateEffects(st, dt) {
 // выделения не рисовалось — игрок не видел, кем управляет.
 export function syncSelectionFlags(st) {
   const sel = new Set(st.selection);
-  for (const u of st.units) u.selected = !u.dead && sel.has(u);
+  for (const u of st.units) u.selected = !u.dead && !u.garrison && sel.has(u);
   for (const b of st.buildings) b.selected = !b.dead && sel.has(b);
 }
 
@@ -606,7 +752,7 @@ export function syncSelectionFlags(st) {
 export function unitAt(st, wx, wy, sideFilter) {
   let best = null, bd = Infinity;
   for (const u of st.units) {
-    if (u.dead) continue;
+    if (u.dead || u.garrison) continue;
     if (sideFilter && u.side !== sideFilter) continue;
     const d = Math.hypot(u.x - wx, u.y - wy);
     if (d <= u.r + 5 && d < bd) { bd = d; best = u; }
@@ -636,27 +782,118 @@ export function drawUnit(ctx, u, rx, ry) {
   ctx.save();
   ctx.translate(rx, ry);
   ctx.rotate(u.angle);
+  const alien = u.faction === 'alien';
   if (u.type === 'worker') {
-    // Корпус + оранжевый рюкзак-инструментарий.
-    ctx.fillStyle = dark;
-    ctx.fillRect(-9, -5, 5, 10);
-    ctx.fillStyle = base;
-    ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#f0a53a';
-    ctx.fillRect(-12, -4, 4, 8);
-    ctx.fillStyle = '#d7e3f5';
-    ctx.beginPath(); ctx.arc(3, 0, 3.4, 0, Math.PI * 2); ctx.fill();
-  } else {
-    // Морпех: корпус + плечи + ствол.
-    ctx.fillStyle = dark;
-    ctx.fillRect(-7, -8, 5, 16);
-    ctx.fillRect(-7, 3, 5, 5);
-    ctx.fillStyle = base;
-    ctx.beginPath(); ctx.arc(0, 0, 9.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#2c3138';
-    ctx.fillRect(4, -2, 14, 4);
-    ctx.fillStyle = '#d7e3f5';
-    ctx.beginPath(); ctx.arc(3, 0, 3.2, 0, Math.PI * 2); ctx.fill();
+    if (alien) {
+      // Сборщик кхарид: кольчатое тельце с лапками и сумкой для кристаллов.
+      ctx.strokeStyle = dark; ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) {
+        const lx = -6 + i * 6;
+        ctx.beginPath(); ctx.moveTo(lx, -4); ctx.lineTo(lx + 2, -11); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(lx, 4); ctx.lineTo(lx + 2, 11); ctx.stroke();
+      }
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.ellipse(-3, 0, 7, 9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = base;
+      ctx.beginPath(); ctx.ellipse(2, 0, 7, 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#b7f0c8';
+      ctx.beginPath(); ctx.arc(6, 0, 3, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // Корпус + оранжевый рюкзак-инструментарий.
+      ctx.fillStyle = dark;
+      ctx.fillRect(-9, -5, 5, 10);
+      ctx.fillStyle = base;
+      ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f0a53a';
+      ctx.fillRect(-12, -4, 4, 8);
+      ctx.fillStyle = '#d7e3f5';
+      ctx.beginPath(); ctx.arc(3, 0, 3.4, 0, Math.PI * 2); ctx.fill();
+    }
+  } else if (u.type === 'marine') {
+    if (alien) {
+      // Жалящий: ползун с гребнем шипов и светящейся пастью.
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.ellipse(-2, 0, 11, 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = base;
+      ctx.beginPath(); ctx.ellipse(1, 0, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#9ff5b8';
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(-8 + i * 5, -4); ctx.lineTo(-6 + i * 5, -12); ctx.lineTo(-4 + i * 5, -4);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle = '#eafff0';
+      ctx.beginPath(); ctx.arc(9, 0, 2.6, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // Морпех: корпус + плечи + ствол.
+      ctx.fillStyle = dark;
+      ctx.fillRect(-7, -8, 5, 16);
+      ctx.fillRect(-7, 3, 5, 5);
+      ctx.fillStyle = base;
+      ctx.beginPath(); ctx.arc(0, 0, 9.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2c3138';
+      ctx.fillRect(4, -2, 14, 4);
+      ctx.fillStyle = '#d7e3f5';
+      ctx.beginPath(); ctx.arc(3, 0, 3.2, 0, Math.PI * 2); ctx.fill();
+    }
+  } else if (u.type === 'buggy') {
+    if (alien) {
+      // Скорч: четвероногий хищник с хвостом.
+      ctx.strokeStyle = dark; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-6, -5); ctx.lineTo(-13, -12); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-6, 5); ctx.lineTo(-13, 12); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(6, -5); ctx.lineTo(13, -12); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(6, 5); ctx.lineTo(13, 12); ctx.stroke();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.ellipse(-4, 0, 10, 7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = base;
+      ctx.beginPath(); ctx.ellipse(3, 0, 8, 5.4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#9ff5b8';
+      ctx.beginPath(); ctx.arc(9, -2, 2.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(9, 2, 2.2, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // Багги: колёса, клиновидный корпус, пулемёт.
+      ctx.fillStyle = '#23262b';
+      ctx.fillRect(-9, -11, 7, 5); ctx.fillRect(3, -11, 7, 5);
+      ctx.fillRect(-9, 6, 7, 5);  ctx.fillRect(3, 6, 7, 5);
+      ctx.fillStyle = dark;
+      ctx.fillRect(-11, -6, 7, 12);
+      ctx.fillStyle = base;
+      ctx.beginPath();
+      ctx.moveTo(-6, -7); ctx.lineTo(10, -3); ctx.lineTo(10, 3); ctx.lineTo(-6, 7);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#2c3138';
+      ctx.fillRect(7, -1.5, 11, 3);
+      ctx.fillStyle = '#d7e3f5';
+      ctx.beginPath(); ctx.arc(2, 0, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  } else if (u.type === 'tank') {
+    if (alien) {
+      // Колосс: исполин с кристалльными рогами и светящимся ядром.
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.ellipse(0, 0, 17, 13, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = base;
+      ctx.beginPath(); ctx.ellipse(2, 0, 13, 9.4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#b7f0c8';
+      ctx.beginPath(); ctx.moveTo(-2, -9); ctx.lineTo(3, -20); ctx.lineTo(8, -8); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-2, 9); ctx.lineTo(3, 20); ctx.lineTo(8, 8); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#eafff0';
+      ctx.beginPath(); ctx.arc(10, 0, 4, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // Танк: гусеницы, корпус, башня со стволом.
+      ctx.fillStyle = '#23262b';
+      ctx.fillRect(-15, -13, 30, 7);
+      ctx.fillRect(-15, 6, 30, 7);
+      ctx.fillStyle = dark;
+      ctx.fillRect(-13, -8, 25, 16);
+      ctx.fillStyle = base;
+      ctx.fillRect(-11, -6, 22, 12);
+      ctx.fillStyle = '#2c3138';
+      ctx.fillRect(3, -2.5, 21, 5);
+      ctx.beginPath(); ctx.arc(-1, 0, 8.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d7e3f5';
+      ctx.beginPath(); ctx.arc(2, 0, 3.4, 0, Math.PI * 2); ctx.fill();
+    }
   }
   // Груз минералов на спине.
   if (u.carrying > 0) {
@@ -679,7 +916,7 @@ export function drawUnit(ctx, u, rx, ry) {
   }
   // Полоска здоровья — у выделенных и раненых.
   if (u.selected || u.hp < u.maxHp) {
-    const w = 24, x0 = rx - w / 2, y0 = ry - 19;
+    const w = u.cfg.vehicle ? 34 : 24, x0 = rx - w / 2, y0 = ry - 19;
     const frac = Math.max(0, u.hp / u.maxHp);
     ctx.fillStyle = '#1a1012';
     ctx.fillRect(x0 - 1, y0 - 1, w + 2, 5);

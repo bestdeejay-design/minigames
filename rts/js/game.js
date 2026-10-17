@@ -1,21 +1,31 @@
 // ============================================================
 // game.js — точка входа. Состояние партии, фиксированный игровой
 // цикл (логика 30 тик/с, отрисовка через requestAnimationFrame с
-// интерполяцией), команды игрока, победа/поражение, рестарт без
-// перезагрузки страницы.
+// интерполяцией), меню кампании/быстрого боя, выбор фракции
+// (Гелиос-люди / кхарид-аборигены), миссия-оборона с волнами,
+// команды игрока, победа/поражение, рестарт без перезагрузки.
 // ============================================================
 import {
   TILE, MAP_W, MAP_H, WORLD_W, WORLD_H, LOGIC_DT, MAX_FRAME_DT,
-  START_MINERALS, WORKER_START, BUILDINGS, UNITS, SUPPLY_MAX,
+  START_MINERALS, BUILDINGS, UNITS, SUPPLY_MAX,
+  fname,
 } from './config.js';
-import { GameMap, BASE } from './map.js';
+import { GameMap, CC_WORKER_OFFS } from './map.js';
 import { Fog } from './fog.js';
 import { Sound } from './audio.js';
 import * as U from './units.js';
 import * as B from './buildings.js';
 import { AIController } from './ai.js';
+import { MISSIONS, SKIRMISH, loadProgress, saveProgress } from './missions.js';
 import * as ui from './ui.js';
 import { attachInput, updateCamera } from './input.js';
+
+// Порядок кнопок в меню стройки: клавиша → тип здания.
+const BUILD_ORDER = [
+  ['KeyQ', 'cc'], ['KeyW', 'depot'], ['KeyE', 'barracks'],
+  ['KeyR', 'turret'], ['KeyT', 'bunker'], ['KeyY', 'wall'], ['KeyU', 'factory'],
+];
+const PRODUCE_KEYS = ['KeyQ', 'KeyW', 'KeyE'];
 
 export class Game {
   constructor() {
@@ -26,6 +36,7 @@ export class Game {
     this.state = null;
     this.started = false;
     this.paused = false;
+    this.mission = MISSIONS[0];      // активная миссия (или сконструированный «быстрый бой»)
     this.box = null;                 // рамка выделения (мировые координаты)
     this.mouse = { x: -1, y: -1 };
     this.cssW = window.innerWidth;
@@ -43,18 +54,23 @@ export class Game {
     ui.initUI(this);
     ui.setSoundUI(this.sound.muted);
     attachInput(this);
-    this.newGame();
+    this.newGame(); // фон для меню — партия не идёт, пока started=false
 
     requestAnimationFrame((t) => this.loop(t));
   }
 
   // ----------------------------------------------------------
-  // Новая партия (используется и для рестарта без перезагрузки).
+  // Новая партия — строится из this.mission (карта, фракции, ИИ).
   // ----------------------------------------------------------
   newGame() {
-    const seed = (Math.random() * 0xFFFFFFFF) >>> 0;
+    const m = this.mission;
+    const seed = m.map.seed;
     const st = {
       tick: 0, time: 0, seed,
+      factions: {
+        player: m.faction,
+        enemy: m.faction === 'alien' ? 'human' : 'alien',
+      },
       minerals: { player: START_MINERALS, enemy: START_MINERALS },
       supply: { player: { used: 0, cap: 0 }, enemy: { used: 0, cap: 0 } },
       units: [], buildings: [], projectiles: [], effects: [], floats: [], pings: [],
@@ -63,9 +79,10 @@ export class Game {
       gameOver: null,
       stats: { kills: 0, losses: 0, mined: 0 },
       bcount: { player: 0, enemy: 0 },
-      lastAlertT: -99, lastSupplyToast: -99,
+      defenseWave: 0,
+      lastAlertT: -99, lastSupplyToast: -99, lastRepairToast: -99,
     };
-    st.map = new GameMap(seed);
+    st.map = new GameMap(seed, m.map);
     st.fog = new Fog();
     st.game = this;
     this.state = st;
@@ -73,39 +90,95 @@ export class Game {
     this.paused = false;
     ui.setPausedUI(false);
 
-    // Стартовые базы: командный центр + рабочие (позиции зеркальны).
-    const pOffs = [[8, 52], [10, 52], [12, 52], [9, 53]];
-    const eOffs = pOffs.map(([x, y]) => [MAP_W - 1 - x, MAP_H - 1 - y]);
+    // Стартовые базы: командный центр + рабочие (враг — зеркален).
     for (const side of ['player', 'enemy']) {
-      const base = BASE[side];
+      const base = st.map.bases[side];
       const cc = new B.Building(st, side, 'cc', base.cc.x, base.cc.y, true);
       st.map.markBuilding(cc);
       st.bcount[side]++;
-      const offs = side === 'player' ? pOffs : eOffs;
-      for (const [x, y] of offs) {
-        U.spawnUnit(st, side, 'worker', (x + 0.5) * TILE, (y + 0.5) * TILE, true);
+      for (const [dx, dy] of CC_WORKER_OFFS) {
+        U.spawnUnit(st, side, 'worker', (base.cc.x + dx + 0.5) * TILE, (base.cc.y + dy + 0.5) * TILE, true);
       }
     }
 
-    st.ai = new AIController();
+    // Миссия-оборона: у противника дополнительные гнёзда-укрепления.
+    if (m.defense) {
+      const e = st.map.bases.enemy.cc;
+      const cand = [[-4, 0], [4, 1], [0, -4], [-1, 4], [3, -3], [-3, 3]];
+      let placed = 0;
+      for (const [dx, dy] of cand) {
+        if (placed >= m.defense.nests) break;
+        const tx = e.x + dx, ty = e.y + dy;
+        if (!B.canPlace(st.map, tx, ty, 3, 2)) continue;
+        const nest = new B.Building(st, 'enemy', 'barracks', tx, ty, true);
+        st.map.markBuilding(nest);
+        st.bcount.enemy++;
+        placed++;
+      }
+      if (m.faction === 'human') {
+        // Фракция игрока — люди: у противника кхарид ставим жвала.
+        this.placeEnemyTurrets(st, e, 2);
+      }
+    }
+
+    st.ai = new AIController({ ...m.ai, defense: m.defense });
     calcSupply(st);
     st.fog.recompute(st);
 
     // Камера — на базу игрока.
-    this.centerCamera(BASE.player.cc.x * TILE + 2 * TILE, BASE.player.cc.y * TILE + 1.5 * TILE);
+    const pb = st.map.bases.player.cc;
+    this.centerCamera((pb.x + 2) * TILE, (pb.y + 2) * TILE);
 
     ui.resetPanel();
     ui.update(this);
+    ui.setObjective(this.objectiveText());
     ui.drawMinimap(this);
   }
 
-  start() {
-    this.sound.unlock();      // разрешено только из жеста пользователя
-    if (!this.started) {
-      this.started = true;
-      ui.hideStart();
-      ui.toast('Добывайте минералы, стройте базу и уничтожьте красных!');
+  // Турели-жвала врага в миссии обороны (ставим без строителей).
+  placeEnemyTurrets(st, cc, count) {
+    const cand = [[2, -2], [-3, -1], [2, 3], [-2, 3], [4, 0], [0, -5]];
+    let placed = 0;
+    for (const [dx, dy] of cand) {
+      if (placed >= count) break;
+      const tx = cc.x + dx, ty = cc.y + dy;
+      if (!B.canPlace(st.map, tx, ty, 1, 1)) continue;
+      const t = new B.Building(st, 'enemy', 'turret', tx, ty, true);
+      st.map.markBuilding(t);
+      st.bcount.enemy++;
+      placed++;
     }
+  }
+
+  // ----------------------------------------------------------
+  // Запуск миссии из меню.
+  // ----------------------------------------------------------
+  startMission(m) {
+    this.sound.unlock();      // жест пользователя — легально включаем звук
+    this.mission = m;
+    this.newGame();
+    this.started = true;
+    ui.hideStart();
+    ui.hideMissions();
+    ui.hideBrief();
+    ui.hideEnd();
+    ui.toast(m.objective);
+  }
+
+  startSkirmish(faction) {
+    const seed = (Math.random() * 0xFFFFFFFF) >>> 0;
+    const biome = ['mars', 'nest', 'moon'][seed % 3];
+    this.startMission({
+      ...SKIRMISH,
+      id: -1,
+      faction,
+      map: {
+        seed, biome,
+        lakes: 'default', rocks: 6 + (seed % 5),
+        rich: 1 + ((seed >> 4) % 3) * 0.15,
+        base: { x: 8, y: 48 },
+      },
+    });
   }
 
   restart() {
@@ -113,6 +186,7 @@ export class Game {
     this.newGame();
     this.started = true;
     ui.hideStart();
+    ui.toast(this.mission.objective);
     this.sound.click();
   }
 
@@ -155,7 +229,7 @@ export class Game {
   }
 
   // ----------------------------------------------------------
-  // Контекстные команды панели (кнопки + хоткеи Q/W/E/B/S).
+  // Контекстные команды панели (кнопки + хоткеи).
   // ----------------------------------------------------------
   getCommands() {
     const st = this.state;
@@ -168,11 +242,23 @@ export class Game {
     const b = sel.length === 1 && sel[0].kind === 'building' ? sel[0] : null;
     if (b && b.side === 'player') {
       if (b.done && b.cfg.produces) {
-        const ut = UNITS[b.cfg.produces];
+        const list = Array.isArray(b.cfg.produces) ? b.cfg.produces : [b.cfg.produces];
+        list.forEach((type, i) => {
+          const ut = UNITS[type];
+          cmds.push({
+            code: PRODUCE_KEYS[i], icon: b.faction === 'alien' ? 'a_' + type : type,
+            label: fname(ut, st.factions.player), cost: ut.cost,
+            enabled: () => st.minerals.player >= ut.cost,
+            on: () => this.hooks.train(b, type),
+          });
+        });
+      }
+      // Гарнизон: выпустить пехоту из бункера/кокона.
+      if (b.done && b.cfg.garrisonCap && b.garrison.length) {
         cmds.push({
-          code: 'KeyQ', icon: b.cfg.produces, label: ut.name, cost: ut.cost,
-          enabled: () => st.minerals.player >= ut.cost,
-          on: () => this.hooks.train(b, b.cfg.produces),
+          code: 'KeyF', icon: 'exit',
+          label: 'Выпустить ×' + b.garrison.length,
+          on: () => { U.releaseGarrison(st, b); this.sound.click(); },
         });
       }
       return cmds;
@@ -181,13 +267,15 @@ export class Game {
     if (units.length) {
       const workers = units.filter((u) => u.cfg.canBuild);
       if (workers.length) {
+        const fac = st.factions.player;
         if (!st.buildMenu) {
           cmds.push({ code: 'KeyB', icon: 'build', label: 'Строить', on: () => { st.buildMenu = true; } });
         } else {
-          for (const [code, type] of [['KeyQ', 'cc'], ['KeyW', 'depot'], ['KeyE', 'barracks']]) {
+          for (const [code, type] of BUILD_ORDER) {
             const cfg = BUILDINGS[type];
             cmds.push({
-              code, icon: type, label: cfg.name, cost: cfg.cost,
+              code, icon: fac === 'alien' ? 'a_' + type : type,
+              label: fname(cfg, fac), cost: cfg.cost,
               enabled: () => st.minerals.player >= cfg.cost,
               on: () => this.hooks.beginPlace(type),
             });
@@ -241,14 +329,14 @@ export class Game {
     };
   }
 
-  // ПКМ: атака врага / добыча кристалла / помочь достроить / движение.
+  // ПКМ: атака врага / добыча кристалла / ремонт / гарнизон /
+  // помочь достроить / движение.
   issueRMB(wx, wy) {
     const st = this.state;
     if (!st || st.gameOver) return;
     const sel = st.selection.filter((e) => !e.dead);
 
-    // Выделено своё здание — ставим точку сбора (фильтр «!dead» оставляет
-    // живое здание в sel, поэтому проверяем sel, а не st.selection[0]).
+    // Выделено своё здание — ставим точку сбора.
     if (sel.length === 1 && sel[0].kind === 'building' &&
         sel[0].side === 'player') {
       sel[0].rally = { x: wx, y: wy };
@@ -259,12 +347,16 @@ export class Game {
     const units = sel.filter((e) => e.kind === 'unit' && e.side === 'player');
     if (!units.length) return;
 
-    const target = U.unitAt(st, wx, wy, 'enemy') || B.buildingAt(st, wx, wy);
-    if (target && target.side === 'enemy') {
+    // 1) Враг — атака.
+    const enemyU = U.unitAt(st, wx, wy, 'enemy');
+    const bld = B.buildingAt(st, wx, wy);
+    if ((enemyU || (bld && bld.side === 'enemy'))) {
+      const target = enemyU || bld;
       for (const u of units) U.orderAttack(st, u, target);
       this.sound.ack();
       return;
     }
+    // 2) Кристалл — добыча (рабочими), остальные идут за ним.
     const crystal = U.crystalAt(st, wx, wy);
     if (crystal) {
       for (const u of units) {
@@ -274,16 +366,44 @@ export class Game {
       this.sound.ack();
       return;
     }
-    const own = B.buildingAt(st, wx, wy);
-    if (own && own.side === 'player' && !own.done) {
-      // Достроить брошенную стройку.
-      for (const u of units) {
-        if (u.type === 'worker') U.orderBuild(st, u, own);
-        else U.orderMove(st, u, wx, wy);
+    // 3) Своя постройка: гарнизон → достройка → ремонт.
+    const own = bld && bld.side === 'player' ? bld : null;
+    if (own) {
+      const infantry = units.filter((u) => !u.cfg.canMine && !u.cfg.vehicle && !u.garrison);
+      if (own.done && own.cfg.garrisonCap && infantry.length &&
+          own.garrison.length < own.cfg.garrisonCap) {
+        for (const u of infantry) U.orderGarrison(st, u, own);
+        this.sound.ack();
+        return;
       }
-      this.sound.ack();
-      return;
+      if (!own.done) {
+        for (const u of units) {
+          if (u.cfg.canBuild) U.orderBuild(st, u, own);
+          else U.orderMove(st, u, wx, wy);
+        }
+        this.sound.ack();
+        return;
+      }
+      const repairers = units.filter((u) => u.cfg.canRepair);
+      if (own.done && own.hp < own.maxHp && repairers.length) {
+        for (const u of repairers) U.orderRepair(st, u, own);
+        for (const u of units) if (!u.cfg.canRepair) U.orderMove(st, u, wx, wy);
+        this.sound.ack();
+        return;
+      }
     }
+    // 4) Своя повреждённая техника под курсором — ремонт.
+    const ownU = U.unitAt(st, wx, wy, 'player');
+    if (ownU && ownU.cfg.vehicle && ownU.hp < ownU.maxHp) {
+      const repairers = units.filter((u) => u.cfg.canRepair);
+      if (repairers.length) {
+        for (const u of repairers) U.orderRepair(st, u, ownU);
+        for (const u of units) if (!u.cfg.canRepair) U.orderMove(st, u, ownU.x, ownU.y);
+        this.sound.ack();
+        return;
+      }
+    }
+    // 5) Просто движение.
     U.orderMoveGroup(st, units, wx, wy);
     this.sound.ack();
   }
@@ -294,6 +414,7 @@ export class Game {
     const pl = st.placing;
     if (!pl) return;
     const cfg = BUILDINGS[pl.type];
+    const fac = st.factions.player;
     tx = Math.max(0, Math.min(MAP_W - cfg.w, tx));
     ty = Math.max(0, Math.min(MAP_H - cfg.h, ty));
     for (let y = ty; y < ty + cfg.h; y++)
@@ -301,6 +422,15 @@ export class Game {
         if (!st.fog.tileExplored(x, y)) {
           ui.toast('Территория не разведана', 'error'); this.sound.error(); return;
         }
+    // Требование технологии: у завода нужна казарма/инкубатор.
+    if (cfg.requires) {
+      const ok = st.buildings.some((b) => !b.dead && b.side === 'player' &&
+        b.type === cfg.requires && b.done);
+      if (!ok) {
+        ui.toast('Сначала постройте: ' + fname(BUILDINGS[cfg.requires], fac), 'error');
+        this.sound.error(); return;
+      }
+    }
     if (!B.canPlace(st.map, tx, ty, cfg.w, cfg.h)) {
       ui.toast('Здесь строить нельзя', 'error'); this.sound.error(); return;
     }
@@ -310,7 +440,8 @@ export class Game {
     const builders = st.selection.filter((e) => e.kind === 'unit' && e.side === 'player' &&
       e.cfg.canBuild && !e.dead);
     if (!builders.length) {
-      ui.toast('Выделите рабочего', 'error'); this.sound.error(); return;
+      ui.toast('Выделите ' + fname(UNITS.worker, fac).toLowerCase(), 'error');
+      this.sound.error(); return;
     }
     const b = B.placeBuildingCmd(st, 'player', pl.type, tx, ty, builders);
     if (b) { st.placing = null; this.sound.build(); }
@@ -327,10 +458,10 @@ export class Game {
     updateCamera(this, LOGIC_DT);
 
     this.grid.clear();
-    for (const u of st.units) if (!u.dead) this.grid.insert(u);
+    for (const u of st.units) if (!u.dead && !u.garrison) this.grid.insert(u);
 
     U.updateUnits(st, LOGIC_DT, this.grid);
-    B.updateBuildings(st, LOGIC_DT);
+    B.updateBuildings(st, LOGIC_DT, this.grid);
     st.units = st.units.filter((u) => !u.dead);
     st.buildings = st.buildings.filter((b) => !b.dead);
     U.syncSelectionFlags(st); // кольца выделения видимы каждый тик
@@ -340,23 +471,62 @@ export class Game {
 
     if (st.tick % 3 === 0) st.fog.recompute(st);
     calcSupply(st);
-    if (st.tick % 2 === 0) ui.update(this);
+    if (st.tick % 2 === 0) {
+      ui.update(this);
+      ui.setObjective(this.objectiveText());
+    }
     if (st.tick % 3 === 0) ui.drawMinimap(this);
     this.checkEnd();
+  }
+
+  // Текст цели миссии в верхней панели (с таймерами обороны).
+  objectiveText() {
+    const st = this.state;
+    if (!st) return '';
+    const def = this.mission && this.mission.defense;
+    if (def) {
+      if (st.time < def.prep) {
+        return 'Подготовка: ' + fmtTime(def.prep - st.time) + ' — стройте оборону';
+      }
+      const left = Math.max(0, def.prep + def.total - st.time);
+      return 'Оборона: ' + fmtTime(left) + ' · волн отбито: ' + st.defenseWave;
+    }
+    return this.mission.objective;
   }
 
   checkEnd() {
     const st = this.state;
     if (st.gameOver) return;
+    const def = this.mission && this.mission.defense;
     if (st.bcount.enemy <= 0) {
-      st.gameOver = 'win';
-      this.sound.win();
-      ui.showEnd(true, st.stats);
+      this.win('Противник уничтожен!');
     } else if (st.bcount.player <= 0) {
       st.gameOver = 'lose';
       this.sound.lose();
-      ui.showEnd(false, st.stats);
+      ui.showEnd(false, st.stats, this.endOpts(false));
+    } else if (def && st.time >= def.prep + def.total) {
+      this.win('Шаттлы прибыли — оборона выстояла!');
     }
+  }
+
+  win(reason) {
+    const st = this.state;
+    st.gameOver = 'win';
+    this.sound.win();
+    if (this.mission.id >= 0) saveProgress(this.mission.id + 1);
+    ui.showEnd(true, st.stats, this.endOpts(true, reason));
+  }
+
+  // Опции экрана финала: следующая миссия, подпись причины.
+  endOpts(win, reason) {
+    const m = this.mission;
+    const opts = {};
+    if (reason) opts.reason = reason;
+    if (win && m.id >= 0 && m.id < MISSIONS.length - 1) {
+      opts.next = MISSIONS[m.id + 1];
+    }
+    if (win && m.id === MISSIONS.length - 1) opts.campaignDone = true;
+    return opts;
   }
 
   // ----------------------------------------------------------
@@ -420,7 +590,7 @@ export class Game {
 
     // Юниты с интерполяцией между логическими тиками.
     for (const u of st.units) {
-      if (u.dead) continue;
+      if (u.dead || u.garrison) continue;
       if (u.side === 'enemy' && !u.visible) continue;
       const wx = u.prevX + (u.x - u.prevX) * alpha;
       const wy = u.prevY + (u.y - u.prevY) * alpha;
@@ -428,11 +598,11 @@ export class Game {
       U.drawUnit(ctx, u, wx - cam.x, wy - cam.y);
     }
 
-    // Снаряды — светящиеся трассеры.
-    ctx.lineWidth = 2;
+    // Снаряды — светящиеся трассеры (пули тонкие, снаряды толстые).
     for (const p of st.projectiles) {
       if (!inView(p.x, p.y, 20)) continue;
-      ctx.strokeStyle = '#ffd977';
+      ctx.strokeStyle = p.splash ? '#ffb36b' : '#ffd977';
+      ctx.lineWidth = p.splash ? 3.5 : 2;
       ctx.beginPath();
       ctx.moveTo(p.x - cam.x, p.y - cam.y);
       ctx.lineTo(p.x - (p.tx - p.x) * 0.03 - cam.x, p.y - (p.ty - p.y) * 0.03 - cam.y);
@@ -509,6 +679,8 @@ export class Game {
     ctx.globalAlpha = 0.55;
     B.drawBuilding(ctx, {
       tx, ty, w: cfg.w, h: cfg.h, side: 'player', type: pl.type, cfg,
+      faction: st.factions.player,
+      angle: -Math.PI / 4, garrison: [],
       done: true, progress: 1, hp: 1, maxHp: 1, flashT: 0, selected: false,
     }, false, cam.x, cam.y);
     ctx.globalAlpha = 1;
@@ -559,6 +731,11 @@ function calcSupply(st) {
     }
     st.supply[side].cap = Math.min(cap, SUPPLY_MAX);
   }
+}
+
+function fmtTime(sec) {
+  const s = Math.max(0, Math.ceil(sec));
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 }
 
 // --- Запуск ---

@@ -32,6 +32,14 @@ html, body {
   box-shadow: 0 2px 8px rgba(0,0,0,.5);
   z-index: 10;
 }
+.res { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
+.dot { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+.dot.mineral { background: #3fd3e8; box-shadow: 0 0 6px #3fd3e8; }
+.dot.supply { background: #9aa7b5; }
+#res-supply.blocked { color: #ff6b5b; animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
+.spacer { flex: 1; }
+/* Хром каталога AXIIOM */
 .tb-sep { width: 1px; height: 16px; background: #3a4450; }
 #topbar .back {
   display: inline-flex; align-items: center; gap: 6px;
@@ -43,13 +51,6 @@ html, body {
   font-size: 10px; font-weight: 600; letter-spacing: 2.5px;
   text-transform: uppercase; color: #6b7a8a;
 }
-.res { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
-.dot { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
-.dot.mineral { background: #3fd3e8; box-shadow: 0 0 6px #3fd3e8; }
-.dot.supply { background: #9aa7b5; }
-#res-supply.blocked { color: #ff6b5b; animation: pulse 1s infinite; }
-@keyframes pulse { 50% { opacity: .45; } }
-.spacer { flex: 1; }
 .tb-btn {
   background: linear-gradient(#39424e, #262d36);
   color: #cfe0f5;
@@ -233,3 +234,101 @@ html, body {
   font-size: 44px; letter-spacing: 12px; color: #eaf2fb;
   text-shadow: 0 0 30px rgba(79,143,232,.8);
 }
+
+/* ---------- Строка цели миссии ---------- */
+.res.objective {
+  color: #ffd977;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  max-width: 46vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Главное меню ---------- */
+.menu-box { max-width: 640px; }
+.menu-buttons { display: flex; gap: 12px; justify-content: center; margin: 4px 0 16px; }
+.ghost-btn {
+  background: linear-gradient(#2b333d, #20262e);
+  border-color: #556373;
+  color: #d5e2f0;
+}
+.ghost-btn:hover { background: linear-gradient(#353f4a, #28303a); }
+.small-start { font-size: 13px; padding: 8px 22px; margin-top: 4px; }
+.fac-teaser { display: flex; gap: 10px; justify-content: center; margin-bottom: 14px; flex-wrap: wrap; }
+.fac-chip {
+  font-size: 12px; font-weight: 700; letter-spacing: .5px;
+  padding: 4px 12px; border-radius: 12px; border: 1px solid;
+}
+.fac-human { color: #9cc4f5; border-color: #4f8fe8; background: rgba(79,143,232,.12); }
+.fac-alien { color: #a8f0bd; border-color: #67c98a; background: rgba(103,201,138,.12); }
+
+/* ---------- Список миссий ---------- */
+.overlay-box.wide { max-width: 720px; max-height: 88vh; overflow-y: auto; }
+#mission-list { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 18px; }
+.mission-card {
+  text-align: left;
+  background: linear-gradient(#262e38, #1a2028);
+  border: 1px solid #44505e;
+  border-radius: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  color: #dfe8f2;
+}
+.mission-card:hover { border-color: #7d92aa; background: linear-gradient(#2d3642, #1f2630); }
+.mission-card.locked { opacity: .5; cursor: not-allowed; filter: grayscale(.6); }
+.mc-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.mc-num { font-size: 11px; color: #8b98a7; letter-spacing: 1px; text-transform: uppercase; }
+.mc-lock { margin-left: auto; font-size: 11px; color: #ffb3ab; }
+.mc-name { font-size: 17px; font-weight: 700; color: #eaf2fb; }
+.mc-place { font-size: 12px; color: #8b98a7; margin-top: 3px; font-style: italic; }
+.mc-obj { font-size: 12.5px; color: #ffd977; margin-top: 6px; }
+.mc-def { font-size: 11.5px; color: #a8f0bd; margin-top: 3px; }
+
+.badge {
+  display: inline-block;
+  font-size: 11px; font-weight: 800; letter-spacing: 1.5px;
+  padding: 3px 10px; border-radius: 10px; border: 1px solid;
+}
+
+/* ---------- Брифинг ---------- */
+.brief-box { max-width: 660px; text-align: left; }
+.brief-head { display: flex; align-items: center; gap: 14px; }
+.brief-head h1 { font-size: 26px; letter-spacing: 2px; }
+#brief-place { font-style: italic; }
+#brief-text { max-height: 40vh; overflow-y: auto; margin: 4px 0 12px; }
+#brief-text p { font-size: 13.5px; color: #c3cfdc; line-height: 1.65; margin-bottom: 10px; }
+.objective-line {
+  border-left: 3px solid #ffd977;
+  background: rgba(255, 217, 119, .08);
+  padding: 9px 12px;
+  font-size: 13.5px; font-weight: 700; color: #ffe4a1;
+  margin-bottom: 16px;
+}
+
+/* ---------- Выбор фракции ---------- */
+.fac-cards { display: flex; gap: 14px; justify-content: center; margin: 10px 0 18px; flex-wrap: wrap; }
+.fac-card {
+  flex: 1 1 240px; max-width: 280px;
+  text-align: center;
+  background: linear-gradient(#262e38, #1a2028);
+  border: 2px solid #44505e;
+  border-radius: 10px;
+  padding: 18px 14px;
+  cursor: pointer;
+  color: #dfe8f2;
+}
+.fac-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+.fac-card.fac-human { border-color: #4f8fe8; }
+.fac-card.fac-human:hover { border-color: #7dabf2; }
+.fac-card.fac-alien { border-color: #67c98a; }
+.fac-card.fac-alien:hover { border-color: #93e2ab; }
+.fc-title { font-size: 22px; font-weight: 800; letter-spacing: 3px; }
+.fac-card.fac-human .fc-title { color: #9cc4f5; text-shadow: 0 0 16px rgba(79,143,232,.6); }
+.fac-card.fac-alien .fc-title { color: #a8f0bd; text-shadow: 0 0 16px rgba(103,201,138,.6); }
+.fc-sub { font-size: 12.5px; color: #93a1b1; margin: 5px 0 10px; }
+.fc-list { font-size: 12px; color: #b9c5d2; line-height: 1.6; }
+
+.end-reason { color: #ffd977; font-size: 14px; margin: 2px 0 8px; min-height: 18px; }
