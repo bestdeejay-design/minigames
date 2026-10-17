@@ -275,20 +275,33 @@ function updateGather(st, u, dt) {
       if (!c) { orderStop(u); return; }
       o.target = c; u.path = null;
     }
-    if (Math.hypot(c.x - u.x, c.y - u.y) < TILE * 1.45) {
+    // Порог 1.75 тайла: покрывает центр любого смежного тайла (диагональ
+    // даёт ~45px) плюс погрешность расталкивания. Меньший порог оставлял
+    // рабочего стоять в 47–52px от кристалла навсегда (путь уже пуст,
+    // а майнинг не стартовал) — «вечное зависание» добычи.
+    if (Math.hypot(c.x - u.x, c.y - u.y) < TILE * 1.75) {
       u.path = null; u.moving = false;
       o.phase = 'mining'; u.mineT = MINE_TIME;
       u.angle = Math.atan2(c.y - u.y, c.x - u.x);
+      u.lastFailedT = 0;
       return;
     }
     if (!u.path) {
       u.path = pathToRect(st.map, (u.x / TILE) | 0, (u.y / TILE) | 0, { x: c.tx, y: c.ty, w: 1, h: 1 });
       u.pathI = 0;
-      if (u.path && u.path.length === 0) { // уже стоим рядом, но не доехали
-        if ((u.lastFailedT = (u.lastFailedT || 0) + 1) > 3) { u.lastFailed = c; orderStop(u); return; }
+      if (u.path && u.path.length === 0) {
+        // По сетке мы уже соседний тайл, но физически не дошли до порога.
+        // Считаем отказы и через несколько попыток переключаемся на другой
+        // кристалл (раньше счётчик сбрасывался в том же тике — висели вечно).
+        if ((u.lastFailedT = (u.lastFailedT || 0) + 1) > 4) {
+          const other = nearestCrystal(st, u, c);
+          if (other) orderGather(st, u, other, true);
+          else orderStop(u);
+          return;
+        }
       }
     }
-    if (followPath(u)) { u.path = null; u.lastFailedT = 0; }
+    if (followPath(u)) u.path = null;
     return;
   }
 
@@ -579,6 +592,15 @@ export function updateEffects(st, dt) {
 }
 
 // ------------------------------------------------------------
+// Синхронизация визуальных флагов выделения (кольца на карте).
+// Вызывается каждый тик: раньше флаги вообще не ставились, и кольцо
+// выделения не рисовалось — игрок не видел, кем управляет.
+export function syncSelectionFlags(st) {
+  const sel = new Set(st.selection);
+  for (const u of st.units) u.selected = !u.dead && sel.has(u);
+  for (const b of st.buildings) b.selected = !b.dead && sel.has(b);
+}
+
 // Пикирование мышью: юнит под точкой / здание / кристалл
 // ------------------------------------------------------------
 export function unitAt(st, wx, wy, sideFilter) {

@@ -247,10 +247,11 @@ export class Game {
     if (!st || st.gameOver) return;
     const sel = st.selection.filter((e) => !e.dead);
 
-    // Выделено своё здание — ставим точку сбора.
-    if (!sel.length && st.selection[0] && st.selection[0].kind === 'building' &&
-        st.selection[0].side === 'player') {
-      st.selection[0].rally = { x: wx, y: wy };
+    // Выделено своё здание — ставим точку сбора (фильтр «!dead» оставляет
+    // живое здание в sel, поэтому проверяем sel, а не st.selection[0]).
+    if (sel.length === 1 && sel[0].kind === 'building' &&
+        sel[0].side === 'player') {
+      sel[0].rally = { x: wx, y: wy };
       U.addFloat(st, wx, wy, 'Точка сбора', '#9be29e');
       this.sound.ack();
       return;
@@ -332,6 +333,7 @@ export class Game {
     B.updateBuildings(st, LOGIC_DT);
     st.units = st.units.filter((u) => !u.dead);
     st.buildings = st.buildings.filter((b) => !b.dead);
+    U.syncSelectionFlags(st); // кольца выделения видимы каждый тик
     U.updateProjectiles(st, LOGIC_DT);
     U.updateEffects(st, LOGIC_DT);
     st.ai.update(LOGIC_DT, st);
