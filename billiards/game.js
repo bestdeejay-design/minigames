@@ -9,6 +9,14 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlaySub = document.getElementById('overlay-sub');
 const btnNext = document.getElementById('btn-next');
 
+function billiardsBest() {
+  var best = 0;
+  try { best = +(localStorage.getItem('billiards.best') || 0); } catch (e) {}
+  var isNew = score > best;
+  if (isNew) { best = score; try { localStorage.setItem('billiards.best', String(score)); } catch (e) {} }
+  return { best: best, isNew: isNew };
+}
+
 let W, H, cw, ch;
 
 function resize() {
@@ -293,7 +301,7 @@ function endTurn() {
     overlay.classList.remove('hidden');
     overlayTitle.textContent = '🎉 Уровень пройден!';
     const nextLv = level + 1;
-    let sub = 'Счёт: ' + score;
+    let sub = 'Счёт: ' + score + ' | Рекорд: ' + billiardsBest().best;
     if (remaining.length === 0) sub += ' | Все шары забиты!';
     if (nextLv <= 20) {
       overlaySub.textContent = sub;

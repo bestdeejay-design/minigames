@@ -417,9 +417,13 @@ function levelComplete() {
 
 function gameOver() {
   gameRunning = false;
+  var bestL = 0;
+  try { bestL = +(localStorage.getItem('cointap.level') || 0); } catch (e) {}
+  var isRec = level > bestL;
+  if (isRec) { bestL = level; try { localStorage.setItem('cointap.level', String(level)); } catch (e) {} }
   overlay.classList.remove('hidden');
-  overlayTitle.textContent = '💀 Игра окончена';
-  overlaySub.textContent = `Дошёл до уровня ${level}`;
+  overlayTitle.textContent = isRec ? '🏆 Новый рекорд!' : '💀 Игра окончена';
+  overlaySub.textContent = 'Дошёл до уровня ' + level + ' | Рекорд: ' + bestL;
   overlayItems.innerHTML = '';
   btnNext.textContent = 'Заново с 1 уровня';
   btnNext.onclick = () => {

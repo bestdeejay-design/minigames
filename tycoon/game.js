@@ -7,6 +7,9 @@ const popEl = document.getElementById('pop');
 const btnBuild = document.getElementById('btn-build');
 const shopEl = document.getElementById('shop');
 
+var tycBest = 0;
+try { tycBest = +(localStorage.getItem('tycoon.floors') || 0); } catch (e) {}
+
 let W, H;
 
 function resize() {
@@ -250,7 +253,7 @@ function update() {
 // ─── Draw ────────────────────────────────────────────────
 function draw() {
   ctx.clearRect(0, 0, cw, ch);
-  ctx.fillStyle = '#0a1628';
+  ctx.fillStyle = '#0B0B12';
   ctx.fillRect(0, 0, cw, ch);
 
   const numElev = getElevatorCount();
@@ -264,10 +267,10 @@ function draw() {
     const isGround = f.id === 0;
     const isSel = selectedFloor && selectedFloor.id === f.id;
 
-    ctx.fillStyle = isSel ? '#1a2a4e' : (isGround ? '#151525' : '#16213e');
+    ctx.fillStyle = isSel ? '#2A2116' : (isGround ? '#0E0E14' : '#12121A');
     ctx.fillRect(0, y, cw, floorH);
 
-    ctx.strokeStyle = '#2a3a5e';
+    ctx.strokeStyle = 'rgba(255,255,255,.08)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, y);
@@ -275,7 +278,7 @@ function draw() {
     ctx.stroke();
 
     // Label
-    ctx.fillStyle = '#667';
+    ctx.fillStyle = '#8E8E93';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
@@ -287,7 +290,7 @@ function draw() {
       ctx.font = '16px sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText(biz.emoji, 34, y + floorH / 2);
-      ctx.fillStyle = '#bbb';
+      ctx.fillStyle = '#C7C7CC';
       ctx.font = '10px sans-serif';
       ctx.fillText(biz.name, 54, y + floorH / 2);
 
@@ -316,9 +319,9 @@ function draw() {
     }
 
     // Elevator shaft bg
-    ctx.fillStyle = '#0a0a1a';
+    ctx.fillStyle = '#08080C';
     ctx.fillRect(shaftX, y, SHAFT, floorH);
-    ctx.strokeStyle = '#1a2a4e';
+    ctx.strokeStyle = 'rgba(255,255,255,.07)';
     ctx.lineWidth = 1;
     ctx.strokeRect(shaftX, y, SHAFT, floorH);
   }
@@ -327,9 +330,9 @@ function draw() {
   for (const ev of elevators) {
     const carX = shaftX + 3 + ev.id * 24;
     const carY = ev.y;
-    ctx.shadowColor = '#e94560';
+    ctx.shadowColor = 'rgba(212,165,116,.8)';
     ctx.shadowBlur = 5;
-    ctx.fillStyle = ev.occupants.length > 0 ? '#e94560' : '#c0392b';
+    ctx.fillStyle = ev.occupants.length > 0 ? '#D4A574' : '#B08D57';
     ctx.fillRect(carX, carY, 20, 16);
     ctx.shadowBlur = 0;
 
@@ -360,7 +363,7 @@ function loop() {
   update();
   draw();
   moneyEl.textContent = '💰 ' + Math.floor(money);
-  infoEl.textContent = '🏢 ' + (floors.length - 1) + ' эт. 🛗' + getElevatorCount();
+  infoEl.textContent = '🏢 ' + (floors.length - 1) + ' эт. 🛗' + getElevatorCount() + (tycBest > 0 ? ' · 🏆 ' + tycBest : '');
   popEl.textContent = '👥 ' + totalPop;
   const cost = getBuildCost();
   btnBuild.textContent = '🏗️ Построить $' + cost;
@@ -375,6 +378,10 @@ btnBuild.addEventListener('click', () => {
   money -= cost;
   const newId = floors.length;
   floors.push({ id: newId, business: null, label: String(newId + 1) });
+  if (floors.length - 1 > tycBest) {
+    tycBest = floors.length - 1;
+    try { localStorage.setItem('tycoon.floors', String(tycBest)); } catch (e) {}
+  }
   recalcFloorH();
   selectedFloor = floors[floors.length - 1];
   updateShop();

@@ -16,19 +16,31 @@
   <meta name="twitter:title" content="Гонка — мини-игра | AXIIOM">
   <meta name="twitter:description" content="Браузерная аркадная гонка: обгоняйте соперников, уклоняйтесь от препятствий и ставьте рекорды. Мини-игра от AXIIOM.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🏎</text></svg>">
+  <meta name="theme-color" content="#0A0A0F">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="grid-overlay"></div>
+<div class="noise"></div>
 <div id="app">
+  <header id="topbar">
+    <a class="back" href="../">← Каталог</a>
+    <span class="brand">AXIIOM</span>
+  </header>
   <div id="hud">
     <span>🏁 <span id="score">0</span></span>
     <span id="speed-label">⏱ NORMAL</span>
   </div>
   <canvas id="gameCanvas"></canvas>
   <div id="overlay" class="hidden">
-    <div id="overlay-title"></div>
-    <div id="overlay-sub"></div>
-    <button id="btn-next">Ещё!</button>
+    <div class="modal-card">
+      <div id="overlay-title"></div>
+      <div id="overlay-sub"></div>
+      <button id="btn-next">Ещё!</button>
+    </div>
   </div>
 </div>
 <script src="game.js"></script>

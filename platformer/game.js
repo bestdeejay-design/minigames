@@ -15,7 +15,7 @@ const player = {
   x: 50, y: 250, w: 20, h: 20,
   vx: 0, vy: 0,
   grounded: false,
-  color: '#e94560',
+  color: '#D4A574',
 };
 
 let coin = { x: 260, y: 147, w: 14, h: 14, collected: false };
@@ -97,9 +97,11 @@ function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Platforms
-  ctx.fillStyle = '#0f3460';
   for (const p of platforms) {
+    ctx.fillStyle = '#1A1A24';
     ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.fillStyle = 'rgba(212,165,116,.22)';
+    ctx.fillRect(p.x, p.y, p.w, 2);
   }
 
   // Player
@@ -108,13 +110,13 @@ function draw() {
 
   // Coin
   if (!coin.collected) {
-    ctx.fillStyle = '#ffd700';
+    ctx.fillStyle = '#E8B04B';
     const cx = coin.x + coin.w / 2;
     const cy = coin.y + coin.h / 2;
     ctx.beginPath();
     ctx.arc(cx, cy, coin.w / 2, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#ffaa00';
+    ctx.fillStyle = '#D4A574';
     ctx.beginPath();
     ctx.arc(cx, cy, coin.w / 4, 0, Math.PI * 2);
     ctx.fill();

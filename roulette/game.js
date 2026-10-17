@@ -392,15 +392,20 @@ function payOut() {
   updateHUD();
   updateGrid();
 
+  var bestBank = 0;
+  try { bestBank = +(localStorage.getItem('roulette.best') || 0); } catch (e) {}
+  var isRec = Math.round(balance) > bestBank;
+  if (isRec) { bestBank = Math.round(balance); try { localStorage.setItem('roulette.best', String(bestBank)); } catch (e) {} }
+
   const color = n === 0 ? 'зелёное' : isRed ? 'красное' : 'чёрное';
   resultLabel.textContent = `${n} (${color})`;
 
   if (win > 0) {
     overlayTitle.textContent = `🎉 Выигрыш: +${Math.round(win)}`;
-    overlaySub.textContent = `Число ${n} (${color})`;
+    overlaySub.textContent = `Число ${n} (${color}) | Банк: ${Math.round(balance)}${isRec ? ' 🏆' : ''}`;
   } else {
     overlayTitle.textContent = '😔 Проигрыш';
-    overlaySub.textContent = `Выпало ${n} (${color})`;
+    overlaySub.textContent = `Выпало ${n} (${color}) | Банк: ${Math.round(balance)}${isRec ? ' 🏆' : ''}`;
   }
   overlay.classList.remove('hidden');
   btnNext.textContent = 'Ещё!';

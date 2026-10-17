@@ -9,6 +9,14 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlaySub = document.getElementById('overlay-sub');
 const btnNext = document.getElementById('btn-next');
 
+function slingBest() {
+  var best = 0;
+  try { best = +(localStorage.getItem('sling.best') || 0); } catch (e) {}
+  var isNew = score > best;
+  if (isNew) { best = score; try { localStorage.setItem('sling.best', String(score)); } catch (e) {} }
+  return { best: best, isNew: isNew };
+}
+
 let W, H;
 
 function resize() {
@@ -326,7 +334,7 @@ function endShot() {
     overlay.classList.remove('hidden');
     overlayTitle.textContent = '🎉 Уровень пройден!';
     const nextIdx = level + 1;
-    let sub = 'Счёт: ' + score;
+    let sub = 'Счёт: ' + score + ' | Рекорд: ' + slingBest().best;
     if (bonus > 0) sub += ' (+' + bonus + ' за выстрелы)';
     if (nextIdx < LEVELS.length) {
       overlaySub.textContent = sub;
@@ -341,7 +349,7 @@ function endShot() {
     gameState = 'done';
     overlay.classList.remove('hidden');
     overlayTitle.textContent = '💥 Нет выстрелов';
-    overlaySub.textContent = 'Счёт: ' + score + ' | Осталось целей: ' + targets.filter(t => !t.hit).length;
+    overlaySub.textContent = 'Счёт: ' + score + ' | Рекорд: ' + slingBest().best + ' | Осталось целей: ' + targets.filter(t => !t.hit).length;
     btnNext.textContent = 'Повторить';
     btnNext.onclick = () => { loadLevel(level); };
   }
@@ -351,25 +359,25 @@ function endShot() {
 function draw() {
   ctx.clearRect(0, 0, cw, ch);
 
-  // Sky
+  // Sky — ночное небо AXIIOM
   const grad = ctx.createLinearGradient(0, 0, 0, ch);
-  grad.addColorStop(0, '#4dc9f6');
-  grad.addColorStop(0.6, '#87CEEB');
-  grad.addColorStop(1, '#a8d8ea');
+  grad.addColorStop(0, '#0B0D16');
+  grad.addColorStop(0.6, '#12101C');
+  grad.addColorStop(1, '#1A1424');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, cw, ch);
 
   // Clouds
-  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
   drawCloud(60, 40, 30);
   drawCloud(cw - 90, 60, 25);
   drawCloud(cw / 2 + 20, 25, 20);
 
   // Ground
-  ctx.fillStyle = '#4a7c3f';
+  ctx.fillStyle = '#151D18';
   ctx.fillRect(0, ch - 25, cw, 25);
-  ctx.fillStyle = '#3d6b34';
-  ctx.fillRect(0, ch - 25, cw, 4);
+  ctx.fillStyle = 'rgba(212,165,116,.18)';
+  ctx.fillRect(0, ch - 25, cw, 2);
 
   // Obstacles — каменные столбики
   for (const o of obstacles) {

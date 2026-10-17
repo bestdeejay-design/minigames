@@ -16,10 +16,20 @@
   <meta name="twitter:title" content="Небоскрёб — мини-игра | AXIIOM">
   <meta name="twitter:description" content="Экономическая стратегия: стройте небоскрёб этаж за этажом и развивайте бизнес. Мини-игра от AXIIOM.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🏙</text></svg>">
+  <meta name="theme-color" content="#0A0A0F">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div class="grid-overlay"></div>
+  <div class="noise"></div>
   <div id="game-wrapper">
+    <header id="topbar">
+      <a class="back" href="../">← Каталог</a>
+      <span class="brand">AXIIOM</span>
+    </header>
     <div id="hud">
       <span id="money">💰 50</span>
       <span id="info">🏢 1 эт.</span>

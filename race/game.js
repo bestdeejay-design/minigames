@@ -2,6 +2,7 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const HUD = document.getElementById('hud');
+const TB = document.getElementById('topbar');
 const scoreEl = document.getElementById('score');
 const speedLabel = document.getElementById('speed-label');
 const overlay = document.getElementById('overlay');
@@ -106,7 +107,7 @@ function roundRect(ctx, x, y, w, h, r) {
 function resetGame() {
   const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
   cw = Math.min(window.innerWidth, 420);
-  ch = vh - HUD.offsetHeight;
+  ch = vh - HUD.offsetHeight - (TB ? TB.offsetHeight : 0);
   canvas.width = cw * dpr;
   canvas.height = ch * dpr;
   canvas.style.width = cw + 'px';
@@ -325,8 +326,12 @@ function updateHUD() {
 
 function showGameOver() {
   draw();
-  overlayTitle.textContent = '💥 Game Over';
-  overlaySub.textContent = 'Счёт: ' + score + ' | Звёзд: ' + Math.floor(score / 15);
+  var best = 0;
+  try { best = +(localStorage.getItem('race.best') || 0); } catch (e) {}
+  var isRec = score > best;
+  if (isRec) { best = Math.round(score); try { localStorage.setItem('race.best', String(best)); } catch (e) {} }
+  overlayTitle.textContent = isRec ? '🏆 Новый рекорд!' : '💥 Game Over';
+  overlaySub.textContent = 'Счёт: ' + score + ' | Звёзд: ' + Math.floor(score / 15) + ' | Рекорд: ' + Math.round(best);
   btnNext.textContent = 'Заново';
   btnNext.onclick = resetGame;
   overlay.classList.remove('hidden');
@@ -361,7 +366,7 @@ function resize() {
   if (gameOver) return;
   const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
   cw = Math.min(window.innerWidth, 420);
-  ch = vh - HUD.offsetHeight;
+  ch = vh - HUD.offsetHeight - (TB ? TB.offsetHeight : 0);
   if (ch < 100) return;
   canvas.width = cw * dpr;
   canvas.height = ch * dpr;

@@ -16,10 +16,20 @@
   <meta name="twitter:title" content="Рогатка — мини-игра | AXIIOM">
   <meta name="twitter:description" content="Физическая игра с рогаткой: прицеливайтесь, рассчитывайте траекторию и сбивайте цели. Мини-игра от AXIIOM.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🪃</text></svg>">
+  <meta name="theme-color" content="#0A0A0F">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div class="grid-overlay"></div>
+  <div class="noise"></div>
   <div id="game-wrapper">
+    <header id="topbar">
+      <a class="back" href="../">← Каталог</a>
+      <span class="brand">AXIIOM</span>
+    </header>
     <div id="hud">
       <span id="score">🎯 0</span>
       <span id="shots">🔫 5</span>
@@ -27,9 +37,11 @@
     </div>
     <canvas id="gameCanvas"></canvas>
     <div id="overlay" class="hidden">
-      <p id="overlay-title">Уровень 1</p>
-      <p id="overlay-sub">Попади по всем целям!</p>
-      <button id="btn-next">Начать</button>
+      <div class="modal-card">
+        <p id="overlay-title">Уровень 1</p>
+        <p id="overlay-sub">Попади по всем целям!</p>
+        <button id="btn-next">Начать</button>
+      </div>
     </div>
   </div>
   <script src="game.js"></script>
