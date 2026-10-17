@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0A0A0F">
+  <title>Кристаллы — мини-игра | AXIIOM</title>
+  <meta name="description" content="Merge-drop игра: роняйте кристаллы, сливайте одинаковые и вырастите Сердце AXIIOM. Ежедневный вызов — один расклад на всех. Играйте прямо в браузере.">
+  <link rel="canonical" href="https://bestdeejay-design.github.io/minigames/crystals/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bestdeejay-design.github.io/minigames/crystals/">
+  <meta property="og:title" content="Кристаллы — мини-игра | AXIIOM">
+  <meta property="og:description" content="Merge-drop игра: роняйте кристаллы, сливайте одинаковые и вырастите Сердце AXIIOM. Ежедневный вызов — один расклад на всех.">
+  <meta property="og:locale" content="ru_RU">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Кристаллы — мини-игра | AXIIOM">
+  <meta name="twitter:description" content="Merge-drop игра: сливайте одинаковые кристаллы и вырастите Сердце AXIIOM.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>💠</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div class="noise"></div>
+<div id="app">
+  <header id="topbar">
+    <a class="back" href="../">← Каталог</a>
+    <span class="brand">AXIIOM</span>
+  </header>
+  <div id="welcome">
+    <span class="w-badge">AXIIOM · Мини-игры</span>
+    <h1>Кристаллы</h1>
+    <div class="gem-row" id="gem-row" aria-hidden="true"></div>
+    <p>Роняйте кристаллы в хранилище. Два одинаковых сливаются в более крупный — от осколка до Сердца AXIIOM. Не дайте хранилище переполнить.</p>
+    <span class="w-daily-chip" id="daily-chip"><span class="dot"></span><span id="daily-date">Вызов дня</span></span>
+    <div class="w-records">
+      <span class="w-rec"><span>Рекорд дня</span><b id="w-daily-best">0</b></span>
+      <span class="w-rec"><span>Рекорд</span><b id="w-best">0</b></span>
+    </div>
+    <div id="mode-switch">
+      <button id="mode-daily" class="active">Вызов дня</button>
+      <button id="mode-free">Свободная</button>
+    </div>
+    <button id="btn-play">Играть</button>
+    <span class="w-hint">один расклад на всех · рекорды хранятся у вас</span>
+  </div>
+  <div id="game" class="hidden">
+    <section id="stats">
+      <div class="stat"><span class="stat-label">Очки</span><span class="stat-value gold" id="score-val">0</span></div>
+      <div class="stat"><span class="stat-label">Рекорд дня</span><span class="stat-value" id="daily-val">0</span></div>
+      <div class="stat"><span class="stat-label">Рекорд</span><span class="stat-value" id="best-val">0</span></div>
+      <div class="stat"><span class="stat-label">Следующий</span><span id="next-wrap"><canvas id="nc"></canvas></span></div>
+    </section>
+    <div id="danger-wrap"><div id="danger-fill"></div></div>
+    <div id="canvas-wrap">
+      <canvas id="gc"></canvas>
+    </div>
+    <div id="bottom">
+      <button id="btn-new">Заново</button>
+      <button id="btn-menu">В меню</button>
+      <button id="btn-sound" aria-label="Звук">🔊</button>
+    </div>
+  </div>
+  <div id="modal" class="hidden">
+    <div class="modal-card" id="modal-card">
+      <span class="modal-badge" id="modal-badge">Забег окончен</span>
+      <div id="modal-title">Хранилище переполнено</div>
+      <div id="modal-score"></div>
+      <div class="modal-actions">
+        <button id="modal-btn">Ещё раз</button>
+        <a id="modal-btn2" href="../">Каталог</a>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>

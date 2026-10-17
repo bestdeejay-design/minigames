@@ -1,6 +1,6 @@
 # Мини-игры AXIIOM
 
-> Коллекция из 10 браузерных мини-игр: физика, аркады, головоломки и стратегии.
+> Коллекция из 11 браузерных мини-игр: физика, аркады, головоломки и стратегии.
 > Без регистрации, без установки — открыл и играешь. Разработка **[AXIIOM](https://axiiom.ru)**.
 
 **Живой каталог игр:** https://bestdeejay-design.github.io/minigames/
@@ -13,6 +13,7 @@
 |------|------|--------|
 | 🎱 Бильярд | спорт-симулятор с реалистичной физикой | [играть](https://bestdeejay-design.github.io/minigames/billiards/) |
 | 🪙 Coin Tap | аркада на реакцию | [играть](https://bestdeejay-design.github.io/minigames/coin-tap/) |
+| 💠 Кристаллы | merge-drop: физика слияний, вызов дня | [играть](https://bestdeejay-design.github.io/minigames/crystals/) |
 | 🎯 FPS Corridor | 3D-шутер от первого лица | [играть](https://bestdeejay-design.github.io/minigames/fps3d/) |
 | 🧩 Три в ряд | головоломка | [играть](https://bestdeejay-design.github.io/minigames/match3/) |
 | 🏃 Mini Platformer | платформер | [играть](https://bestdeejay-design.github.io/minigames/platformer/) |
@@ -35,6 +36,7 @@
 ```
 index.html   — хаб-каталог со ссылками на все игры
 <game>/      — папка игры: index.html, style.css, game.js
+               (match3 и fps3d — однофайловые: только index.html)
 ```
 
 ---
