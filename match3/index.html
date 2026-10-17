@@ -16,72 +16,121 @@
   <meta name="twitter:title" content="Три в ряд — мини-игра | AXIIOM">
   <meta name="twitter:description" content="Классическая головоломка «три в ряд»: комбинируйте фишки, собирайте комбо и проходите уровни. Мини-игра от AXIIOM.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🧩</text></svg>">
+  <meta name="theme-color" content="#0A0A0F">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+:root{
+  --clr-bg:#0A0A0F;--clr-bg-alt:#0E0E14;--clr-surface:#12121A;--clr-surface-hover:#1A1A24;
+  --clr-text:#C7C7CC;--clr-heading:#F5F5F7;--clr-muted:#8E8E93;--clr-faint:#78787D;
+  --clr-border:rgba(255,255,255,.06);--clr-border-hover:rgba(255,255,255,.1);
+  --clr-accent:#D4A574;--clr-accent2:#8B9D83;--clr-danger:#C96A6A;
+}
 *{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;overflow:hidden;touch-action:none}
-body{background:linear-gradient(135deg,#0a0a2e,#1a0a3e);color:#eee;font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center}
-#app{width:100%;max-width:420px;height:100vh;height:100dvh;display:flex;flex-direction:column;position:relative}
+body{background:var(--clr-bg);color:var(--clr-text);font-family:'Inter',system-ui,-apple-system,sans-serif;display:flex;justify-content:center}
+.hidden{display:none!important}
+.noise{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:60;opacity:.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")}
+.grid-overlay{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;background-image:linear-gradient(var(--clr-border) 1px,transparent 1px),linear-gradient(90deg,var(--clr-border) 1px,transparent 1px);background-size:60px 60px}
+#app{width:100%;max-width:420px;height:100vh;height:100dvh;display:flex;flex-direction:column;position:relative;z-index:1;background:var(--clr-bg)}
+/* Topbar */
+#topbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--clr-border);background:rgba(10,10,15,.7);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#topbar .back{display:inline-flex;align-items:center;gap:6px;color:var(--clr-muted);text-decoration:none;font-size:.8rem;letter-spacing:.5px;transition:color .25s}
+#topbar .back:hover{color:var(--clr-heading)}
+#topbar .brand{font-size:.65rem;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--clr-faint)}
 /* Welcome */
-#welcome{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;background:linear-gradient(135deg,#0a0a2e,#2a0a4e);gap:16px;padding:24px}
-#welcome h1{font-size:2.2rem;background:linear-gradient(135deg,#f88,#4af,#f8f);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-#welcome p{text-align:center;color:#aaa;max-width:280px;line-height:1.4;font-size:0.9rem}
-#welcome button{padding:14px 56px;border:none;border-radius:10px;background:linear-gradient(135deg,#e94560,#c73a50);color:#fff;font-size:1.2rem;font-weight:bold;cursor:pointer;margin-top:8px}
+#welcome{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;overflow:auto}
+.w-badge{display:inline-flex;padding:6px 16px;border:1px solid var(--clr-border);border-radius:20px;font-size:.62rem;color:var(--clr-muted);letter-spacing:2.5px;text-transform:uppercase;line-height:1}
+#welcome h1{font-size:2.1rem;font-weight:600;letter-spacing:-.02em;color:var(--clr-heading)}
+.gem-row{display:flex;gap:10px;margin:2px 0}
+.gem-row i{width:11px;height:11px;border-radius:3px;display:block;box-shadow:0 0 8px rgba(255,255,255,.12)}
+#welcome p{color:var(--clr-muted);max-width:300px;line-height:1.65;font-size:.9rem}
+.w-best{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:10px;background:var(--clr-surface);border:1px solid var(--clr-border);font-size:.8rem;color:var(--clr-text)}
+.w-best b{color:var(--clr-accent);font-variant-numeric:tabular-nums}
+#btn-play{margin-top:6px;padding:14px 64px;border:none;border-radius:12px;background:var(--clr-accent);color:#14100B;font-family:inherit;font-size:1rem;font-weight:700;letter-spacing:.5px;cursor:pointer;transition:filter .2s,transform .1s}
+#btn-play:hover{filter:brightness(1.08)}
+#btn-play:active{transform:translateY(1px)}
 /* Game */
 #game{display:flex;flex-direction:column;flex:1;overflow:hidden}
-#game.hidden{display:none}
-#hud{flex-shrink:0;padding:6px 8px 4px;background:rgba(0,0,0,0.3)}
-.hud-row{display:flex;justify-content:space-between;font-size:0.7rem;flex-wrap:wrap;gap:2px}
-.hud-row span{white-space:nowrap}
-#total-score,#level-score{color:#ffd700}
-#moves-left{color:#4af}
-#progress-wrap{height:3px;background:#1a1a3a;border-radius:2px;margin-top:4px;overflow:hidden}
-#progress-fill{height:100%;background:linear-gradient(90deg,#4af,#8cf);width:0%;border-radius:2px;transition:width 0.15s}
-#canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:4px}
-#gc{display:block}
-#bottom{display:flex;justify-content:space-around;padding:6px 8px;flex-shrink:0;gap:6px}
-#bottom button{padding:8px 12px;border:none;border-radius:6px;background:#1a1a3a;color:#ccc;font-size:0.75rem;cursor:pointer;flex:1}
-#bottom button:active{background:#2a2a4a}
+#stats{flex-shrink:0;display:grid;grid-template-columns:repeat(4,1fr);padding:10px 8px;background:var(--clr-surface);border-bottom:1px solid var(--clr-border)}
+.stat{display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px 4px;border-left:1px solid var(--clr-border);min-width:0}
+.stat:first-child{border-left:none}
+.stat-label{font-size:.56rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--clr-faint);white-space:nowrap}
+.stat-value{font-size:.9rem;font-weight:600;color:var(--clr-heading);font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat-value.gold{color:var(--clr-accent)}
+#level-score{font-size:.78rem}
+.stat-value.moves.low{color:var(--clr-danger)}
+#progress-wrap{height:3px;background:var(--clr-bg-alt);overflow:hidden;flex-shrink:0}
+#progress-fill{height:100%;background:linear-gradient(90deg,var(--clr-accent),#E8C9A0);width:0%;transition:width .3s}
+#canvas-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:12px}
+#gc{display:block;border-radius:12px;background:var(--clr-bg-alt);border:1px solid var(--clr-border);box-shadow:0 12px 40px rgba(0,0,0,.45)}
+#bottom{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));flex-shrink:0;border-top:1px solid var(--clr-border);background:rgba(10,10,15,.6)}
+#bottom button{flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--clr-border);background:var(--clr-surface);color:var(--clr-text);font-family:inherit;font-size:.8rem;font-weight:500;letter-spacing:.3px;cursor:pointer;transition:background .25s,border-color .25s,color .25s}
+#bottom button:hover{background:var(--clr-surface-hover);border-color:var(--clr-border-hover);color:var(--clr-heading)}
+#bottom button:active{transform:translateY(1px)}
+#btn-sound{flex:0 0 46px!important}
 /* Modal */
-#modal{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:15;background:rgba(0,0,0,0.85);gap:12px;padding:24px}
-#modal.hidden{display:none}
-#modal-title{font-size:1.6rem;font-weight:bold}
-#modal-score{font-size:1rem;color:#aaa}
-#modal-btn{padding:14px 48px;border:none;border-radius:8px;font-size:1.1rem;font-weight:bold;cursor:pointer;margin-top:4px}
-.modal-win #modal-btn{background:linear-gradient(135deg,#44cc88,#228855);color:#fff}
-.modal-lose #modal-btn{background:linear-gradient(135deg,#e94560,#c73a50);color:#fff}
-#modal-btn:active{opacity:0.8}
+#modal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:50;background:rgba(5,5,8,.8);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:24px}
+.modal-card{width:100%;max-width:320px;background:var(--clr-surface);border:1px solid var(--clr-border-hover);border-radius:16px;padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+#modal-title{font-size:1.35rem;font-weight:600;color:var(--clr-heading)}
+#modal-score{font-size:.9rem;color:var(--clr-muted);line-height:1.5}
+.modal-actions{display:flex;gap:8px;width:100%;margin-top:8px}
+#modal-btn,#modal-btn2{flex:1;padding:12px 16px;border-radius:10px;border:1px solid transparent;font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;transition:filter .2s}
+#modal-btn:active,#modal-btn2:active{transform:translateY(1px)}
+.modal-win #modal-btn{background:var(--clr-accent2);color:#0E1410}
+.modal-lose #modal-btn{background:var(--clr-danger);color:#170D0D}
+.modal-ask #modal-btn{background:var(--clr-accent);color:#14100B}
+#modal-btn2{background:transparent;border-color:var(--clr-border-hover);color:var(--clr-muted)}
+.modal-win .modal-card{border-top:2px solid var(--clr-accent2)}
+.modal-lose .modal-card{border-top:2px solid var(--clr-danger)}
+.modal-ask .modal-card{border-top:2px solid var(--clr-accent)}
 </style>
 </head>
 <body>
+<div class="grid-overlay"></div>
+<div class="noise"></div>
 <div id="app">
+  <header id="topbar">
+    <a class="back" href="../">← Каталог</a>
+    <span class="brand">AXIIOM</span>
+  </header>
   <div id="welcome">
-    <h1>✦ Три в ряд ✦</h1>
-    <p>Меняйте фигуры местами, собирайте линии из трёх и больше одинаковых, набирайте очки и проходите 15 уровней!</p>
+    <span class="w-badge">AXIIOM · Мини-игры</span>
+    <h1>Три в ряд</h1>
+    <div class="gem-row" aria-hidden="true">
+      <i style="background:#ff4444"></i><i style="background:#4488ff"></i><i style="background:#44cc44"></i><i style="background:#ffdd44"></i><i style="background:#cc44ff"></i><i style="background:#ff8844"></i>
+    </div>
+    <p>Меняйте камни местами, собирайте линии из трёх и более одинаковых, набирайте очки и проходите 15 уровней.</p>
+    <span class="w-best hidden" id="welcome-best">Рекорд: <b>0</b></span>
     <button id="btn-play">Играть</button>
   </div>
   <div id="game" class="hidden">
-    <div id="hud">
-      <div class="hud-row">
-        <span>Ур. <span id="level-num">1</span></span>
-        <span>Σ <span id="total-score">0</span></span>
-        <span>★ <span id="level-score">0</span></span>
-        <span>⬡ <span id="moves-left">30</span></span>
-      </div>
-      <div id="progress-wrap"><div id="progress-fill"></div></div>
-    </div>
+    <section id="stats">
+      <div class="stat"><span class="stat-label">Уровень</span><span class="stat-value"><span id="level-num">1</span>/15</span></div>
+      <div class="stat"><span class="stat-label">Очки</span><span class="stat-value gold" id="total-score">0</span></div>
+      <div class="stat"><span class="stat-label">Цель</span><span class="stat-value" id="level-score">0 / 100</span></div>
+      <div class="stat"><span class="stat-label">Ходы</span><span class="stat-value moves" id="moves-left">30</span></div>
+    </section>
+    <div id="progress-wrap"><div id="progress-fill"></div></div>
     <div id="canvas-wrap">
       <canvas id="gc"></canvas>
     </div>
     <div id="bottom">
-      <button id="btn-new">🔄 Новая</button>
-      <button id="btn-retry">↩️ Повтор</button>
-      <button id="btn-sound">🔊</button>
+      <button id="btn-new">Новая</button>
+      <button id="btn-retry">Заново</button>
+      <button id="btn-sound" aria-label="Звук">🔊</button>
     </div>
   </div>
   <div id="modal" class="hidden">
-    <div id="modal-title"></div>
-    <div id="modal-score"></div>
-    <button id="modal-btn"></button>
+    <div class="modal-card">
+      <div id="modal-title"></div>
+      <div id="modal-score"></div>
+      <div class="modal-actions">
+        <button id="modal-btn"></button>
+        <button id="modal-btn2" class="hidden">Отмена</button>
+      </div>
+    </div>
   </div>
 </div>
 <script>
@@ -116,6 +165,7 @@ const GEM_COLORS = [
 const SCORE_3 = 10, SCORE_4 = 20, SCORE_5P = 30;
 const SWAP_DURATION = 150, MATCH_DURATION = 200, FALL_DURATION = 180;
 const SAVE_KEY = 'match3_progress';
+const SND_KEY = 'match3_sound';
 
 // ======================== DOM ========================
 const canvas = document.getElementById('gc');
@@ -126,6 +176,7 @@ const modalEl = document.getElementById('modal');
 const modalTitle = document.getElementById('modal-title');
 const modalScore = document.getElementById('modal-score');
 const modalBtn = document.getElementById('modal-btn');
+const modalBtn2 = document.getElementById('modal-btn2');
 const levelNum = document.getElementById('level-num');
 const totalScoreEl = document.getElementById('total-score');
 const levelScoreEl = document.getElementById('level-score');
@@ -140,7 +191,7 @@ let grid = [], gridSize = 0, gemTypes = 0;
 let animState = 'idle'; // idle | swap | match | fall
 let animType = '', animData = null, animStart = 0, animDuration = 0;
 let selectedR = -1, selectedC = -1;
-let soundOn = true, levelTarget = 0;
+let soundOn = (localStorage.getItem(SND_KEY) !== '0'), levelTarget = 0;
 let locked = false;
 
 // ======================== AUDIO ========================
@@ -198,6 +249,9 @@ function loadGame() {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY));
     if (d && d.level !== undefined) { currentLevel = d.level; totalScore = d.totalScore || 0; }
   } catch(e){}
+}
+function getBest() {
+  try { return (JSON.parse(localStorage.getItem(SAVE_KEY)) || {}).highScore || 0; } catch (e) { return 0; }
 }
 
 // ======================== GRID ========================
@@ -391,7 +445,10 @@ function calcScore(matches) {
 
 function afterCascade() {
   if (levelScore >= levelTarget) {
-    sndWin(); saveGame(); showModal('🎉 Уровень пройден!', `Очки: ${levelScore}`, 'Далее', () => {
+    const prevBest = getBest();
+    saveGame();
+    const rec = totalScore > prevBest;
+    sndWin(); showModal(rec ? '🏆 Уровень пройден!' : '🎉 Уровень пройден!', `Очки: ${levelScore}` + (rec ? ' · Новый рекорд!' : ''), 'Далее', () => {
       if (currentLevel < LEVELS.length - 1) { currentLevel++; startLevel(); }
       else showVictory();
     }, 'win');
@@ -427,8 +484,8 @@ function fillEmpty() {
 
 // ======================== RENDERING ========================
 function drawBackground() {
-  const grd = ctx.createRadialGradient(cw/2, ch/2, 0, cw/2, ch/2, cw*0.7);
-  grd.addColorStop(0, 'rgba(30,20,60,0.3)');
+  const grd = ctx.createRadialGradient(cw/2, ch/2, 0, cw/2, ch/2, cw*0.75);
+  grd.addColorStop(0, 'rgba(212,165,116,0.05)');
   grd.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = grd;
   ctx.fillRect(0, 0, cw, ch);
@@ -590,9 +647,10 @@ function drawGemAtPos(x, y, type, scale, alpha) {
 // ======================== HUD ========================
 function updateHUD() {
   levelNum.textContent = currentLevel + 1;
-  totalScoreEl.textContent = totalScore;
-  levelScoreEl.textContent = levelScore;
+  totalScoreEl.textContent = totalScore.toLocaleString('ru-RU');
+  levelScoreEl.textContent = levelScore.toLocaleString('ru-RU') + ' / ' + levelTarget.toLocaleString('ru-RU');
   movesLeftEl.textContent = movesLeft;
+  movesLeftEl.classList.toggle('low', movesLeft <= 5);
   const pct = Math.min(levelScore / levelTarget * 100, 100);
   progressFill.style.width = pct + '%';
 }
@@ -602,16 +660,30 @@ function showModal(title, score, btnText, onClick, cls) {
   modalScore.textContent = score;
   modalBtn.textContent = btnText;
   modalBtn.onclick = onClick;
+  modalBtn2.classList.add('hidden');
   modalEl.className = cls === 'win' ? 'modal-win' : 'modal-lose';
   modalEl.classList.remove('hidden');
 }
 
 function showVictory() {
   modalTitle.textContent = '🏆 Победа!';
-  modalScore.textContent = 'Все 15 уровней пройдены! Общий счёт: ' + totalScore;
+  modalScore.textContent = 'Все 15 уровней пройдены! Общий счёт: ' + totalScore.toLocaleString('ru-RU');
   modalBtn.textContent = 'Сыграть снова';
   modalBtn.onclick = () => { currentLevel = 0; totalScore = 0; localStorage.removeItem(SAVE_KEY); startLevel(); };
+  modalBtn2.classList.add('hidden');
   modalEl.className = 'modal-win';
+  modalEl.classList.remove('hidden');
+}
+
+function askConfirm(title, text, onYes) {
+  modalTitle.textContent = title;
+  modalScore.textContent = text;
+  modalBtn.textContent = 'Да, заново';
+  modalBtn2.textContent = 'Отмена';
+  modalBtn.onclick = () => { modalEl.classList.add('hidden'); onYes(); };
+  modalBtn2.onclick = () => modalEl.classList.add('hidden');
+  modalBtn2.classList.remove('hidden');
+  modalEl.className = 'modal-ask';
   modalEl.classList.remove('hidden');
 }
 
@@ -631,11 +703,10 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 }
 
 function resizeCanvas() {
-  const maxW = Math.min(window.innerWidth, 420);
   const wrap = document.getElementById('canvas-wrap');
   const wrapH = wrap.clientHeight;
   if (wrapH < 50 || gridSize < 3) return;
-  const avail = Math.min(maxW - 16, wrapH - 8);
+  const avail = Math.min(wrap.clientWidth - 24, wrapH - 24);
   cellSize = Math.floor(avail / gridSize);
   cw = cellSize * gridSize;
   ch = cellSize * gridSize;
@@ -733,19 +804,29 @@ function loop() {
 
 // ======================== INIT ========================
 loadGame();
+const sndBtn = document.getElementById('btn-sound');
+sndBtn.textContent = soundOn ? '🔊' : '🔇';
+const bestOnLoad = getBest();
+if (bestOnLoad > 0) {
+  const bestEl = document.getElementById('welcome-best');
+  bestEl.querySelector('b').textContent = bestOnLoad.toLocaleString('ru-RU');
+  bestEl.classList.remove('hidden');
+}
 document.getElementById('btn-play').onclick = () => {
   initAudio();
   welcomeEl.style.display = 'none';
   startLevel();
 };
 document.getElementById('btn-new').onclick = () => {
-  if (confirm('Начать новую игру? Весь прогресс будет сброшен.')) {
+  askConfirm('Начать заново?', 'Текущий прогресс и счёт будут сброшены.', () => {
     currentLevel = 0; totalScore = 0; localStorage.removeItem(SAVE_KEY); startLevel();
-  }
+  });
 };
 document.getElementById('btn-retry').onclick = () => startLevel();
-document.getElementById('btn-sound').onclick = function() {
-  soundOn = !soundOn; this.textContent = soundOn ? '🔊' : '🔇';
+sndBtn.onclick = function() {
+  soundOn = !soundOn;
+  this.textContent = soundOn ? '🔊' : '🔇';
+  try { localStorage.setItem(SND_KEY, soundOn ? '1' : '0'); } catch (e) {}
 };
 window.addEventListener('resize', () => {
   if (gameEl.classList.contains('hidden')) return;
