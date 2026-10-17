@@ -1,6 +1,6 @@
 # Мини-игры AXIIOM
 
-> Коллекция из 11 браузерных мини-игр: физика, аркады, головоломки и стратегии.
+> Коллекция из 12 браузерных мини-игр: физика, аркады, головоломки и стратегии.
 > Без регистрации, без установки — открыл и играешь. Разработка **[AXIIOM](https://axiiom.ru)**.
 
 **Живой каталог игр:** https://bestdeejay-design.github.io/minigames/
@@ -21,6 +21,7 @@
 | 🎰 Рулетка | демо казино без риска | [играть](https://bestdeejay-design.github.io/minigames/roulette/) |
 | 🚀 Шутер | космический шутер | [играть](https://bestdeejay-design.github.io/minigames/shooter/) |
 | 🪃 Рогатка | физическая аркада | [играть](https://bestdeejay-design.github.io/minigames/sling/) |
+| 🧱 Тетрис | падающие блоки: SRS, T-спины, Спринт | [играть](https://bestdeejay-design.github.io/minigames/tetris/) |
 | 🏙 Небоскрёб | экономическая стратегия | [играть](https://bestdeejay-design.github.io/minigames/tycoon/) |
 
 ## Технически

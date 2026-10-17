@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <title>Тетрис — мини-игра | AXIIOM</title>
+  <meta name="description" content="Классический Тетрис в браузере: SRS-вращение, холдер, призрак фигуры, комбо и T-спины. Режимы Маратон и Спринт на 40 линий. Мини-игра от AXIIOM.">
+  <link rel="canonical" href="https://bestdeejay-design.github.io/minigames/tetris/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bestdeejay-design.github.io/minigames/tetris/">
+  <meta property="og:title" content="Тетрис — мини-игра | AXIIOM">
+  <meta property="og:description" content="Классический Тетрис в браузере: SRS-вращение, холдер, призрак фигуры, комбо и T-спины. Режимы Маратон и Спринт на 40 линий. Мини-игра от AXIIOM.">
+  <meta property="og:image" content="https://axiiom.ru/og-image.png">
+  <meta property="og:locale" content="ru_RU">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Тетрис — мини-игра | AXIIOM">
+  <meta name="twitter:description" content="Классический Тетрис в браузере: SRS-вращение, холдер, призрак фигуры, комбо и T-спины. Режимы Маратон и Спринт на 40 линий.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🧱</text></svg>">
+  <meta name="theme-color" content="#0A0A0F">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div class="noise"></div>
+<div id="app">
+  <header id="topbar">
+    <a class="back" href="../">← Каталог</a>
+    <span class="brand">AXIIOM</span>
+  </header>
+
+  <div id="welcome">
+    <span class="w-badge">AXIIOM · Мини-игры</span>
+    <h1>Тетрис</h1>
+    <div class="tet-row" aria-hidden="true">
+      <i style="background:#4FC3F7"></i><i style="background:#FFD54F"></i><i style="background:#BA68C8"></i><i style="background:#81C784"></i><i style="background:#E57373"></i><i style="background:#64B5F6"></i><i style="background:#FFB74D"></i>
+    </div>
+    <p>Собирайте линии из падающих фигур. Комбо множат очки, T-спины и четыре линии за раз — самый сочный бонус.</p>
+    <div class="w-legend">
+      <span><kbd>←</kbd><kbd>→</kbd> движение · <kbd>↓</kbd> ускорить</span>
+      <span><kbd>↑</kbd>/<kbd>X</kbd> поворот · <kbd>Z</kbd> против часовой</span>
+      <span><kbd>Space</kbd> сброс · <kbd>C</kbd> отложить фигуру</span>
+      <span><b>T-спин</b> — вращение в щель под навесом</span>
+    </div>
+    <div class="w-records">
+      <span class="w-rec hidden" id="rec-marathon">Рекорд: <b>0</b></span>
+      <span class="w-rec hidden" id="rec-sprint">Спринт: <b>—</b></span>
+    </div>
+    <div class="w-modes">
+      <button id="btn-marathon">Маратон</button>
+      <button id="btn-sprint">Спринт · 40 линий на время</button>
+    </div>
+    <p class="w-hint">На телефоне: свайпы по полю и кнопки внизу. Уровень растёт каждые 10 линий — скорость тоже.</p>
+  </div>
+
+  <div id="game" class="hidden">
+    <div id="stats">
+      <div class="stat"><span class="stat-label">Счёт</span><span class="stat-value gold" id="st-score">0</span></div>
+      <div class="stat"><span class="stat-label" id="st-lines-label">Линии</span><span class="stat-value" id="st-lines">0</span></div>
+      <div class="stat"><span class="stat-label">Уровень</span><span class="stat-value" id="st-level">1</span></div>
+      <div class="stat"><span class="stat-label">Время</span><span class="stat-value" id="st-time">0:00</span></div>
+      <div class="stat"><span class="stat-label">Рекорд</span><span class="stat-value" id="st-best">0</span></div>
+    </div>
+    <div id="progress-wrap"><div id="progress-fill"></div></div>
+    <div id="strip">
+      <div class="strip-box">
+        <canvas id="hold-c" width="132" height="72"></canvas>
+        <span class="strip-label">Отложено</span>
+      </div>
+      <span id="mode-chip">Маратон</span>
+      <div class="strip-box">
+        <canvas id="next-c" width="204" height="72"></canvas>
+        <span class="strip-label">Далее</span>
+      </div>
+    </div>
+    <div id="canvas-wrap">
+      <canvas id="gc"></canvas>
+      <div id="fx-banner"></div>
+    </div>
+    <div id="touch">
+      <button id="t-left" aria-label="Влево">◀</button>
+      <button id="t-rot" class="t-wide" aria-label="Повернуть">⟳</button>
+      <button id="t-right" aria-label="Вправо">▶</button>
+      <button id="t-down" aria-label="Вниз">▼</button>
+      <button id="t-drop" class="t-wide" aria-label="Сброс">⤓</button>
+      <button id="t-hold" aria-label="Отложить">⇄</button>
+    </div>
+    <div id="bottom">
+      <button id="btn-pause">Пауза</button>
+      <button id="btn-restart">Заново</button>
+      <button id="btn-sound">🔊</button>
+    </div>
+  </div>
+
+  <div id="modal" class="hidden">
+    <div class="modal-card">
+      <span id="modal-record" class="new-record hidden">Новый рекорд!</span>
+      <h2 id="modal-title">Пауза</h2>
+      <p id="modal-sub"></p>
+      <div class="modal-actions">
+        <button id="modal-btn">Продолжить</button>
+        <button id="modal-btn2">В меню</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
