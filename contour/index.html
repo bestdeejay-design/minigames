@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#091116">
+  <meta name="description" content="Контур — мобильная мини-игра одним жестом. Обводите искры, избегайте ловушек и побейте свой рекорд за 45 секунд.">
+  <link rel="canonical" href="https://bestdeejay-design.github.io/minigames/contour/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bestdeejay-design.github.io/minigames/contour/">
+  <meta property="og:title" content="Контур — мини-игра | AXIIOM">
+  <meta property="og:description" content="Нарисуй петлю, поймай искры и побей свой рекорд. Бесплатная игра для телефона прямо в браузере.">
+  <meta property="og:locale" content="ru_RU">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='27' font-size='26'>✳️</text></svg>">
+  <title>Контур — мини-игра | AXIIOM</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="game.js" defer></script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <a class="back-link" href="../" aria-label="Вернуться к каталогу игр">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14.5 5-7 7 7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="back-full">Все игры</span><span class="back-short">Игры</span>
+      </a>
+      <a class="brand" href="../" aria-label="AXIIOM — каталог мини-игр">AXIIOM<span>✳</span></a>
+      <button class="icon-button sound-button" id="sound-button" type="button" aria-label="Включить звук" aria-pressed="false" title="Включить звук">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 9v6h3.2L12 19V5L7.2 9H4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+          <path class="sound-waves" d="M15.5 9a4 4 0 0 1 0 6m2.5-9a8 8 0 0 1 0 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          <path class="sound-slash" d="m17 9 4 6m0-6-4 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </header>
+
+    <main class="game">
+      <div class="title-row">
+        <div>
+          <p class="eyebrow">МИНИ-ИГРА · ОДИН ЖЕСТ</p>
+          <h1>КОНТУР<span>.</span></h1>
+        </div>
+        <div class="best-badge"><span>ЛИЧНЫЙ РЕКОРД</span><strong id="best-score">0</strong></div>
+      </div>
+
+      <section class="scorebar" aria-label="Игровые показатели">
+        <div class="stat score-stat"><span>СЧЁТ</span><strong id="score">0</strong></div>
+        <div class="stat combo-stat"><span>СЕРИЯ</span><strong id="combo">×1</strong></div>
+        <div class="stat time-stat" id="time-stat"><span>ВРЕМЯ</span><strong id="time">0:45</strong></div>
+        <button class="icon-button pause-button" id="pause-button" type="button" aria-label="Пауза" title="Пауза" disabled>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 5v14M16 5v14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </button>
+      </section>
+
+      <div class="field" id="field">
+        <canvas id="game-canvas" aria-label="Игровое поле: проведите пальцем петлю вокруг зелёных искр и замкните её. Ваш жест ограничен по длине.">Ваш браузер не поддерживает canvas.</canvas>
+        <div class="field-caption" aria-hidden="true"><span id="stage-label">ЗОНА 01 / 03</span><span class="stage-dots" id="stage-dots"><i class="active"></i><i></i><i></i></span></div>
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+        <div class="field-corner corner-tl" aria-hidden="true"></div>
+        <div class="field-corner corner-tr" aria-hidden="true"></div>
+        <div class="field-corner corner-bl" aria-hidden="true"></div>
+        <div class="field-corner corner-br" aria-hidden="true"></div>
+      </div>
+
+      <footer class="game-footer">
+        <div class="gesture-tip">
+          <svg viewBox="0 0 36 36" fill="none" aria-hidden="true"><path d="M25 12c-4-4-12-3-15 3-3 6 1 12 7 13 7 1 12-4 11-10-.7-4-3-6-6-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 2"/><circle cx="23" cy="11" r="3" fill="currentColor"/></svg>
+          <span id="gesture-hint">Обведи искры и замкни линию</span>
+        </div>
+        <div class="ink-row" aria-label="Оставшаяся длина линии">
+          <span>ЛИНИЯ</span><div class="ink-track"><div id="ink-fill"></div></div>
+        </div>
+        <div class="legend" aria-label="Обозначения">
+          <span><i class="legend-mark spark"></i> искры</span>
+          <span><i class="legend-mark hazard"></i> −5 сек</span>
+          <span><i class="legend-mark bonus"></i> +2 сек</span>
+        </div>
+      </footer>
+
+      <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+        <section class="panel intro-panel" id="intro-panel">
+          <div class="intro-art" aria-hidden="true">
+            <svg viewBox="0 0 120 120" fill="none"><path d="M30 27C14 35 10 57 22 77c13 22 43 28 66 14 20-12 23-37 10-56C83 14 52 11 30 27Z" stroke="#A9F5C8" stroke-width="3" stroke-linecap="round" stroke-dasharray="5 4"/><circle cx="31" cy="27" r="6" fill="#D8FFE7"/><circle cx="47" cy="55" r="8" fill="#B6F9CD"/><circle cx="73" cy="41" r="7" fill="#B6F9CD"/><circle cx="68" cy="76" r="9" fill="#B6F9CD"/><path d="m104 75 5 5-5 5-5-5 5-5Z" fill="#FF747A"/></svg>
+          </div>
+          <p class="panel-kicker">45 СЕКУНД · ОДИН ПАЛЕЦ</p>
+          <h2 id="intro-title">Замкни петлю.<br><em>Поймай искры.</em></h2>
+          <p class="panel-copy">Проведи пальцем вокруг зелёных искр и вернись к началу линии. Несколько за раз — больше очков и комбо.</p>
+          <div class="rule-list">
+            <span><i class="legend-mark spark"></i> Собирай искры</span>
+            <span><i class="legend-mark hazard"></i> Избегай красных</span>
+            <span><i class="legend-mark bonus"></i> Золото даёт время</span>
+          </div>
+          <button class="primary-button" id="start-button" type="button">Начать раунд <span aria-hidden="true">↗</span></button>
+          <p class="panel-footnote">Длина каждого жеста ограничена</p>
+        </section>
+
+        <section class="panel pause-panel" id="pause-panel" hidden>
+          <p class="panel-kicker">ПЕРЕДЫШКА</p>
+          <h2 id="pause-title">Пауза<span class="accent-dot">.</span></h2>
+          <p class="panel-copy">Искры подождут. Продолжай, когда будешь готов.</p>
+          <button class="primary-button" id="resume-button" type="button">Продолжить <span aria-hidden="true">→</span></button>
+          <button class="text-button" id="restart-button" type="button">Начать заново</button>
+        </section>
+
+        <section class="panel result-panel" id="result-panel" hidden>
+          <p class="panel-kicker" id="result-kicker">ВРЕМЯ ВЫШЛО</p>
+          <h2 id="result-title">Хорошая петля<span class="accent-dot">.</span></h2>
+          <p class="result-caption">ТВОЙ СЧЁТ</p>
+          <div class="result-score" id="result-score">0</div>
+          <p class="panel-copy" id="result-message">Попробуй собрать больше искр за один жест.</p>
+          <div class="result-stats"><div><span>РЕКОРД</span><strong id="result-best">0</strong></div><div><span>УДАЧНЫХ ПЕТЕЛЬ</span><strong id="result-loops">0</strong></div></div>
+          <button class="primary-button" id="again-button" type="button">Ещё раунд <span aria-hidden="true">↗</span></button>
+        </section>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
