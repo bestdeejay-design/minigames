@@ -1,6 +1,6 @@
 # Мини-игры AXIIOM
 
-> Коллекция из 13 браузерных мини-игр: физика, аркады, головоломки и стратегии.
+> Коллекция из 14 браузерных мини-игр: физика, аркады, головоломки и стратегии.
 > Без регистрации, без установки — открыл и играешь. Разработка **[AXIIOM](https://axiiom.ru)**.
 
 **Живой каталог игр:** https://bestdeejay-design.github.io/minigames/
@@ -13,6 +13,7 @@
 |------|------|--------|
 | 🎱 Бильярд | спорт-симулятор с реалистичной физикой | [играть](https://bestdeejay-design.github.io/minigames/billiards/) |
 | 🧨 Разлом | брейкер: рой шаров, вызов дня, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/breaker/) |
+| ⚔️ Звёздный рубеж | RTS: минералы, база, волны морпехов, туман войны | [играть](https://bestdeejay-design.github.io/minigames/rts/) |
 | 🪙 Coin Tap | аркада на реакцию | [играть](https://bestdeejay-design.github.io/minigames/coin-tap/) |
 | 💠 Кристаллы | merge-drop: физика слияний, вызов дня | [играть](https://bestdeejay-design.github.io/minigames/crystals/) |
 | 🎯 FPS Corridor | 3D-шутер от первого лица | [играть](https://bestdeejay-design.github.io/minigames/fps3d/) |
@@ -38,7 +39,8 @@
 ```
 index.html   — хаб-каталог со ссылками на все игры
 <game>/      — папка игры: index.html, style.css, game.js
-               (match3 и fps3d — однофайловые: только index.html)
+               (match3 и fps3d — однофайловые: только index.html,
+                rts — модульная: 11 ES-модулей в js/)
 ```
 
 ---

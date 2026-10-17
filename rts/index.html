@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Звёздный рубеж — мини-игра | AXIIOM</title>
+  <meta name="description" content="Стратегия в реальном времени в духе классики 1998: минералы, база, морпехи, туман войны и волны противника. Мини-игра от AXIIOM."/>
+  <link rel="canonical" href="https://bestdeejay-design.github.io/minigames/rts/"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:url" content="https://bestdeejay-design.github.io/minigames/rts/"/>
+  <meta property="og:title" content="Звёздный рубеж — мини-игра | AXIIOM"/>
+  <meta property="og:description" content="Стратегия в реальном времени: минералы, база, морпехи, туман войны и волны противника. Мини-игра от AXIIOM."/>
+  <meta name="twitter:title" content="Звёздный рубеж — мини-игра | AXIIOM"/>
+  <meta name="twitter:description" content="Стратегия в реальном времени: минералы, база, морпехи, туман войны и волны противника. Мини-игра от AXIIOM."/>
+  <link rel="stylesheet" href="./style.css"/>
+</head>
+<body>
+  <div id="game-root">
+    <canvas id="game-canvas"></canvas>
+
+    <div id="topbar">
+      <a class="back" href="../">← Каталог</a>
+      <span class="brand">AXIIOM</span>
+      <span class="tb-sep"></span>
+      <div class="res"><span class="dot mineral"></span><span id="res-minerals">0</span></div>
+      <div class="res"><span class="dot supply"></span><span id="res-supply">0/0</span></div>
+      <div class="res"><span id="res-time">00:00</span></div>
+      <div class="spacer"></div>
+      <button id="btn-sound" class="tb-btn">Звук: вкл</button>
+      <button id="btn-pause" class="tb-btn">Пауза</button>
+      <button id="btn-restart" class="tb-btn">Заново</button>
+    </div>
+
+    <div id="bottom-panel">
+      <div id="minimap-box"><canvas id="minimap" width="176" height="176"></canvas></div>
+      <div id="sel-info"><div class="hint">Загрузка…</div></div>
+      <div id="cmd-grid"></div>
+    </div>
+
+    <div id="toasts"></div>
+
+    <div id="overlay" class="overlay">
+      <div class="overlay-box">
+        <h1>ЗВЁЗДНЫЙ РУБЕЖ</h1>
+        <p class="sub">Стратегия в реальном времени в духе классики 1998 — одна миссия против ИИ</p>
+        <div class="help">
+          <p><b>ЛКМ</b> — выделение, рамка &nbsp;·&nbsp; <b>ПКМ</b> — идти / добывать / атаковать</p>
+          <p><b>Ctrl/Shift + 1…9</b> — создать группу &nbsp;·&nbsp; <b>1…9</b> — выбрать группу</p>
+          <p><b>B</b> — стройка (Q/W/E — ЦК/Дом/Казарма) &nbsp;·&nbsp; <b>S</b> — стоп &nbsp;·&nbsp; <b>P</b> — пауза</p>
+          <p>Камера: стрелки или мышь у края экрана</p>
+          <p class="goal">Цель: уничтожить все постройки красных. Не потеряйте свои!</p>
+        </div>
+        <button id="btn-start" class="big-btn">Начать игру</button>
+      </div>
+    </div>
+
+    <div id="end-overlay" class="overlay hidden">
+      <div class="overlay-box">
+        <h1 id="end-title">Победа!</h1>
+        <div id="end-stats"></div>
+        <button id="btn-again" class="big-btn">Играть снова</button>
+      </div>
+    </div>
+
+    <div id="pause-overlay" class="overlay thin hidden"><div class="pause-text">ПАУЗА</div></div>
+  </div>
+
+  <script type="module" src="./js/game.js"></script>
+</body>
+</html>
