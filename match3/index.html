@@ -333,8 +333,10 @@ function getBest() { return readSave().highScore || 0; }
 // ======================== ЕЖЕДНЕВНЫЙ ВЫЗОВ ========================
 // Одна заездка в день: 3 seeded-уровня от даты; победа растит стрик, провал сжигает
 function dateStr(d) {
-  const p = n => String(n).padStart(2, '0');
-  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  // Единый день для всех игроков — по Москве (как в crystals)
+  const loc = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+  const get = t => loc.find(x => x.type === t).value;
+  return get('year') + '-' + get('month') + '-' + get('day');
 }
 function fnv1a(s) {
   let h = 0x811c9dc5;
