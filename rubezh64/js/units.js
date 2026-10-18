@@ -7,8 +7,8 @@ export function createUnit(game, type, team, x, y) {
     id: game.nextId++, kind: 'unit', type, team, x, y,
     hp: stats.hp, maxHp: stats.hp, radius: stats.radius, facing: team === 'player' ? 0 : Math.PI,
     order: { kind: 'idle' }, path: null, pathIndex: 0, pathKey: '', repath: 0,
-    cooldown: 0, autoTimer: 0, cargo: 0, harvestTimer: 0,
-    hitFlash: 0,
+    cooldown: 0, autoTimer: 0, healTimer: 0, cargo: 0, harvestTimer: 0,
+    hitFlash: 0, waveAssigned: false,
   };
   game.units.push(unit);
   game.entities.set(unit.id, unit);
@@ -39,7 +39,7 @@ export function buildOrder(unit, buildingId) {
   clearPath(unit);
 }
 export function attackOrder(unit, targetId, automatic = false) {
-  unit.order = { kind: 'attack', targetId, automatic, lastX: unit.x, lastY: unit.y };
+  unit.order = { kind: 'attack', targetId, automatic, lastX: unit.x, lastY: unit.y, homeX: unit.x, homeY: unit.y };
   clearPath(unit);
 }
 export function attackMoveOrder(unit, x, y) {
@@ -145,7 +145,7 @@ function updateHarvest(game, unit, dt) {
   if (advance(game, unit, mineral.x, mineral.y, RULES.mineralReach, dt)) {
     unit.harvestTimer += dt;
     if (unit.harvestTimer >= RULES.harvestSeconds) {
-      const amount = Math.min(RULES.harvestAmount, mineral.amount);
+      const amount = Math.min(RULES.harvestAmount + game[unit.team].upgrades.drills * 5, mineral.amount);
       mineral.amount -= amount;
       unit.cargo = amount;
       unit.harvestTimer = 0;
@@ -183,6 +183,12 @@ function updateBuild(game, unit, dt) {
 
 function updateAttack(game, unit, dt) {
   const order = unit.order;
+  // Automatic defence is leashed; one scout must not draw the entire garrison
+  // across the map. Explicit player orders and AI waves have no such limit.
+  if (order.automatic && Math.hypot(unit.x - order.homeX, unit.y - order.homeY) > UNIT_TYPES[unit.type].vision * TILE_SIZE * .85) {
+    moveOrder(unit, order.homeX, order.homeY);
+    return;
+  }
   const target = game.entities.get(order.targetId);
   if (!target || target.hp <= 0 || target.team === unit.team) { stopUnit(unit); return; }
   if (isVisibleTo(game, unit, target)) {
@@ -213,6 +219,23 @@ function updateAttackMove(game, unit, dt) {
   } else if (advance(game, unit, order.x, order.y, 8, dt)) stopUnit(unit);
 }
 
+function repairAllies(game, unit, dt) {
+  const stats = UNIT_TYPES.support;
+  unit.healTimer -= dt;
+  if (unit.healTimer > 0) return;
+  unit.healTimer = stats.healInterval;
+  let target = null, priority = 0;
+  for (const ally of [...game.units, ...game.buildings]) {
+    if (ally === unit || ally.team !== unit.team || ally.hp <= 0 || ally.hp >= ally.maxHp || ally.kind === 'building' && ally.progress < 1) continue;
+    if (Math.hypot(unit.x - ally.x, unit.y - ally.y) > stats.healRange + (ally.kind === 'building' ? ally.size * TILE_SIZE / 2 : 0)) continue;
+    const urgency = (ally.maxHp - ally.hp) / ally.maxHp + (ally.kind === 'unit' ? .3 : 0);
+    if (urgency > priority) { target = ally; priority = urgency; }
+  }
+  if (!target) return;
+  target.hp = Math.min(target.maxHp, target.hp + stats.healAmount);
+  game.effects.push({ kind: 'repair', x: target.x, y: target.y, life: .45, maxLife: .45, team: unit.team });
+}
+
 export function updateUnits(game, dt) {
   for (const unit of game.units) {
     if (unit.hp <= 0) continue;
@@ -225,12 +248,15 @@ export function updateUnits(game, dt) {
     else if (unit.order.kind === 'build') updateBuild(game, unit, dt);
     else if (unit.order.kind === 'attack') updateAttack(game, unit, dt);
     else if (unit.order.kind === 'attackMove') updateAttackMove(game, unit, dt);
+    if (unit.type === 'support') repairAllies(game, unit, dt);
 
     // Idle troops pursue a nearby threat; busy units still shoot in self-defence.
     if (unit.autoTimer <= 0) {
       unit.autoTimer = .28 + (unit.id % 5) * .035;
       if (unit.order.kind !== 'attack' && unit.order.kind !== 'attackMove') {
-        const sight = unit.order.kind === 'idle' ? UNIT_TYPES[unit.type].vision * TILE_SIZE : UNIT_TYPES[unit.type].range;
+        const sight = unit.order.kind === 'idle'
+          ? ['worker','support'].includes(unit.type) ? UNIT_TYPES[unit.type].range + 60 : UNIT_TYPES[unit.type].vision * TILE_SIZE
+          : UNIT_TYPES[unit.type].range;
         const target = closestEnemy(game, unit, sight);
         if (target) {
           if (unit.order.kind === 'idle') attackOrder(unit, target.id, true);

@@ -1,8 +1,9 @@
-import { BUILDING_TYPES, FIXED_STEP, MAP_SIZE, RULES, TILE_SIZE, UNIT_TYPES, WORLD_SIZE } from './config.js';
+import { BUILDING_TYPES, DIFFICULTIES, FIXED_STEP, MAP_SIZE, RULES, TILE_SIZE, UNIT_TYPES, WORLD_SIZE } from './config.js';
 import { createMap, tileCenter, tileIndex, worldToTile } from './map.js';
 import { createPathfinder } from './pathfinding.js';
 import { createUnit, updateUnits, moveOrder, harvestOrder, buildOrder, attackOrder, attackMoveOrder, stopUnit } from './units.js';
-import { createBuilding, removeBuilding, canPlaceBuilding, beginBuilding, queueUnit, updateBuildings } from './buildings.js';
+import { createBuilding, removeBuilding, canPlaceBuilding, beginBuilding, queueUnit, queueResearch, updateBuildings } from './buildings.js';
+import { createRelays, updateRelays } from './relays.js';
 import { Fog } from './fog.js';
 import { EnemyAI } from './ai.js';
 
@@ -10,15 +11,17 @@ const START_UNITS = {
   player: { workers: [[7, 13], [8, 14], [10, 15], [12, 15]], marines: [[14, 12], [15, 13]] },
   enemy: { workers: [[56, 53], [55, 55], [54, 56], [52, 56]], marines: [[49, 50]] },
 };
-const BEST_KEY = 'rubezh64-best-win';
+const BEST_KEY = 'rubezh64-best-win-';
 
 export class Game {
-  constructor() {
+  constructor(difficulty = 'normal') {
     this.audio = null;
-    this.reset();
+    this.reset(difficulty);
   }
 
-  reset() {
+  reset(difficulty = this.difficulty) {
+    this.difficulty = DIFFICULTIES[difficulty] ? difficulty : 'normal';
+    this.settings = DIFFICULTIES[this.difficulty];
     this.map = createMap();
     this.entities = new Map();
     this.nextId = 1;
@@ -37,8 +40,8 @@ export class Game {
     this.buildings = [];
     this.projectiles = [];
     this.effects = [];
-    this.player = { minerals: RULES.playerMinerals };
-    this.enemy = { minerals: RULES.enemyMinerals };
+    this.player = { minerals: this.settings.playerMinerals, upgrades: { drills: 0, plating: 0, weapons: 0 } };
+    this.enemy = { minerals: this.settings.enemyMinerals, upgrades: { drills: 0, plating: 0, weapons: 0 } };
     this.camera = { x: 0, y: 60 };
     this.selection = [];
     this.groups = Array.from({ length: 10 }, () => []);
@@ -59,8 +62,9 @@ export class Game {
       for (const [tx, ty] of START_UNITS[team].workers) this.spawnUnit('worker', team, tileCenter(tx), tileCenter(ty));
       for (const [tx, ty] of START_UNITS[team].marines) this.spawnUnit('marine', team, tileCenter(tx), tileCenter(ty));
     }
+    this.relays = createRelays(this);
     this.fog = new Fog(this);
-    this.ai = new EnemyAI();
+    this.ai = new EnemyAI(this.settings);
   }
 
   start() {
@@ -78,6 +82,7 @@ export class Game {
     this.pathBudget = RULES.maxPathsPerTick;
     updateBuildings(this, dt);
     updateUnits(this, dt);
+    updateRelays(this, dt);
     this.ai.update(this, dt);
     this.updateProjectiles(dt);
     this.updateEffects(dt);
@@ -96,8 +101,10 @@ export class Game {
     return [units + queued, Math.min(RULES.maxSupply, cap)];
   }
   spawnUnit(type, team, x, y) {
-    if (!this.isTileOpen(worldToTile(x), worldToTile(y))) return null;
-    return createUnit(this, type, team, x, y);
+    if (!UNIT_TYPES[type] || !this.isTileOpen(worldToTile(x), worldToTile(y))) return null;
+    const unit = createUnit(this, type, team, x, y);
+    if (team === 'enemy') unit.hp = unit.maxHp = Math.round(UNIT_TYPES[type].hp * this.settings.health);
+    return unit;
   }
   findSpawnPoint(building) {
     const centerX = building.tx + (building.size - 1) / 2;
@@ -127,7 +134,7 @@ export class Game {
   findNearestBase(team, x, y) {
     let closest = null, best = Infinity;
     for (const building of this.buildings) {
-      if (building.team !== team || building.type !== 'command' || building.hp <= 0 || building.progress < 1) continue;
+      if (building.team !== team || !BUILDING_TYPES[building.type].deposit || building.hp <= 0 || building.progress < 1) continue;
       const distance = Math.hypot(x - building.x, y - building.y);
       if (distance < best) { best = distance; closest = building; }
     }
@@ -153,11 +160,16 @@ export class Game {
       else this.orderMove(unit, px, py);
     });
   }
-  canPlace(type, tx, ty, team = 'player') { return canPlaceBuilding(this, type, tx, ty, team); }
+  canBuild(type, team = 'player') {
+    const stats = BUILDING_TYPES[type];
+    return Boolean(stats && type !== 'command' && (!stats.requires || this.buildings.some(b => b.team === team && b.type === stats.requires && b.hp > 0 && b.progress >= 1)));
+  }
+  canPlace(type, tx, ty, team = 'player') { return this.canBuild(type, team) && canPlaceBuilding(this, type, tx, ty, team); }
   place(type, tx, ty, worker, team = 'player', requireVision = true) {
     return beginBuilding(this, type, team, tx, ty, worker, requireVision);
   }
   train(building, type) { return queueUnit(this, building, type); }
+  research(building, key) { return queueResearch(this, building, key); }
   selected() { return this.selection.map(id => this.entities.get(id)).filter(entity => entity && (entity.hp === undefined || entity.hp > 0)); }
   select(ids, additive = false) {
     this.selection = additive ? [...new Set([...this.selection, ...ids])] : [...new Set(ids)];
@@ -176,13 +188,22 @@ export class Game {
       if (x >= building.tx * TILE_SIZE && x < (building.tx + building.size) * TILE_SIZE &&
           y >= building.ty * TILE_SIZE && y < (building.ty + building.size) * TILE_SIZE) return building;
     }
-    return this.minerals.find(m => m.amount > 0 && Math.hypot(x - m.x, y - m.y) < 18 && (!this.fog || this.fog.isExplored(m.tx, m.ty))) || null;
+    return this.minerals.find(m => m.amount > 0 && Math.hypot(x - m.x, y - m.y) < 18 && (!this.fog || this.fog.isExplored(m.tx, m.ty)))
+      || this.relays.find(r => Math.hypot(x - r.x, y - r.y) < 20 && (!this.fog || this.fog.isExplored(r.tx, r.ty))) || null;
   }
 
-  fireProjectile(unit, target) {
-    this.projectiles.push({ x: unit.x, y: unit.y, fromTeam: unit.team, fromType: unit.type,
-      targetId: target.id, damage: UNIT_TYPES[unit.type].damage, life: RULES.projectileLifeSeconds });
-    if (unit.team === 'player' && unit.type === 'marine' && Math.random() < .12) this.audio?.play('shot');
+  damageFor(source, target) {
+    const stats = source.kind === 'building' ? BUILDING_TYPES[source.type] : UNIT_TYPES[source.type];
+    const level = this[source.team].upgrades.weapons;
+    const bonus = source.kind === 'building' || source.type === 'worker' ? 0 : source.type === 'guardian' ? 4 : 2;
+    let damage = (stats.damage + bonus * level) * (source.team === 'enemy' ? this.settings.damage : 1);
+    if (source.type === 'guardian' && target.kind === 'building') damage *= stats.buildingBonus;
+    return Math.max(1, Math.round(damage));
+  }
+  fireProjectile(source, target) {
+    this.projectiles.push({ x: source.x, y: source.y, fromTeam: source.team, fromType: source.type,
+      targetId: target.id, damage: this.damageFor(source, target), life: RULES.projectileLifeSeconds });
+    if (source.team === 'player' && Math.random() < .12) this.audio?.play('shot');
   }
   updateProjectiles(dt) {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
@@ -194,7 +215,10 @@ export class Game {
       const distance = Math.hypot(dx, dy);
       const step = RULES.projectileSpeed * dt;
       if (distance <= step + (target.kind === 'unit' ? target.radius : TILE_SIZE / 2)) {
-        target.hp = Math.max(0, target.hp - shot.damage);
+        const armor = target.kind === 'unit'
+          ? (UNIT_TYPES[target.type].armor || 0) + this[target.team].upgrades.plating * 2
+          : (BUILDING_TYPES[target.type].armor || 0);
+        target.hp = Math.max(0, target.hp - Math.max(1, shot.damage - armor));
         target.hitFlash = .15;
         this.effects.push({ kind: 'spark', x: target.x, y: target.y, life: .25, maxLife: .25, team: shot.fromTeam });
         if (target.hp <= 0) this.effects.push({ kind: 'explosion', x: target.x, y: target.y, life: .65, maxLife: .65, team: target.team });
@@ -239,7 +263,7 @@ export class Game {
   }
   readBest() {
     try {
-      const stored = localStorage.getItem(BEST_KEY);
+      const stored = localStorage.getItem(BEST_KEY + this.difficulty);
       if (stored === null) return null;
       const value = Number(stored);
       return value >= 0 && Number.isFinite(value) ? value : null;
@@ -248,7 +272,7 @@ export class Game {
   saveBest() {
     const old = this.readBest();
     if (old !== null && old <= this.time) return;
-    try { localStorage.setItem(BEST_KEY, String(Math.floor(this.time))); } catch (_) {}
+    try { localStorage.setItem(BEST_KEY + this.difficulty, String(Math.floor(this.time))); } catch (_) {}
   }
   clampCamera(viewWidth, viewHeight) {
     this.camera.x = Math.max(0, Math.min(Math.max(0, WORLD_SIZE - viewWidth), this.camera.x));

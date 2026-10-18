@@ -53,6 +53,9 @@ export class AudioSystem {
         case 'error': this.note(190, .16, 0, 'sawtooth', .23); break;
         case 'build': this.note(420, .11, 0, 'triangle', .4); this.note(630, .17, .12, 'triangle', .4); break;
         case 'train': this.note(480, .1, 0, 'sine', .35); this.note(700, .11, .1, 'sine', .3); break;
+        case 'research': [390,520,740].forEach((f,i)=>this.note(f,.15,i*.09,'triangle',.36)); break;
+        case 'relay': this.note(610,.17,0,'sine',.35); this.note(890,.26,.12,'sine',.3); break;
+        case 'warning': this.note(310,.12,0,'triangle',.37); this.note(235,.18,.18,'triangle',.32); break;
         case 'shot': this.note(850, .08, 0, 'sawtooth', .12); break;
         case 'hit': this.note(125, .14, 0, 'triangle', .35); break;
         case 'victory': [523,659,784,1046].forEach((f,i)=>this.note(f,.23,i*.15,'sine',.45)); break;
