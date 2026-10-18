@@ -35,9 +35,9 @@ export function createStripedSunTexture() {
   if (ctx) {
     ctx.clearRect(0, 0, 256, 256);
     const grad = ctx.createLinearGradient(0, 20, 0, 236);
-    grad.addColorStop(0, '#fff36d');
-    grad.addColorStop(0.35, '#ff9e00');
-    grad.addColorStop(0.7, '#ff2a85');
+    grad.addColorStop(0, '#fff8a6');
+    grad.addColorStop(0.32, '#ff9e00');
+    grad.addColorStop(0.68, '#ff2a85');
     grad.addColorStop(1, '#7b2cbf');
 
     ctx.save();
@@ -47,7 +47,6 @@ export function createStripedSunTexture() {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 256, 256);
 
-    // Полосы заката в нижней половине солнца (стиль синтвейв 80-х)
     ctx.globalCompositeOperation = 'destination-out';
     const stripes = [
       { y: 142, h: 4 },
@@ -68,31 +67,31 @@ export function createStripedSunTexture() {
 }
 
 export function createSkyTexture(isNight = false) {
-  const canvas = makeCanvas(64, 256);
+  const canvas = makeCanvas(128, 256);
   const ctx = canvas.getContext('2d');
   if (ctx) {
     const grad = ctx.createLinearGradient(0, 0, 0, 256);
     if (!isNight) {
-      grad.addColorStop(0.0, '#180636');
-      grad.addColorStop(0.32, '#481268');
-      grad.addColorStop(0.54, '#b5179e');
-      grad.addColorStop(0.72, '#ff2a85');
-      grad.addColorStop(0.88, '#ff7b00');
-      grad.addColorStop(1.0, '#ffbe0b');
+      grad.addColorStop(0.0, '#13072e');
+      grad.addColorStop(0.28, '#3f1668');
+      grad.addColorStop(0.52, '#9d1b82');
+      grad.addColorStop(0.72, '#ff3e7f');
+      grad.addColorStop(0.88, '#ff8533');
+      grad.addColorStop(1.0, '#ffd166');
     } else {
-      grad.addColorStop(0.0, '#04010c');
-      grad.addColorStop(0.4, '#0c0524');
-      grad.addColorStop(0.75, '#1d0b46');
-      grad.addColorStop(1.0, '#3a0ca3');
+      grad.addColorStop(0.0, '#03010a');
+      grad.addColorStop(0.38, '#090521');
+      grad.addColorStop(0.74, '#180c3d');
+      grad.addColorStop(1.0, '#2a165c');
     }
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 64, 256);
+    ctx.fillRect(0, 0, 128, 256);
 
     if (isNight) {
       ctx.fillStyle = '#ffffff';
-      for (let i = 0; i < 45; i++) {
-        const sx = (i * 19) % 62;
-        const sy = (i * 37) % 160;
+      for (let i = 0; i < 65; i++) {
+        const sx = (i * 29) % 124;
+        const sy = (i * 43) % 165;
         ctx.fillRect(sx, sy, 1.5, 1.5);
       }
     }
@@ -102,27 +101,71 @@ export function createSkyTexture(isNight = false) {
   return tex;
 }
 
+// Процедурная текстура морской поверхности с каустикой и солнечными бликами
+export function createWaterTexture() {
+  const canvas = makeCanvas(256, 256);
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#0e7c9e';
+    ctx.fillRect(0, 0, 256, 256);
+
+    // Мягкие волны и лазурные переливы
+    for (let y = 0; y < 256; y += 8) {
+      ctx.fillStyle = y % 16 === 0 ? 'rgba(0, 245, 212, 0.16)' : 'rgba(5, 45, 78, 0.18)';
+      ctx.fillRect(0, y, 256, 4);
+    }
+
+    // Светлые ячейки каустики и солнечной ряби
+    for (let i = 0; i < 220; i++) {
+      const rx = (i * 53) % 256;
+      const ry = (i * 97) % 256;
+      const rw = 10 + (i % 5) * 6;
+      ctx.fillStyle = i % 3 === 0 ? 'rgba(255, 255, 255, 0.22)' : 'rgba(114, 239, 221, 0.2)';
+      ctx.fillRect(rx, ry, rw, 2);
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(38, 38);
+  tex.needsUpdate = true;
+  return tex;
+}
+
 export function createAsphaltTexture() {
   const canvas = makeCanvas(256, 256);
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = '#232331';
+    ctx.fillStyle = '#252630';
     ctx.fillRect(0, 0, 256, 256);
-    for (let i = 0; i < 900; i++) {
+
+    // Полосы наката от шин
+    ctx.fillStyle = '#1e1f28';
+    ctx.fillRect(36, 0, 48, 256);
+    ctx.fillRect(172, 0, 48, 256);
+
+    // Зернистость асфальта
+    for (let i = 0; i < 1400; i++) {
       const x = (i * 73) % 256;
       const y = (i * 137) % 256;
-      ctx.fillStyle = i % 2 === 0 ? '#2b2b3c' : '#1b1b27';
+      ctx.fillStyle = i % 3 === 0 ? '#323442' : '#1b1c24';
       ctx.fillRect(x, y, 2, 2);
     }
-    // Двойная жёлтая осевая и боковые бирюзовые/белые полосы
+
+    // Бордюрные кромки
+    ctx.fillStyle = '#5c5f72';
+    ctx.fillRect(0, 0, 6, 256);
+    ctx.fillRect(250, 0, 6, 256);
+
+    // Двойная жёлтая осевая и боковые прерывистые полосы
     ctx.fillStyle = '#ffbe0b';
     ctx.fillRect(122, 0, 4, 256);
     ctx.fillRect(130, 0, 4, 256);
 
-    ctx.fillStyle = '#e0fbfc';
+    ctx.fillStyle = '#e8f1f5';
     for (let y = 0; y < 256; y += 32) {
-      ctx.fillRect(62, y + 4, 3, 18);
-      ctx.fillRect(191, y + 4, 3, 18);
+      ctx.fillRect(62, y + 5, 3, 18);
+      ctx.fillRect(191, y + 5, 3, 18);
     }
   }
   const tex = new THREE.CanvasTexture(canvas);
@@ -133,65 +176,131 @@ export function createAsphaltTexture() {
 }
 
 export function createSandTexture() {
-  const canvas = makeCanvas(128, 128);
+  const canvas = makeCanvas(256, 256);
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = '#f3d38c';
-    ctx.fillRect(0, 0, 128, 128);
-    for (let i = 0; i < 500; i++) {
-      const x = (i * 41) % 128;
-      const y = (i * 89) % 128;
-      ctx.fillStyle = i % 3 === 0 ? '#ffe6a7' : '#e0b96c';
+    ctx.fillStyle = '#eed294';
+    ctx.fillRect(0, 0, 256, 256);
+
+    // Мягкие песчаные барханы
+    for (let y = 0; y < 256; y += 12) {
+      ctx.fillStyle = y % 24 === 0 ? 'rgba(255, 240, 200, 0.35)' : 'rgba(210, 172, 102, 0.25)';
+      ctx.fillRect(0, y, 256, 5);
+    }
+    for (let i = 0; i < 900; i++) {
+      const x = (i * 41) % 256;
+      const y = (i * 89) % 256;
+      ctx.fillStyle = i % 3 === 0 ? '#fff1c9' : '#d6ad60';
       ctx.fillRect(x, y, 2, 2);
     }
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(16, 48);
+  tex.repeat.set(24, 24);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function createGrassParkTexture() {
+  const canvas = makeCanvas(128, 128);
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#2d4c3e';
+    ctx.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 500; i++) {
+      const x = (i * 37) % 128;
+      const y = (i * 71) % 128;
+      ctx.fillStyle = i % 2 === 0 ? '#365b4a' : '#243e32';
+      ctx.fillRect(x, y, 2, 2);
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(32, 32);
   tex.needsUpdate = true;
   return tex;
 }
 
 export function createWindowTexture(baseHex, trimHex, isNight = false, style = 'artdeco') {
-  const canvas = makeCanvas(128, 256);
+  const canvas = makeCanvas(256, 512);
   const ctx = canvas.getContext('2d');
   if (ctx) {
     ctx.fillStyle = baseHex;
-    ctx.fillRect(0, 0, 128, 256);
+    ctx.fillRect(0, 0, 256, 512);
 
-    // Декоративные вертикальные полосы арт-деко
+    // Межэтажные карнизы и текстура фасада
+    for (let y = 0; y < 512; y += 32) {
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.fillRect(0, y, 256, 3);
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.fillRect(0, y + 3, 256, 2);
+    }
+
+    // Декоративные пилястры арт-деко
     ctx.fillStyle = trimHex;
-    ctx.fillRect(0, 0, 8, 256);
-    ctx.fillRect(120, 0, 8, 256);
+    ctx.fillRect(0, 0, 12, 512);
+    ctx.fillRect(244, 0, 12, 512);
     if (style === 'artdeco') {
-      ctx.fillRect(58, 0, 12, 256);
+      ctx.fillRect(118, 0, 20, 512);
     }
 
     const cols = style === 'tower' ? 6 : 4;
     const rows = style === 'tower' ? 14 : 8;
-    const padX = 14;
-    const padY = 14;
-    const cellW = (128 - padX * 2) / cols;
-    const cellH = (256 - padY * 2) / rows;
+    const padX = 22;
+    const padY = 24;
+    const cellW = (256 - padX * 2) / cols;
+    const cellH = (440 - padY) / rows;
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const hash = (r * 17 + c * 31) % 11;
-        const lit = isNight ? hash < 8 : hash < 4;
+        const lit = isNight ? hash < 8 : hash < 5;
+        const wx = padX + c * cellW + 5;
+        const wy = padY + r * cellH + 5;
+        const ww = Math.max(8, cellW - 10);
+        const wh = Math.max(10, cellH - 10);
+
+        // Рама окна с углублением
+        ctx.fillStyle = '#121324';
+        ctx.fillRect(wx - 2, wy - 2, ww + 4, wh + 4);
+
         if (lit) {
-          ctx.fillStyle = hash % 3 === 0 ? '#00f5d4' : hash % 2 === 0 ? '#ffbe0b' : '#ff70a6';
+          const g = ctx.createLinearGradient(0, wy, 0, wy + wh);
+          if (hash % 3 === 0) {
+            g.addColorStop(0, '#98f5e1');
+            g.addColorStop(1, '#00bbf9');
+          } else if (hash % 2 === 0) {
+            g.addColorStop(0, '#fff3b0');
+            g.addColorStop(1, '#ff9e00');
+          } else {
+            g.addColorStop(0, '#ffcfd2');
+            g.addColorStop(1, '#ff2a85');
+          }
+          ctx.fillStyle = g;
         } else {
-          ctx.fillStyle = '#1b1936';
+          const g = ctx.createLinearGradient(0, wy, 0, wy + wh);
+          g.addColorStop(0, '#29324c');
+          g.addColorStop(1, '#14192b');
+          ctx.fillStyle = g;
         }
-        ctx.fillRect(
-          padX + c * cellW + 3,
-          padY + r * cellH + 3,
-          Math.max(4, cellW - 6),
-          Math.max(6, cellH - 6)
-        );
+        ctx.fillRect(wx, wy, ww, wh);
+
+        // Горизонтальные жалюзи / переплёт
+        ctx.fillStyle = 'rgba(15, 16, 32, 0.35)';
+        ctx.fillRect(wx, wy + wh * 0.48, ww, 2);
       }
     }
+
+    // Первый этаж — витрины и неоновый фриз
+    ctx.fillStyle = trimHex;
+    ctx.fillRect(0, 456, 256, 8);
+    ctx.fillStyle = '#141b2d';
+    ctx.fillRect(16, 468, 224, 44);
+    ctx.fillStyle = 'rgba(0, 245, 212, 0.32)';
+    ctx.fillRect(24, 474, 96, 32);
+    ctx.fillRect(136, 474, 96, 32);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
@@ -238,14 +347,14 @@ export class World {
     this.quality = quality;
     this.isNight = false;
     this.spatialGrid = new SpatialGrid(CONFIG.SPATIAL_CELL_SIZE);
-    this.colliders = []; // { minX, maxX, minZ, maxZ, maxY, tag, mesh }
+    this.colliders = [];
     this.raycastMeshes = [];
     this.neonMaterials = [];
     this.neonSprites = [];
     this.windowMeshes = [];
 
     this._initAtmosphere();
-    this._initGroundAndSea();
+    this._initIslandAndOcean();
   }
 
   _initAtmosphere() {
@@ -253,20 +362,20 @@ export class World {
     this.scene.background = new THREE.Color(CONFIG.COLORS.sunsetFog);
     this.scene.fog = new THREE.Fog(CONFIG.COLORS.sunsetFog, q.fogNear, q.fogFar);
 
-    this.ambientLight = new THREE.AmbientLight(0xffd6e8, 0.85);
+    this.ambientLight = new THREE.AmbientLight(0xffe3f0, 0.78);
     this.scene.add(this.ambientLight);
 
-    this.sunLight = new THREE.DirectionalLight(0xff9e5e, 1.25);
-    this.sunLight.position.set(220, 95, -40);
+    this.sunLight = new THREE.DirectionalLight(0xffa96b, 1.45);
+    this.sunLight.position.set(240, 115, -35);
     this.scene.add(this.sunLight);
 
-    this.hemiLight = new THREE.HemisphereLight(0xff70a6, 0x240b4c, 0.55);
+    this.hemiLight = new THREE.HemisphereLight(0xff85b3, 0x1d3557, 0.65);
     this.scene.add(this.hemiLight);
 
     // Купол неба
     this.skyTexSunset = createSkyTexture(false);
     this.skyTexNight = createSkyTexture(true);
-    const skyGeo = new THREE.SphereGeometry(290, 24, 16);
+    const skyGeo = new THREE.SphereGeometry(330, 28, 18);
     this.skyMat = new THREE.MeshBasicMaterial({
       map: this.skyTexSunset,
       side: THREE.BackSide,
@@ -276,7 +385,7 @@ export class World {
     this.skyDome = new THREE.Mesh(skyGeo, this.skyMat);
     this.scene.add(this.skyDome);
 
-    // Большое полосатое солнце над морским горизонтом (Восток, +X)
+    // Большое полосатое солнце над морским горизонтом
     const sunTex = createStripedSunTexture();
     const sunMat = new THREE.SpriteMaterial({
       map: sunTex,
@@ -285,63 +394,125 @@ export class World {
       depthWrite: false,
     });
     this.sunSprite = new THREE.Sprite(sunMat);
-    this.sunSprite.position.set(275, 52, -20);
-    this.sunSprite.scale.set(95, 95, 1);
+    this.sunSprite.position.set(295, 58, -20);
+    this.sunSprite.scale.set(105, 105, 1);
     this.scene.add(this.sunSprite);
 
-    // Ореол вокруг солнца
     const sunGlowMat = new THREE.SpriteMaterial({
       map: createGlowTexture('#ff2a85'),
       transparent: true,
       blending: THREE.AdditiveBlending,
       fog: false,
       depthWrite: false,
-      opacity: 0.65,
+      opacity: 0.68,
     });
     this.sunGlow = new THREE.Sprite(sunGlowMat);
-    this.sunGlow.position.set(274, 52, -20);
-    this.sunGlow.scale.set(165, 165, 1);
+    this.sunGlow.position.set(294, 58, -20);
+    this.sunGlow.scale.set(180, 180, 1);
     this.scene.add(this.sunGlow);
   }
 
-  _initGroundAndSea() {
-    // Основная земля города (X от -300 до +150)
-    const landWidth = 450;
-    const landGeo = new THREE.PlaneGeometry(landWidth, CONFIG.WORLD_SIZE);
-    landGeo.rotateX(-Math.PI / 2);
-    const landMat = new THREE.MeshLambertMaterial({ color: 0x322f42 });
-    this.landMesh = new THREE.Mesh(landGeo, landMat);
-    this.landMesh.position.set(-75, -0.05, 0);
-    this.scene.add(this.landMesh);
-    this.raycastMeshes.push(this.landMesh);
+  _initIslandAndOcean() {
+    const isl = CONFIG.ISLAND;
+    const islandW = isl.maxX - isl.minX; // 433 м (от -248 до +185)
+    const islandD = isl.maxZ - isl.minZ; // 496 м (от -248 до +248)
+    const centerX = (isl.minX + isl.maxX) * 0.5; // -31.5
+    const centerZ = (isl.minZ + isl.maxZ) * 0.5; // 0
 
-    // Пляж с песком (X от +148 до +188)
-    const beachGeo = new THREE.PlaneGeometry(42, CONFIG.WORLD_SIZE);
-    beachGeo.rotateX(-Math.PI / 2);
+    // 1. Песчаное основание острова со всех 4 сторон (пляжное кольцо вокруг всего острова)
+    const sandTex = createSandTexture();
     const beachMat = new THREE.MeshLambertMaterial({
-      map: createSandTexture(),
+      map: sandTex,
       color: CONFIG.COLORS.sand,
     });
-    this.beachMesh = new THREE.Mesh(beachGeo, beachMat);
-    this.beachMesh.position.set(168, -0.02, 0);
+    const islandBeachGeo = new THREE.BoxGeometry(islandW, 0.7, islandD);
+    this.beachMesh = new THREE.Mesh(islandBeachGeo, beachMat);
+    this.beachMesh.position.set(centerX, -0.36, centerZ);
     this.scene.add(this.beachMesh);
     this.raycastMeshes.push(this.beachMesh);
 
-    // Анимированное море с волнами (X от +185 до +300)
+    // 2. Внутреннее городское плато острова (оставляет песчаные пляжи по всему периметру острова)
+    const urbanMinX = isl.minX + 14;
+    const urbanMaxX = CONFIG.SHORE_X; // до +150, чтобы с востока был широкий океанский пляж
+    const urbanMinZ = isl.minZ + 14;
+    const urbanMaxZ = isl.maxZ - 14;
+    const urbanW = urbanMaxX - urbanMinX;
+    const urbanD = urbanMaxZ - urbanMinZ;
+
+    const landGeo = new THREE.PlaneGeometry(urbanW, urbanD);
+    landGeo.rotateX(-Math.PI / 2);
+    const landMat = new THREE.MeshLambertMaterial({
+      map: createGrassParkTexture(),
+      color: 0x8d99ae,
+    });
+    this.landMesh = new THREE.Mesh(landGeo, landMat);
+    this.landMesh.position.set((urbanMinX + urbanMaxX) * 0.5, 0.0, (urbanMinZ + urbanMaxZ) * 0.5);
+    this.scene.add(this.landMesh);
+    this.raycastMeshes.push(this.landMesh);
+
+    // 3. Полоса береговой морской пены и бирюзового мелководья вокруг всего острова
+    const foamGeo = new THREE.RingGeometry(1, 1.06, 64);
+    foamGeo.rotateX(-Math.PI / 2);
+    this.foamMat = new THREE.MeshBasicMaterial({
+      color: 0xe0fbfc,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+    });
+    this.foamRing = new THREE.Mesh(foamGeo, this.foamMat);
+    this.foamRing.position.set(centerX, -0.18, centerZ);
+    this.foamRing.scale.set(islandW * 0.52, 1, islandD * 0.52);
+    this.scene.add(this.foamRing);
+
+    // 4. Океан на 360 градусов вокруг всего острова (с каустикой, градиентом глубины и бликами солнца)
     const segs = CONFIG.QUALITY[this.quality].waveSegments;
-    this.seaGeo = new THREE.PlaneGeometry(125, CONFIG.WORLD_SIZE, 20, segs);
+    const oceanSize = CONFIG.OCEAN_SIZE;
+    this.seaGeo = new THREE.PlaneGeometry(oceanSize, oceanSize, segs, segs);
     this.seaGeo.rotateX(-Math.PI / 2);
+
     const pos = this.seaGeo.attributes.position;
     this._seaBaseY = new Float32Array(pos.count);
+    const colors = new Float32Array(pos.count * 3);
+    const shallowColor = new THREE.Color(0x00e5c3); // бирюзовая лагуна у берегов острова
+    const midColor = new THREE.Color(0x0077b6); // лазурное море
+    const deepColor = new THREE.Color(0x03254c); // глубокий океан
+    const tmpColor = new THREE.Color();
+
     for (let i = 0; i < pos.count; i++) {
       this._seaBaseY[i] = pos.getY(i);
+      const vx = pos.getX(i);
+      const vz = pos.getZ(i);
+
+      // Расстояние до береговой рамки острова
+      const dx = Math.max(isl.minX - vx, 0, vx - isl.maxX);
+      const dz = Math.max(isl.minZ - vz, 0, vz - isl.maxZ);
+      const shoreDist = Math.hypot(dx, dz);
+
+      if (shoreDist < 36) {
+        tmpColor.copy(shallowColor).lerp(midColor, shoreDist / 36);
+      } else {
+        const t = Math.min(1, (shoreDist - 36) / 160);
+        tmpColor.copy(midColor).lerp(deepColor, t);
+      }
+      colors[i * 3] = tmpColor.r;
+      colors[i * 3 + 1] = tmpColor.g;
+      colors[i * 3 + 2] = tmpColor.b;
     }
-    this.seaMat = new THREE.MeshLambertMaterial({
-      color: CONFIG.COLORS.seaSunset,
-      emissive: 0x102542,
+    this.seaGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    this.waterTex = createWaterTexture();
+    this.seaMat = new THREE.MeshPhongMaterial({
+      map: this.waterTex,
+      vertexColors: true,
+      color: 0xffffff,
+      emissive: 0x07223b,
+      specular: 0xffbe76,
+      shininess: 92,
+      transparent: true,
+      opacity: 0.94,
     });
     this.seaMesh = new THREE.Mesh(this.seaGeo, this.seaMat);
-    this.seaMesh.position.set(244, -0.35, 0);
+    this.seaMesh.position.set(0, -0.26, 0);
     this.scene.add(this.seaMesh);
   }
 
@@ -349,13 +520,31 @@ export class World {
     if (playerPos) {
       this.skyDome.position.set(playerPos.x, 0, playerPos.z);
     }
+
+    // Движение текстуры воды и пены у берега
+    if (this.waterTex) {
+      this.waterTex.offset.x = (time * 0.025) % 1;
+      this.waterTex.offset.y = (time * 0.018) % 1;
+    }
+    if (this.foamRing) {
+      const pulse = 1 + Math.sin(time * 2.2) * 0.012;
+      const isl = CONFIG.ISLAND;
+      this.foamRing.scale.set(
+        (isl.maxX - isl.minX) * 0.515 * pulse,
+        1,
+        (isl.maxZ - isl.minZ) * 0.515 * pulse
+      );
+      this.foamMat.opacity = 0.42 + Math.sin(time * 2.2) * 0.18;
+    }
+
     const pos = this.seaGeo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       const vx = pos.getX(i);
       const vz = pos.getZ(i);
       const wave =
-        Math.sin(vx * 0.22 + time * 2.4) * 0.28 +
-        Math.cos(vz * 0.14 + time * 1.8) * 0.22;
+        Math.sin(vx * 0.08 + time * 2.2) * 0.24 +
+        Math.cos(vz * 0.07 + time * 1.7) * 0.2 +
+        Math.sin((vx + vz) * 0.12 - time * 2.8) * 0.1;
       pos.setY(i, this._seaBaseY[i] + wave);
     }
     pos.needsUpdate = true;
@@ -378,25 +567,26 @@ export class World {
 
     if (this.isNight) {
       this.ambientLight.color.setHex(0x6b5b95);
-      this.ambientLight.intensity = 0.45;
+      this.ambientLight.intensity = 0.48;
       this.sunLight.color.setHex(0x72efdd);
-      this.sunLight.intensity = 0.55;
-      this.seaMat.color.setHex(CONFIG.COLORS.seaNight);
-      this.seaMat.emissive.setHex(0x091834);
+      this.sunLight.intensity = 0.62;
+      this.seaMat.color.setHex(0x88b8e6);
+      this.seaMat.emissive.setHex(0x040d21);
+      this.seaMat.specular.setHex(0x00f5d4);
       this.sunSprite.material.opacity = 0.35;
       this.sunGlow.material.opacity = 0.35;
     } else {
-      this.ambientLight.color.setHex(0xffd6e8);
-      this.ambientLight.intensity = 0.85;
-      this.sunLight.color.setHex(0xff9e5e);
-      this.sunLight.intensity = 1.25;
-      this.seaMat.color.setHex(CONFIG.COLORS.seaSunset);
-      this.seaMat.emissive.setHex(0x102542);
+      this.ambientLight.color.setHex(0xffe3f0);
+      this.ambientLight.intensity = 0.78;
+      this.sunLight.color.setHex(0xffa96b);
+      this.sunLight.intensity = 1.45;
+      this.seaMat.color.setHex(0xffffff);
+      this.seaMat.emissive.setHex(0x07223b);
+      this.seaMat.specular.setHex(0xffbe76);
       this.sunSprite.material.opacity = 1.0;
-      this.sunGlow.material.opacity = 0.65;
+      this.sunGlow.material.opacity = 0.68;
     }
 
-    // Усиливаем свечение неоновых вывесок и ореолов ночью
     for (const mat of this.neonMaterials) {
       if (mat.emissiveIntensity !== undefined) {
         mat.emissiveIntensity = this.isNight ? 1.5 : 0.85;
@@ -429,7 +619,6 @@ export class World {
   getGroundHeight(x, z) {
     const p = CONFIG.PIER;
     if (Math.abs(z - p.zCenter) <= p.width * 0.5 && x >= p.xMin && x <= p.xMax) {
-      // Плавный пандус с бульвара (146..154) на настил пирса
       if (x < p.xMin + 8) {
         const t = (x - p.xMin) / 8;
         return t * p.deckY;
@@ -439,28 +628,51 @@ export class World {
     return 0;
   }
 
+  // Проверка воды вокруг всего острова (на 360 градусов, с исключением для настила пирса)
   isWater(x, z) {
     if (this.isOnPier(x, z)) return false;
-    return x > CONFIG.WATER_START_X;
+    const isl = CONFIG.ISLAND;
+    return (
+      x > isl.maxX ||
+      x < isl.minX ||
+      z > isl.maxZ ||
+      z < isl.minZ
+    );
   }
 
-  // Скользящая коллизия окружности (игрок или машина) против AABB зданий, границ карты и глубокой воды
+  // Скользящая коллизия окружности против зданий и береговой линии острова со всех 4 сторон
   resolveCircleCollision(x, z, radius, y = 0) {
-    const bound = CONFIG.HALF_WORLD - 12;
-    let nx = Math.max(-bound, Math.min(bound, x));
-    let nz = Math.max(-bound, Math.min(bound, z));
+    const isl = CONFIG.ISLAND;
+    let nx = x;
+    let nz = z;
     let hitWall = false;
 
-    // Не даём уходить в глубокую воду мимо пирса
-    if (!this.isOnPier(nx, nz) && nx > CONFIG.WATER_START_X - radius) {
-      nx = CONFIG.WATER_START_X - radius;
+    // Западный, северный и южный берега острова
+    if (nx < isl.minX + radius) {
+      nx = isl.minX + radius;
+      hitWall = true;
+    }
+    if (nz < isl.minZ + radius) {
+      nz = isl.minZ + radius;
+      hitWall = true;
+    }
+    if (nz > isl.maxZ - radius) {
+      nz = isl.maxZ - radius;
       hitWall = true;
     }
 
-    // Бортики пирса, если игрок находится над водой на пирсе
-    if (nx > CONFIG.WATER_START_X - 1 && Math.abs(nz - CONFIG.PIER.zCenter) > CONFIG.PIER.width * 0.5 - radius) {
+    // Восточный берег острова и пирс
+    if (!this.isOnPier(nx, nz) && nx > isl.maxX - radius) {
+      nx = isl.maxX - radius;
+      hitWall = true;
+    }
+    if (nx > isl.maxX - 1 && Math.abs(nz - CONFIG.PIER.zCenter) > CONFIG.PIER.width * 0.5 - radius) {
       const sign = nz >= CONFIG.PIER.zCenter ? 1 : -1;
       nz = CONFIG.PIER.zCenter + sign * (CONFIG.PIER.width * 0.5 - radius);
+      hitWall = true;
+    }
+    if (nx > CONFIG.PIER.xMax - radius) {
+      nx = CONFIG.PIER.xMax - radius;
       hitWall = true;
     }
 
@@ -483,11 +695,10 @@ export class World {
             nx += (dx / dist) * overlap;
             nz += (dz / dist) * overlap;
           } else {
-            // Центр оказался внутри AABB — выталкиваем к ближайшей грани
             const left = Math.abs(nx - b.minX);
             const right = Math.abs(b.maxX - nx);
             const top = Math.abs(nz - b.minZ);
-            const bottom = Math.abs(b.maxZ - nz);
+            const bottom = Math.abs(nz - b.maxZ);
             const m = Math.min(left, right, top, bottom);
             if (m === left) nx = b.minX - radius;
             else if (m === right) nx = b.maxX + radius;
@@ -501,7 +712,6 @@ export class World {
     return { x: nx, z: nz, hitWall };
   }
 
-  // Проверка прямой видимости между двумя точками (против AABB зданий)
   hasLineOfSight(x1, z1, x2, z2) {
     const dx = x2 - x1;
     const dz = z2 - z1;

@@ -5,23 +5,70 @@ export function createVintageCarMesh(colorHex = 0xff2a85, isPolice = false, isSp
   const group = new THREE.Group();
 
   const bodyColor = isPolice ? 0x1d3557 : colorHex;
-  const bodyMat = new THREE.MeshLambertMaterial({ color: bodyColor });
-  const roofMat = new THREE.MeshLambertMaterial({
-    color: isPolice ? 0xf8f9fa : isSports ? 0x181824 : colorHex,
+  const bodyMat = new THREE.MeshPhongMaterial({
+    color: bodyColor,
+    specular: 0xffffff,
+    shininess: 85,
   });
-  const glassMat = new THREE.MeshBasicMaterial({
+  const roofMat = new THREE.MeshPhongMaterial({
+    color: isPolice ? 0xf8f9fa : isSports ? 0x181824 : colorHex,
+    specular: 0xdddddd,
+    shininess: 65,
+  });
+  const glassMat = new THREE.MeshPhongMaterial({
     color: 0x72efdd,
+    specular: 0xffffff,
+    shininess: 110,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.44,
   });
   const darkMat = new THREE.MeshLambertMaterial({ color: 0x151520 });
+  const chromeMat = new THREE.MeshPhongMaterial({
+    color: 0xd8e2dc,
+    specular: 0xffffff,
+    shininess: 100,
+  });
   const headlightMat = new THREE.MeshBasicMaterial({ color: 0xfff3b0 });
   const taillightMat = new THREE.MeshBasicMaterial({ color: 0xff2a55 });
 
+  // Мягкая тень под кузовом автомобиля
+  const shadowGeo = new THREE.PlaneGeometry(2.35, 4.75);
+  shadowGeo.rotateX(-Math.PI / 2);
+  const shadow = new THREE.Mesh(
+    shadowGeo,
+    new THREE.MeshBasicMaterial({
+      color: 0x05020a,
+      transparent: true,
+      opacity: 0.48,
+      depthWrite: false,
+    })
+  );
+  shadow.position.y = 0.03;
+  group.add(shadow);
+
   // Нижний клиновидный кузов в стиле 80-х
-  const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.68, 4.5), bodyMat);
+  const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.64, 4.5), bodyMat);
   chassis.position.y = 0.56;
   group.add(chassis);
+
+  // Передний скошенный капот и бамперы
+  const hoodSlope = new THREE.Mesh(new THREE.BoxGeometry(2.02, 0.16, 1.35), bodyMat);
+  hoodSlope.position.set(0, 0.88, 1.42);
+  hoodSlope.rotation.x = 0.08;
+  group.add(hoodSlope);
+
+  const frontBumper = new THREE.Mesh(new THREE.BoxGeometry(2.16, 0.22, 0.22), chromeMat);
+  frontBumper.position.set(0, 0.38, 2.28);
+  const rearBumper = new THREE.Mesh(new THREE.BoxGeometry(2.16, 0.22, 0.22), chromeMat);
+  rearBumper.position.set(0, 0.38, -2.28);
+  group.add(frontBumper, rearBumper);
+
+  // Боковые зеркала
+  const mirrorL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.14), bodyMat);
+  mirrorL.position.set(-1.12, 0.96, 0.62);
+  const mirrorR = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.14), bodyMat);
+  mirrorR.position.set(1.12, 0.96, 0.62);
+  group.add(mirrorL, mirrorR);
 
   // Неоновая боковая полоса
   const stripe = new THREE.Mesh(

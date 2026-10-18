@@ -15,19 +15,44 @@ export const CONFIG = {
   MAX_PIXEL_RATIO_HIGH: 2,
   MAX_PIXEL_RATIO_LOW: 1,
 
-  // Мир (600x600 м)
+  // Мир (остров 600x600 м, окружённый океаном со всех сторон)
   WORLD_SIZE: 600,
   HALF_WORLD: 300,
+  OCEAN_SIZE: 1500,
   SHORE_X: 150,
   WATER_START_X: 185,
   DEEP_WATER_X: 192,
   OCEAN_END_X: 300,
+  ISLAND: {
+    minX: -248,
+    maxX: 185,
+    minZ: -248,
+    maxZ: 248,
+    beachWidth: 28,
+  },
   PIER: {
     xMin: 146,
     xMax: 246,
     zCenter: -20,
     width: 14,
     deckY: 1.6,
+  },
+
+  // Режимы камеры (переключение клавишей V или кнопкой КАМЕРА)
+  CAMERA_MODES: [
+    { id: 'fp', label: 'ОТ 1-ГО ЛИЦА' },
+    { id: 'tp', label: 'ОТ 3-ГО ЛИЦА' },
+    { id: 'top', label: 'ВИД СВЕРХУ (GTA)' },
+  ],
+  CAMERA: {
+    tpFootDist: 4.8,
+    tpFootHeight: 2.15,
+    tpFootShoulder: 0.65,
+    tpCarDist: 7.8,
+    tpCarHeight: 3.1,
+    topFootHeight: 36.0,
+    topCarBaseHeight: 44.0,
+    topCarSpeedZoom: 0.55,
   },
 
   // Сетка улиц
@@ -112,22 +137,24 @@ export const CONFIG = {
   // Производительность и инстансинг
   QUALITY: {
     high: {
-      drawDistance: 280,
-      fogNear: 55,
-      fogFar: 265,
-      palmCount: 220,
-      lampCount: 140,
-      maxParticles: 140,
-      waveSegments: 48,
+      drawDistance: 360,
+      fogNear: 75,
+      fogFar: 330,
+      palmCount: 260,
+      treeCount: 160,
+      lampCount: 150,
+      maxParticles: 150,
+      waveSegments: 56,
     },
     low: {
-      drawDistance: 185,
-      fogNear: 35,
-      fogFar: 175,
-      palmCount: 140,
+      drawDistance: 220,
+      fogNear: 45,
+      fogFar: 205,
+      palmCount: 150,
+      treeCount: 80,
       lampCount: 90,
-      maxParticles: 70,
-      waveSegments: 24,
+      maxParticles: 75,
+      waveSegments: 28,
     },
   },
 

@@ -23,6 +23,7 @@ export class HUD {
           missionHint: document.getElementById('hud-mission-hint'),
           missionStatus: document.getElementById('hud-mission-status'),
           interactPrompt: document.getElementById('hud-interact'),
+          cameraLabel: document.getElementById('hud-camera-mode'),
           radioLabel: document.getElementById('hud-radio'),
           timeLabel: document.getElementById('hud-time-mode'),
           fpsLabel: document.getElementById('hud-fps'),
@@ -150,7 +151,10 @@ export class HUD {
       if (this.els.missionStatus) this.els.missionStatus.textContent = info.status || '';
     }
 
-    // 7. Радио, Закат/Ночь и FPS
+    // 7. Камера, Радио, Закат/Ночь и FPS
+    if (this.els.cameraLabel && player) {
+      this.els.cameraLabel.textContent = `🎥 ${player.getCameraModeLabel()} [V]`;
+    }
     if (this.els.radioLabel && audio) {
       this.els.radioLabel.textContent = `📻 ${audio.getCurrentStationName()} [Q]`;
     }
@@ -212,8 +216,8 @@ export class HUD {
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.clip();
 
-    // Фон радара
-    ctx.fillStyle = 'rgba(12, 6, 28, 0.88)';
+    // Фон радара — океан вокруг острова
+    ctx.fillStyle = 'rgba(3, 52, 92, 0.92)';
     ctx.fillRect(0, 0, w, h);
 
     // Вращение радара по направлению взгляда игрока (вверх = направление взгляда)
@@ -221,10 +225,23 @@ export class HUD {
     ctx.translate(cx, cy);
     ctx.rotate(viewYaw);
 
-    // Отрисовка береговой линии и моря
-    const seaX = (CONFIG.WATER_START_X - player.x) * scale;
-    ctx.fillStyle = 'rgba(0, 119, 182, 0.45)';
-    ctx.fillRect(seaX, -400, 300, 800);
+    // Отрисовка острова и его песчаного берега со всех 4 сторон
+    const isl = CONFIG.ISLAND;
+    const islX = (isl.minX - player.x) * scale;
+    const islZ = (isl.minZ - player.z) * scale;
+    const islW = (isl.maxX - isl.minX) * scale;
+    const islD = (isl.maxZ - isl.minZ) * scale;
+
+    ctx.fillStyle = 'rgba(238, 210, 148, 0.42)';
+    ctx.fillRect(islX, islZ, islW, islD);
+
+    ctx.fillStyle = 'rgba(18, 12, 38, 0.92)';
+    ctx.fillRect(
+      islX + 8,
+      islZ + 8,
+      Math.max(10, islW - 24),
+      Math.max(10, islD - 16)
+    );
 
     // Отрисовка сетки дорог
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';

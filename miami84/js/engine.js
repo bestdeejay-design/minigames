@@ -106,6 +106,8 @@ export class Engine {
           antialias: this.quality === 'high',
           powerPreference: 'high-performance',
         });
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.12;
       } catch (_err) {
         this.renderer = null;
       }

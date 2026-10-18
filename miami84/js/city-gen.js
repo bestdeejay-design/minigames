@@ -33,7 +33,9 @@ export function mergeBufferGeometries(geometries) {
 
     positions.set(pos.array, vOffset * 3);
     if (norm) normals.set(norm.array, vOffset * 3);
-    if (uv) uvs.set(uv.array, vOffset * 2);
+    if (uv && uv.array.length === count * 2) {
+      uvs.set(uv.array, vOffset * 2);
+    }
 
     if (indices && g.index) {
       const idx = g.index.array;
@@ -62,28 +64,35 @@ export class CityGenerator {
     this.glowTexCyan = createGlowTexture('#00f5d4');
     this.glowTexWarm = createGlowTexture('#ffbe0b');
     this.palmPositions = [];
+    this.treePositions = [];
     this.lampPositions = [];
-    this.coverPoints = []; // точки укрытий для ИИ врагов
+    this.coverPoints = [];
   }
 
   generate() {
     this._buildRoadsAndIntersections();
     this._buildPierAndBeachDecor();
+    this._buildIslandCoastlineTrees();
     this._buildDistricts();
     this._buildBillboards();
     this._buildInstancedPalms();
+    this._buildInstancedTrees();
     this._buildInstancedStreetLamps();
   }
 
   _buildRoadsAndIntersections() {
     const asphaltTex = createAsphaltTexture();
-    const roadMat = new THREE.MeshLambertMaterial({ map: asphaltTex });
+    const roadMat = new THREE.MeshPhongMaterial({
+      map: asphaltTex,
+      specular: 0x3b3e52,
+      shininess: 24,
+    });
     const sidewalkGeos = [];
     const crosswalkGeos = [];
 
     // Проспекты Север-Юг
     for (const ax of CONFIG.AVENUES_X) {
-      const geo = new THREE.PlaneGeometry(CONFIG.ROAD_WIDTH, 520);
+      const geo = new THREE.PlaneGeometry(CONFIG.ROAD_WIDTH, 476);
       geo.rotateX(-Math.PI / 2);
       const uv = geo.attributes.uv;
       for (let i = 0; i < uv.count; i++) {
@@ -95,24 +104,34 @@ export class CityGenerator {
 
       // Тротуары вдоль проспекта
       for (const side of [-1, 1]) {
-        const sw = new THREE.BoxGeometry(CONFIG.SIDEWALK_WIDTH, 0.16, 520);
-        sw.translate(ax + side * (CONFIG.ROAD_WIDTH * 0.5 + CONFIG.SIDEWALK_WIDTH * 0.5), 0.08, 0);
+        const sw = new THREE.BoxGeometry(CONFIG.SIDEWALK_WIDTH, 0.18, 476);
+        sw.translate(ax + side * (CONFIG.ROAD_WIDTH * 0.5 + CONFIG.SIDEWALK_WIDTH * 0.5), 0.09, 0);
         sidewalkGeos.push(sw);
       }
 
-      // Пальмы и фонари вдоль проспектов
-      for (let z = -240; z <= 240; z += 26) {
-        if (CONFIG.STREETS_Z.some((sz) => Math.abs(sz - z) < 16)) continue;
-        this.lampPositions.push({ x: ax - 9.5, z, rotY: 0 });
+      // Пальмы, тропические деревья и фонари вдоль проспектов
+      for (let z = -225; z <= 225; z += 24) {
+        if (CONFIG.STREETS_Z.some((sz) => Math.abs(sz - z) < 15)) continue;
+        this.lampPositions.push({ x: ax - 9.6, z, rotY: 0 });
         if (ax >= -40) {
-          this.palmPositions.push({ x: ax + 10.5, z: z + 6, scale: 0.9 + ((Math.abs(z) % 5) * 0.08) });
+          this.palmPositions.push({
+            x: ax + 10.6,
+            z: z + 5,
+            scale: 0.92 + ((Math.abs(z) % 5) * 0.07),
+          });
+        } else {
+          this.treePositions.push({
+            x: ax + 11.2,
+            z: z + 6,
+            scale: 0.85 + ((Math.abs(z) % 4) * 0.1),
+          });
         }
       }
     }
 
     // Улицы Запад-Восток
     for (const sz of CONFIG.STREETS_Z) {
-      const geo = new THREE.PlaneGeometry(410, CONFIG.ROAD_WIDTH);
+      const geo = new THREE.PlaneGeometry(390, CONFIG.ROAD_WIDTH);
       geo.rotateX(-Math.PI / 2);
       geo.rotateY(Math.PI / 2);
       const uv = geo.attributes.uv;
@@ -120,10 +139,9 @@ export class CityGenerator {
         uv.setY(i, uv.getY(i) * 22);
       }
       const mesh = new THREE.Mesh(geo, roadMat);
-      mesh.position.set(-45, 0.025, sz);
+      mesh.position.set(-40, 0.025, sz);
       this.scene.add(mesh);
 
-      // Зебры и светофоры на перекрёстках
       for (const ax of CONFIG.AVENUES_X) {
         for (let s = -5; s <= 5; s += 2.5) {
           const stripe = new THREE.PlaneGeometry(1.1, 3.2);
@@ -134,7 +152,6 @@ export class CityGenerator {
       }
     }
 
-    // Объединённый меш тротуаров и зебр
     if (sidewalkGeos.length) {
       const mergedSw = mergeBufferGeometries(sidewalkGeos);
       const swMesh = new THREE.Mesh(
@@ -152,7 +169,7 @@ export class CityGenerator {
       this.scene.add(cwMesh);
     }
 
-    // Светофоры на ключевых перекрёстках
+    // Светофоры
     const poleMat = new THREE.MeshLambertMaterial({ color: 0x222634 });
     const redMat = new THREE.MeshBasicMaterial({ color: 0xff2a55 });
     const greenMat = new THREE.MeshBasicMaterial({ color: 0x00f5d4 });
@@ -213,7 +230,6 @@ export class CityGenerator {
       }
     }
 
-    // Перила и неоновая арка «SUNSET PIER '84»
     for (const side of [-1, 1]) {
       const rail = new THREE.Mesh(new THREE.BoxGeometry(len - 8, 0.9, 0.25), railMat);
       rail.position.set(p.xMin + len * 0.5 + 2, p.deckY + 0.45, p.zCenter + side * (p.width * 0.48));
@@ -236,41 +252,87 @@ export class CityGenerator {
     archGroup.add(signBoard);
     this.scene.add(archGroup);
 
-    // Пальмы вдоль набережной и пляжа
-    for (let z = -250; z <= 250; z += 18) {
+    // Густая пальмовая аллея вдоль восточного пляжа
+    for (let z = -236; z <= 236; z += 15) {
       if (Math.abs(z - p.zCenter) < 12) continue;
-      this.palmPositions.push({ x: 153 + ((Math.abs(z) % 3) * 1.5), z, scale: 1.05 });
-      if (Math.abs(z) % 36 === 0) {
-        this.palmPositions.push({ x: 166, z: z + 7, scale: 0.92 });
+      this.palmPositions.push({ x: 153 + ((Math.abs(z) % 3) * 1.5), z, scale: 1.08 });
+      if (Math.abs(z) % 30 === 0) {
+        this.palmPositions.push({ x: 168, z: z + 6, scale: 0.94 });
       }
     }
 
-    // Пляжные зонтики и вышки спасателей
+    // Пляжные зонтики и шезлонги
     const umbrellaColors = [0xff2a85, 0x00f5d4, 0xffbe0b, 0xff7b00];
-    for (let z = -190; z <= 190; z += 32) {
+    for (let z = -200; z <= 200; z += 28) {
       if (Math.abs(z - p.zCenter) < 18) continue;
       const ux = 169 + ((z * 7) % 5);
       const uGroup = new THREE.Group();
       uGroup.position.set(ux, 0, z);
       const stick = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.08, 0.08, 2.4, 6),
+        new THREE.CylinderGeometry(0.08, 0.08, 2.5, 6),
         new THREE.MeshLambertMaterial({ color: 0xffffff })
       );
-      stick.position.y = 1.2;
+      stick.position.y = 1.25;
       const top = new THREE.Mesh(
-        new THREE.ConeGeometry(1.9, 0.85, 8),
+        new THREE.ConeGeometry(2.05, 0.9, 8),
         new THREE.MeshLambertMaterial({
           color: umbrellaColors[Math.abs(z) % umbrellaColors.length],
         })
       );
-      top.position.y = 2.45;
-      uGroup.add(stick, top);
+      top.position.y = 2.5;
+      const lounger = new THREE.Mesh(
+        new THREE.BoxGeometry(1.7, 0.22, 0.8),
+        new THREE.MeshLambertMaterial({ color: 0xf8f9fa })
+      );
+      lounger.position.set(0.6, 0.12, 1.1);
+      uGroup.add(stick, top, lounger);
       this.scene.add(uGroup);
     }
   }
 
+  // Пальмы, тропические деревья и береговые валуны вдоль северного, южного и западного берегов острова
+  _buildIslandCoastlineTrees() {
+    const isl = CONFIG.ISLAND;
+
+    // Северный и южный песчаные берега острова
+    for (let x = isl.minX + 16; x <= isl.maxX - 18; x += 22) {
+      this.palmPositions.push({ x, z: isl.minZ + 8, scale: 0.95 + ((Math.abs(x) % 4) * 0.08) });
+      this.palmPositions.push({ x: x + 6, z: isl.maxZ - 8, scale: 1.0 + ((Math.abs(x) % 3) * 0.08) });
+      if (Math.abs(x) % 44 === 0) {
+        this.treePositions.push({ x: x - 4, z: isl.minZ + 14, scale: 1.05 });
+        this.treePositions.push({ x: x + 4, z: isl.maxZ - 14, scale: 1.0 });
+      }
+    }
+
+    // Западный берег острова
+    for (let z = isl.minZ + 22; z <= isl.maxZ - 22; z += 24) {
+      this.palmPositions.push({ x: isl.minX + 8, z, scale: 0.92 + ((Math.abs(z) % 4) * 0.07) });
+      if (Math.abs(z) % 48 === 0) {
+        this.treePositions.push({ x: isl.minX + 15, z: z + 7, scale: 0.95 });
+      }
+    }
+
+    // Зелёные скверы и деревья внутри кварталов города
+    const parkSpots = [
+      { x: 96, z: -50, scale: 1.1 },
+      { x: 96, z: 50, scale: 1.15 },
+      { x: 96, z: 145, scale: 1.05 },
+      { x: 25, z: -40, scale: 1.1 },
+      { x: 25, z: 50, scale: 1.0 },
+      { x: -60, z: -40, scale: 1.15 },
+      { x: -60, z: 50, scale: 1.05 },
+      { x: -60, z: 140, scale: 1.1 },
+      { x: 148, z: -60, scale: 1.0 },
+      { x: 148, z: 60, scale: 1.08 },
+      { x: 148, z: 120, scale: 1.12 },
+    ];
+    for (const sp of parkSpots) {
+      this.treePositions.push(sp);
+    }
+  }
+
   _buildDistricts() {
-    // 1. НАБЕРЕЖНАЯ-БУЛЬВАР: Пастельные арт-деко отели и клубы (X от 64 до 126)
+    // 1. НАБЕРЕЖНАЯ-БУЛЬВАР: Пастельные арт-деко отели и клубы
     const boulevardBlocksZ = [-185, -155, -25, 10, 85, 115, 175, 205];
     const pastelHexes = ['#ffafcc', '#98f5e1', '#fde49e', '#cdb4db', '#a2d2ff', '#ffcfd2'];
     const trimHexes = ['#ff2a85', '#00f5d4', '#ff7b00', '#8338ec'];
@@ -296,7 +358,7 @@ export class CityGenerator {
       this._createArtDecoBuilding(76, bz, 22, 18 + (idx % 2) * 6, 22, baseHex, trimHex, CONFIG.NEON_SIGNS[(idx + 4) % CONFIG.NEON_SIGNS.length]);
     });
 
-    // 2. ДЕЛОВЫЕ ВЫСОТКИ (Downtown, X от -115 до +30, Z от -200 до +120)
+    // 2. ДЕЛОВЫЕ ВЫСОТКИ (Downtown)
     const towers = [
       { x: 5, z: -175, w: 28, d: 28, h: 48, base: '#2b3a67', trim: '#00f5d4' },
       { x: 5, z: -85, w: 26, d: 26, h: 56, base: '#3c2a6e', trim: '#ff2a85' },
@@ -311,7 +373,7 @@ export class CityGenerator {
       this._createSkyscraper(t.x, t.z, t.w, t.h, t.d, t.base, t.trim, CONFIG.NEON_SIGNS[(idx + 6) % CONFIG.NEON_SIGNS.length]);
     });
 
-    // 3. ПОРТОВАЯ ЗОНА С КОНТЕЙНЕРАМИ, СКЛАДАМИ, ГАРАЖОМ И АРЕНОЙ БОССА (X от -250 до -145, Z от -210 до +220)
+    // 3. ПОРТОВАЯ ЗОНА
     this._buildPortZone();
   }
 
@@ -323,18 +385,19 @@ export class CityGenerator {
     this.scene.add(body);
     this.world.addCollider(x - w * 0.5, x + w * 0.5, z - d * 0.5, z + d * 0.5, h, 'building', body);
 
-    // Ступенчатая корона арт-деко на крыше
     const crownColor = new THREE.Color(trimHex);
     const crownMat = new THREE.MeshBasicMaterial({ color: crownColor });
     this.world.neonMaterials.push(crownMat);
 
-    const step1 = new THREE.Mesh(new THREE.BoxGeometry(w * 0.72, 2.2, d * 0.72), mat);
+    // Козырёк над входом и ступенчатая корона арт-деко
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(w + 1.4, 0.35, d + 1.4), crownMat);
+    canopy.position.set(x, 3.6, z);
+    const step1 = new THREE.Mesh(new THREE.BoxGeometry(w * 0.74, 2.2, d * 0.74), mat);
     step1.position.set(x, h + 1.1, z);
-    const step2 = new THREE.Mesh(new THREE.BoxGeometry(w * 0.42, 2.0, d * 0.42), crownMat);
+    const step2 = new THREE.Mesh(new THREE.BoxGeometry(w * 0.44, 2.0, d * 0.44), crownMat);
     step2.position.set(x, h + 3.1, z);
-    this.scene.add(step1, step2);
+    this.scene.add(canopy, step1, step2);
 
-    // Неоновая вывеска на фасаде
     if (signInfo) {
       const signTex = createNeonSignTexture(signInfo.text, signInfo.sub, signInfo.color);
       const signMat = new THREE.MeshBasicMaterial({ map: signTex });
@@ -343,7 +406,6 @@ export class CityGenerator {
       signMesh.position.set(signX, Math.min(h - 2.5, 7.2), z);
       this.scene.add(signMesh);
 
-      // Спрайт-ореол неона
       const haloMat = new THREE.SpriteMaterial({
         map: signInfo.color === '#00f5d4' ? this.glowTexCyan : this.glowTexPink,
         transparent: true,
@@ -358,7 +420,6 @@ export class CityGenerator {
       this.world.neonSprites.push(halo);
     }
 
-    // Точки укрытий по углам здания
     this.coverPoints.push(
       { x: x + w * 0.5 + 2.2, z: z - d * 0.5 - 1.5 },
       { x: x + w * 0.5 + 2.2, z: z + d * 0.5 + 1.5 },
@@ -368,7 +429,6 @@ export class CityGenerator {
   }
 
   _buildCoralClubPlaza(cx, cz) {
-    // Неоновый павильон и низкие укрытия для перестрелки Миссии 2
     const floor = new THREE.Mesh(
       new THREE.BoxGeometry(36, 0.2, 36),
       new THREE.MeshLambertMaterial({ color: 0x3b2d54 })
@@ -392,7 +452,6 @@ export class CityGenerator {
     sign.position.set(cx - 12.5, 4.2, cz);
     this.scene.add(sign);
 
-    // Декоративные неоновые тумбы-укрытия на площадке
     const crateOffsets = [
       { dx: 6, dz: -8 },
       { dx: 6, dz: 8 },
@@ -415,13 +474,16 @@ export class CityGenerator {
 
   _createSkyscraper(x, z, w, h, d, baseHex, trimHex, signInfo) {
     const tex = createWindowTexture(baseHex, trimHex, true, 'tower');
-    const mat = new THREE.MeshLambertMaterial({ map: tex });
+    const mat = new THREE.MeshPhongMaterial({
+      map: tex,
+      specular: 0x48cae4,
+      shininess: 35,
+    });
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     mesh.position.set(x, h * 0.5, z);
     this.scene.add(mesh);
     this.world.addCollider(x - w * 0.5, x + w * 0.5, z - d * 0.5, z + d * 0.5, h, 'building', mesh);
 
-    // Светящийся неоновый контур крыши и шпиль
     const neonMat = new THREE.MeshBasicMaterial({ color: trimHex });
     this.world.neonMaterials.push(neonMat);
     const roofTrim = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 1.2, d + 0.6), neonMat);
@@ -446,7 +508,6 @@ export class CityGenerator {
   }
 
   _buildPortZone() {
-    // Крупные портовые склады
     const warehouses = [
       { x: -185, z: -85, w: 34, d: 22, h: 11, color: 0x4a5568 },
       { x: -185, z: 5, w: 34, d: 24, h: 12, color: 0x3b4252 },
@@ -471,7 +532,6 @@ export class CityGenerator {
       );
     }
 
-    // Морские контейнеры (разноцветные, в том числе на арене Босса X=-175, Z=-175)
     const containerStacks = [
       { x: -160, z: -162, rot: 0, floors: 2, colorIdx: 0 },
       { x: -190, z: -162, rot: 0, floors: 2, colorIdx: 1 },
@@ -510,7 +570,7 @@ export class CityGenerator {
       );
     }
 
-    // ГАРАЖ ПОРТА для Миссии 3 (X = -175, Z = 185) — открытый въезд со светящейся вывеской
+    // ГАРАЖ ПОРТА для Миссии 3
     const gx = CONFIG.MISSIONS[2].garageTarget.x;
     const gz = CONFIG.MISSIONS[2].garageTarget.z;
     const gMat = new THREE.MeshLambertMaterial({ color: 0x2b2d42 });
@@ -558,6 +618,7 @@ export class CityGenerator {
     });
   }
 
+  // Реалистичные изогнутые пальмы с сегментированным стволом, кокосами и раскидистой кроной из 9 дугообразных ветвей
   _buildInstancedPalms() {
     const maxPalms = Math.min(
       this.palmPositions.length,
@@ -565,22 +626,64 @@ export class CityGenerator {
     );
     if (maxPalms === 0) return;
 
-    const trunkGeo = new THREE.CylinderGeometry(0.22, 0.42, 7.6, 6);
-    trunkGeo.translate(0, 3.8, 0);
-    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6d4c3d });
+    // 1. Изогнутый 5-сегментный ствол с кокосами наверху
+    const trunkSegments = [];
+    const segHeights = [1.6, 1.6, 1.6, 1.5, 1.4];
+    let curY = 0;
+    let curX = 0;
+    for (let s = 0; s < segHeights.length; s++) {
+      const h = segHeights[s];
+      const rBottom = 0.44 - s * 0.048;
+      const rTop = 0.44 - (s + 1) * 0.048;
+      const seg = new THREE.CylinderGeometry(rTop, rBottom, h + 0.1, 7);
+      const bend = s * 0.045;
+      seg.rotateZ(-bend);
+      seg.translate(curX + Math.sin(bend) * h * 0.5, curY + h * 0.5, 0);
+      curX += Math.sin(bend) * h;
+      curY += h * 0.96;
+      trunkSegments.push(seg);
+    }
 
-    // Крона пальмы из нескольких раскидистых листьев, объединённых в один BufferGeometry
+    // Гроздь кокосов под кроной
+    for (let c = 0; c < 3; c++) {
+      const ang = (c / 3) * Math.PI * 2;
+      const nut = new THREE.DodecahedronGeometry(0.24, 0);
+      nut.translate(curX + Math.cos(ang) * 0.26, curY - 0.1, Math.sin(ang) * 0.26);
+      trunkSegments.push(nut);
+    }
+
+    const trunkGeo = mergeBufferGeometries(trunkSegments);
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x7a543e });
+
+    // 2. Пышная крона из 9 изогнутых дугой пальмовых ветвей
     const frondGeos = [];
-    for (let i = 0; i < 6; i++) {
-      const angle = (i / 6) * Math.PI * 2;
-      const leaf = new THREE.ConeGeometry(0.95, 3.8, 4);
-      leaf.rotateZ(Math.PI * 0.38);
-      leaf.rotateY(angle);
-      leaf.translate(Math.cos(angle) * 1.4, 7.5, Math.sin(angle) * 1.4);
-      frondGeos.push(leaf);
+    const frondCount = 9;
+    for (let i = 0; i < frondCount; i++) {
+      const angle = (i / frondCount) * Math.PI * 2 + (i % 2) * 0.12;
+      const tierLift = i % 2 === 0 ? 0.15 : -0.05;
+
+      // Каждая ветвь состоит из 3 наклонных сегментов (подъём у ствола -> дуга -> свисающий кончик)
+      const seg1 = new THREE.BoxGeometry(1.3, 0.09, 0.72);
+      seg1.rotateZ(-0.22 - tierLift);
+      seg1.translate(0.65, 0.18, 0);
+
+      const seg2 = new THREE.BoxGeometry(1.4, 0.08, 0.88);
+      seg2.rotateZ(0.18 - tierLift);
+      seg2.translate(1.85, 0.14, 0);
+
+      const seg3 = new THREE.ConeGeometry(0.46, 1.55, 4);
+      seg3.scale(1, 1, 0.24);
+      seg3.rotateZ(-Math.PI * 0.68);
+      seg3.translate(3.05, -0.36, 0);
+
+      for (const part of [seg1, seg2, seg3]) {
+        part.rotateY(angle);
+        part.translate(curX, curY + 0.05, 0);
+        frondGeos.push(part);
+      }
     }
     const crownGeo = mergeBufferGeometries(frondGeos);
-    const crownMat = new THREE.MeshLambertMaterial({ color: 0x2ec4b6 });
+    const crownMat = new THREE.MeshLambertMaterial({ color: 0x24b47e });
 
     const trunkInst = new THREE.InstancedMesh(trunkGeo, trunkMat, maxPalms);
     const crownInst = new THREE.InstancedMesh(crownGeo, crownMat, maxPalms);
@@ -589,7 +692,7 @@ export class CityGenerator {
     for (let i = 0; i < maxPalms; i++) {
       const p = this.palmPositions[i];
       dummy.position.set(p.x, 0, p.z);
-      dummy.rotation.set(0.05, (i * 1.7) % (Math.PI * 2), 0);
+      dummy.rotation.set(0, (i * 1.9) % (Math.PI * 2), 0);
       dummy.scale.setScalar(p.scale || 1);
       dummy.updateMatrix();
       trunkInst.setMatrixAt(i, dummy.matrix);
@@ -600,6 +703,51 @@ export class CityGenerator {
     crownInst.instanceMatrix.needsUpdate = true;
     this.scene.add(trunkInst, crownInst);
     this.palmInstanced = { trunkInst, crownInst, count: maxPalms };
+  }
+
+  // Пышные лиственные тропические деревья для парков, проспектов и берегов острова (InstancedMesh)
+  _buildInstancedTrees() {
+    const maxTrees = Math.min(
+      this.treePositions.length,
+      CONFIG.QUALITY[this.quality].treeCount || 120
+    );
+    if (maxTrees === 0) return;
+
+    const trunkGeo = new THREE.CylinderGeometry(0.24, 0.42, 3.6, 6);
+    trunkGeo.translate(0, 1.8, 0);
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x624230 });
+
+    const c1 = new THREE.DodecahedronGeometry(2.1, 1);
+    c1.scale(1.15, 0.82, 1.15);
+    c1.translate(0, 4.4, 0);
+    const c2 = new THREE.DodecahedronGeometry(1.55, 1);
+    c2.translate(1.05, 3.9, 0.65);
+    const c3 = new THREE.DodecahedronGeometry(1.5, 1);
+    c3.translate(-0.95, 4.0, -0.6);
+    const c4 = new THREE.DodecahedronGeometry(1.4, 1);
+    c4.translate(0, 5.5, 0.15);
+
+    const canopyGeo = mergeBufferGeometries([c1, c2, c3, c4]);
+    const canopyMat = new THREE.MeshLambertMaterial({ color: 0x2d9c5a });
+
+    const trunkInst = new THREE.InstancedMesh(trunkGeo, trunkMat, maxTrees);
+    const canopyInst = new THREE.InstancedMesh(canopyGeo, canopyMat, maxTrees);
+
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < maxTrees; i++) {
+      const t = this.treePositions[i];
+      dummy.position.set(t.x, 0, t.z);
+      dummy.rotation.set(0, (i * 2.3) % (Math.PI * 2), 0);
+      dummy.scale.setScalar(t.scale || 1);
+      dummy.updateMatrix();
+      trunkInst.setMatrixAt(i, dummy.matrix);
+      canopyInst.setMatrixAt(i, dummy.matrix);
+      this.world.addCollider(t.x - 0.5, t.x + 0.5, t.z - 0.5, t.z + 0.5, 6.0, 'tree');
+    }
+    trunkInst.instanceMatrix.needsUpdate = true;
+    canopyInst.instanceMatrix.needsUpdate = true;
+    this.scene.add(trunkInst, canopyInst);
+    this.treeInstanced = { trunkInst, canopyInst, count: maxTrees };
   }
 
   _buildInstancedStreetLamps() {

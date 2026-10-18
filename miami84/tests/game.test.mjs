@@ -326,3 +326,82 @@ test('8. Синтвейв-радио (2 станции + ВЫКЛ), ИИ вра�
   const nextZ = 60 + steer.vz * 2.6;
   assert.equal(game.world.isWater(nextX, nextZ), false, 'ИИ врагов не должен шагать в море');
 });
+
+test('9. Вид от 1-го лица, от 3-го лица и вид сверху (GTA), остров в океане на 360°, вода и деревья', () => {
+  const game = new NeonMiamiGame();
+  game.startGame();
+
+  // 1. Проверка острова, окружённого водой со всех 4 сторон (Восток, Запад, Север, Юг)
+  assert.equal(game.world.isWater(CONFIG.ISLAND.maxX + 20, 60), true, 'Восток — океан');
+  assert.equal(game.world.isWater(CONFIG.ISLAND.minX - 20, 0), true, 'Запад — океан');
+  assert.equal(game.world.isWater(0, CONFIG.ISLAND.minZ - 20), true, 'Север — океан');
+  assert.equal(game.world.isWater(0, CONFIG.ISLAND.maxZ + 20), true, 'Юг — океан');
+  assert.equal(game.world.isWater(0, 0), false, 'Центр острова — суша');
+
+  // Коллизия берега со всех 4 сторон удерживает игрока на острове
+  assert.ok(game.world.resolveCircleCollision(CONFIG.ISLAND.minX - 30, 0, 0.55, 0).x >= CONFIG.ISLAND.minX);
+  assert.ok(game.world.resolveCircleCollision(0, CONFIG.ISLAND.minZ - 30, 0.55, 0).z >= CONFIG.ISLAND.minZ);
+  assert.ok(game.world.resolveCircleCollision(0, CONFIG.ISLAND.maxZ + 30, 0.55, 0).z <= CONFIG.ISLAND.maxZ);
+
+  // 2. Проверка улучшенной воды (MeshPhongMaterial + градиент глубины вершин + пена у берега) и деревьев
+  assert.ok(game.world.seaMat instanceof THREE.MeshPhongMaterial);
+  assert.ok(game.world.seaGeo.attributes.color, 'У воды должен быть вершинный градиент глубины (лагуна -> океан)');
+  assert.ok(game.world.foamRing instanceof THREE.Mesh);
+  assert.ok(game.cityGen.treeInstanced.trunkInst instanceof THREE.InstancedMesh);
+  assert.ok(game.cityGen.treeInstanced.count > 20);
+
+  // 3. Переключение камеры: От 1-го лица ('fp') -> От 3-го лица ('tp') -> Вид сверху GTA ('top')
+  assert.equal(game.player.cameraMode, 'fp');
+  assert.equal(game.player.mesh.visible, false);
+  assert.equal(game.weapons.holder.visible, true);
+
+  // Переход на вид от 3-го лица
+  const labelTp = game.player.cycleCameraMode();
+  assert.equal(game.player.cameraMode, 'tp');
+  assert.match(labelTp, /3-ГО ЛИЦА/);
+  game.stepPhysics(CONFIG.FIXED_TIMESTEP);
+  assert.equal(game.player.mesh.visible, true, 'В режиме от 3-го лица видна 3D-модель игрока');
+  assert.equal(game.weapons.holder.visible, false, 'В режиме от 3-го лица скрыты руки от 1-го лица');
+
+  // Переход на вид сверху (GTA)
+  const labelTop = game.player.cycleCameraMode();
+  assert.equal(game.player.cameraMode, 'top');
+  assert.match(labelTop, /СВЕРХУ/);
+  game.stepPhysics(CONFIG.FIXED_TIMESTEP);
+  assert.equal(game.player.mesh.visible, true);
+  assert.ok(
+    game.engine.camera.position.y >= CONFIG.CAMERA.topFootHeight - 0.5,
+    'Камера в режиме сверху находится высоко над улицей'
+  );
+
+  // Стрельба в режиме сверху попадает по врагу на улице
+  const enemy = game.enemies.spawnEnemy('pistol', game.player.x, game.player.z - 10, 'top_test', false);
+  game.player.yaw = 0;
+  const hpBefore = enemy.hp;
+  const hits = game.weapons.fireShot(
+    game.player,
+    game.enemies,
+    game.civilians,
+    game.vehicles,
+    game.wanted,
+    game.audio
+  );
+  assert.ok(hits >= 1, 'Стрельба при виде сверху должна попадать по врагу вдоль луча прицела');
+  assert.ok(enemy.hp < hpBefore);
+
+  // Вид сверху в машине отдаляется при наборе скорости
+  const car = game.vehicles.vehicles[0];
+  game.player.x = car.x + 1;
+  game.player.z = car.z;
+  game.vehicles.tryToggleVehicle(game.player, game.wanted, game.audio);
+  car.speed = 22;
+  game.player._syncCameraInCar(car);
+  assert.ok(
+    game.engine.camera.position.y > CONFIG.CAMERA.topCarBaseHeight + 5,
+    'Камера сверху в машине динамически поднимается выше на скорости'
+  );
+
+  // Возврат на вид от 1-го лица
+  game.player.cycleCameraMode();
+  assert.equal(game.player.cameraMode, 'fp');
+});

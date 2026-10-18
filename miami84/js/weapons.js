@@ -183,8 +183,16 @@ export class WeaponSystem {
   update(dt, input, player, enemyManager, civilianManager, vehicleManager, wantedSystem, audio) {
     if (!player || player.dead) return;
 
-    // Скрываем оружие в руках, когда игрок сидит в машине
-    this.holder.visible = !player.inVehicle;
+    // Показываем оружие в руках от 1-го лица только в режиме 'fp' и вне машины
+    this.holder.visible = !player.inVehicle && player.cameraMode === 'fp';
+    if (player.aimLineMesh) {
+      player.aimLineMesh.material.color.setHex(this.current.color);
+    }
+    const avatarGun = player.mesh?.userData?.limbs?.weaponAttachment;
+    if (avatarGun) {
+      avatarGun.material.color.setHex(this.current.color);
+      avatarGun.scale.z = this.current.id === 'shotgun' ? 1.45 : this.current.id === 'smg' ? 1.15 : 0.85;
+    }
     if (player.inVehicle) return;
 
     // Переключение оружия клавишами 1-3 и колёсиком
@@ -264,10 +272,11 @@ export class WeaponSystem {
     civilianManager?.notifyGunshot(player.x, player.z);
 
     // Выброс гильзы и дыма
-    const eyeY = player.y + CONFIG.PLAYER.eyeHeight;
-    const forwardX = -Math.sin(player.yaw) * Math.cos(player.pitch);
-    const forwardY = Math.sin(player.pitch);
-    const forwardZ = -Math.cos(player.yaw) * Math.cos(player.pitch);
+    const eyeY = player.y + (player.cameraMode === 'top' ? 1.25 : CONFIG.PLAYER.eyeHeight);
+    const basePitch = player.cameraMode === 'top' ? 0 : player.pitch;
+    const forwardX = -Math.sin(player.yaw) * Math.cos(basePitch);
+    const forwardY = Math.sin(basePitch);
+    const forwardZ = -Math.cos(player.yaw) * Math.cos(basePitch);
     const rightX = Math.cos(player.yaw);
     const rightZ = -Math.sin(player.yaw);
 
@@ -290,7 +299,7 @@ export class WeaponSystem {
 
     for (let p = 0; p < w.pellets; p++) {
       const spreadYaw = player.yaw + (Math.random() - 0.5) * w.spread * 2;
-      const spreadPitch = player.pitch + (Math.random() - 0.5) * w.spread * 2;
+      const spreadPitch = basePitch + (Math.random() - 0.5) * w.spread * 2;
 
       const dir = new THREE.Vector3(
         -Math.sin(spreadYaw) * Math.cos(spreadPitch),
@@ -356,6 +365,20 @@ export class WeaponSystem {
       const hitX = origin.x + dir.x * bestDist;
       const hitY = origin.y + dir.y * bestDist;
       const hitZ = origin.z + dir.z * bestDist;
+
+      // Трассер выстрела (особенно нагляден при виде от 3-го лица и сверху)
+      if (p === 0 || p % 2 === 0) {
+        const traceDist = Math.min(bestDist, 24);
+        this.particles?.spawnTracer(
+          origin.x + dir.x * 0.8,
+          origin.y - 0.12,
+          origin.z + dir.z * 0.8,
+          origin.x + dir.x * traceDist,
+          origin.y + dir.y * traceDist,
+          origin.z + dir.z * traceDist,
+          w.color
+        );
+      }
 
       if (bestTarget) {
         hitsCount++;

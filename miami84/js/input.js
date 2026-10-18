@@ -58,6 +58,7 @@ export class InputController {
       if (e.code === 'Digit2') this.weaponSlotRequested = 2;
       if (e.code === 'Digit3') this.weaponSlotRequested = 3;
       if (e.code === 'KeyE') this.callbacks.onInteract?.();
+      if (e.code === 'KeyV' || e.code === 'KeyC') this.callbacks.onCameraCycle?.();
       if (e.code === 'KeyQ') this.callbacks.onRadioNext?.();
       if (e.code === 'KeyN') this.callbacks.onToggleNight?.();
       if (e.code === 'Escape' || e.code === 'KeyP') this.callbacks.onPauseToggle?.();
@@ -255,6 +256,9 @@ export class InputController {
     });
     bindBtn('btn-mobile-car', () => {
       this.callbacks.onInteract?.();
+    });
+    bindBtn('btn-mobile-camera', () => {
+      this.callbacks.onCameraCycle?.();
     });
   }
 }

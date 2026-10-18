@@ -83,6 +83,10 @@ export class NeonMiamiGame {
           this.vehicles.tryToggleVehicle(this.player, this.wanted, this.audio);
         }
       },
+      onCameraCycle: () => {
+        const modeLabel = this.player.cycleCameraMode();
+        this.hud.addPopup(`КАМЕРА: ${modeLabel}`, '#00f5d4');
+      },
       onRadioNext: () => {
         this.audio.unlock();
         const stName = this.audio.nextStation();
@@ -136,6 +140,7 @@ export class NeonMiamiGame {
     const btnTopPause = document.getElementById('btn-top-pause');
     const btnTopNight = document.getElementById('btn-top-night');
     const btnTopRadio = document.getElementById('btn-top-radio');
+    const btnTopCamera = document.getElementById('btn-top-camera');
 
     btnStart?.addEventListener('click', () => {
       this.audio.unlock();
@@ -178,6 +183,11 @@ export class NeonMiamiGame {
         this.cityGen.palmInstanced.trunkInst.count = pCount;
         this.cityGen.palmInstanced.crownInst.count = pCount;
       }
+      if (this.cityGen.treeInstanced) {
+        const tCount = Math.min(this.cityGen.treePositions.length, q.treeCount || 80);
+        this.cityGen.treeInstanced.trunkInst.count = tCount;
+        this.cityGen.treeInstanced.canopyInst.count = tCount;
+      }
       if (this.cityGen.lampInstanced) {
         const lCount = Math.min(this.cityGen.lampPositions.length, q.lampCount);
         this.cityGen.lampInstanced.poleInst.count = lCount;
@@ -213,6 +223,10 @@ export class NeonMiamiGame {
       this.audio.unlock();
       const stName = this.audio.nextStation();
       this.hud.addPopup(`РАДИО: ${stName}`, '#ff2a85');
+    });
+    btnTopCamera?.addEventListener('click', () => {
+      const modeLabel = this.player.cycleCameraMode();
+      this.hud.addPopup(`КАМЕРА: ${modeLabel}`, '#00f5d4');
     });
 
     // Автоматическая пауза при потере фокуса вкладки

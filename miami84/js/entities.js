@@ -2,11 +2,13 @@ import * as THREE from '../libs/three.module.min.js';
 import { CONFIG } from './config.js';
 import { createGlowTexture } from './world.js';
 
-// Фабрика низкополигонального человечка (для NPC, бандитов, полиции и босса)
+// Фабрика проработанного персонажа (для игрока в виде от 3-го лица / сверху, NPC, бандитов, полиции и босса)
 export function createHumanoidMesh({
   shirtColor = 0xff2a85,
+  innerShirtColor = 0x00f5d4,
   pantsColor = 0xf8f9fa,
   skinColor = 0xe0ac69,
+  hairColor = 0x22181c,
   scale = 1.0,
   hasHat = false,
   hatColor = 0x0d1b2a,
@@ -19,49 +21,104 @@ export function createHumanoidMesh({
 
   const skinMat = new THREE.MeshLambertMaterial({ color: skinColor });
   const shirtMat = new THREE.MeshLambertMaterial({ color: shirtColor });
+  const innerMat = new THREE.MeshLambertMaterial({ color: innerShirtColor });
   const pantsMat = new THREE.MeshLambertMaterial({ color: pantsColor });
   const darkMat = new THREE.MeshBasicMaterial({ color: 0x111118 });
+  const shoeMat = new THREE.MeshLambertMaterial({ color: 0xf8f9fa });
+  const hairMat = new THREE.MeshLambertMaterial({ color: hairColor });
 
-  // Торс
+  // Тень под ногами для реалистичной привязки к земле (особенно в виде от 3-го лица и сверху)
+  const shadowGeo = new THREE.CircleGeometry(0.46, 12);
+  shadowGeo.rotateX(-Math.PI / 2);
+  const shadow = new THREE.Mesh(
+    shadowGeo,
+    new THREE.MeshBasicMaterial({
+      color: 0x06030d,
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+    })
+  );
+  shadow.position.y = 0.02;
+  group.add(shadow);
+
+  // Торс (пиджак 80-х + яркая футболка под ним + ремень)
   const torso = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.68, 0.32), shirtMat);
   torso.position.y = 1.06;
   group.add(torso);
 
-  // Голова + солнечные очки 80-х
+  const innerTee = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.56, 0.34), innerMat);
+  innerTee.position.set(0, 1.08, 0);
+  group.add(innerTee);
+
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(0.57, 0.08, 0.33), darkMat);
+  belt.position.y = 0.74;
+  group.add(belt);
+
+  // Шея и голова + причёска + солнечные очки 80-х
+  const neck = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.18), skinMat);
+  neck.position.y = 1.43;
+  group.add(neck);
+
   const head = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.38, 0.38), skinMat);
-  head.position.y = 1.62;
+  head.position.y = 1.64;
   group.add(head);
 
+  const hair = new THREE.Mesh(new THREE.BoxGeometry(0.41, 0.15, 0.41), hairMat);
+  hair.position.set(0, 1.8, -0.01);
+  group.add(hair);
+
   const glasses = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.08), darkMat);
-  glasses.position.set(0, 1.64, 0.18);
+  glasses.position.set(0, 1.66, 0.19);
   group.add(glasses);
 
   if (hasHat || isBoss) {
     const hat = new THREE.Mesh(
-      new THREE.BoxGeometry(0.46, 0.14, 0.48),
+      new THREE.BoxGeometry(0.48, 0.14, 0.5),
       new THREE.MeshLambertMaterial({ color: isBoss ? 0xf72585 : hatColor })
     );
-    hat.position.set(0, 1.85, 0.02);
+    hat.position.set(0, 1.87, 0.02);
     group.add(hat);
   }
 
-  // Ноги и руки для анимации ходьбы
-  const legGeo = new THREE.BoxGeometry(0.22, 0.72, 0.24);
-  legGeo.translate(0, -0.36, 0);
+  // Ноги с кроссовками
+  const legGeo = new THREE.BoxGeometry(0.22, 0.64, 0.24);
+  legGeo.translate(0, -0.32, 0);
+  const shoeGeo = new THREE.BoxGeometry(0.23, 0.12, 0.32);
+
   const leftLeg = new THREE.Mesh(legGeo, pantsMat);
   leftLeg.position.set(-0.15, 0.72, 0);
+  const leftShoe = new THREE.Mesh(shoeGeo, shoeMat);
+  leftShoe.position.set(0, -0.66, 0.04);
+  leftLeg.add(leftShoe);
+
   const rightLeg = new THREE.Mesh(legGeo, pantsMat);
   rightLeg.position.set(0.15, 0.72, 0);
+  const rightShoe = new THREE.Mesh(shoeGeo, shoeMat);
+  rightShoe.position.set(0, -0.66, 0.04);
+  rightLeg.add(rightShoe);
   group.add(leftLeg, rightLeg);
 
-  const armGeo = new THREE.BoxGeometry(0.18, 0.62, 0.2);
-  armGeo.translate(0, -0.28, 0);
+  // Руки с кистями
+  const armGeo = new THREE.BoxGeometry(0.18, 0.54, 0.2);
+  armGeo.translate(0, -0.25, 0);
+  const handGeo = new THREE.BoxGeometry(0.15, 0.14, 0.16);
+
   const leftArm = new THREE.Mesh(armGeo, shirtMat);
   leftArm.position.set(-0.38, 1.34, 0);
+  const leftHand = new THREE.Mesh(handGeo, skinMat);
+  leftHand.position.set(0, -0.54, 0);
+  leftArm.add(leftHand);
+
   const rightArm = new THREE.Mesh(armGeo, shirtMat);
   rightArm.position.set(0.38, 1.34, 0);
+  const rightHand = new THREE.Mesh(handGeo, skinMat);
+  rightHand.position.set(0, -0.54, 0);
+  rightArm.add(rightHand);
+
   group.add(leftArm, rightArm);
 
+  let weaponAttachment = null;
   if (hasBat) {
     const bat = new THREE.Mesh(
       new THREE.CylinderGeometry(0.05, 0.03, 0.85, 6),
@@ -70,16 +127,18 @@ export function createHumanoidMesh({
     bat.rotation.x = Math.PI * 0.4;
     bat.position.set(0, -0.55, 0.28);
     rightArm.add(bat);
+    weaponAttachment = bat;
   } else if (hasGun) {
     const gun = new THREE.Mesh(
-      new THREE.BoxGeometry(0.1, 0.14, 0.42),
+      new THREE.BoxGeometry(0.1, 0.14, 0.45),
       new THREE.MeshLambertMaterial({ color: 0x222634 })
     );
-    gun.position.set(0, -0.5, 0.22);
+    gun.position.set(0, -0.52, 0.24);
     rightArm.add(gun);
+    weaponAttachment = gun;
   }
 
-  group.userData.limbs = { leftLeg, rightLeg, leftArm, rightArm, torso, head };
+  group.userData.limbs = { leftLeg, rightLeg, leftArm, rightArm, torso, head, weaponAttachment };
   return group;
 }
 
@@ -185,6 +244,32 @@ export class ParticlePool {
     this.spawnSparks(x, y + 0.8, z, 0xff2a85, 16);
     this.spawnSparks(x, y + 0.5, z, 0xffbe0b, 16);
     this.spawnSmoke(x, y + 1.0, z, 10);
+  }
+
+  // Светящиеся трассеры выстрелов (отлично видны и от 1-го, и от 3-го лица, и сверху)
+  spawnTracer(x1, y1, z1, x2, y2, z2, color = 0x00f5d4) {
+    const steps = 3;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / (steps + 1);
+      const p = this._acquire();
+      p.active = true;
+      p.isShell = false;
+      p.life = 0;
+      p.maxLife = 0.09 + i * 0.02;
+      p.gravity = 0;
+      p.mesh.material.color.setHex(color);
+      p.mesh.material.opacity = 0.9;
+      p.mesh.position.set(
+        x1 + (x2 - x1) * t,
+        y1 + (y2 - y1) * t,
+        z1 + (z2 - z1) * t
+      );
+      p.mesh.scale.setScalar(0.65);
+      p.mesh.visible = true;
+      p.vx = (x2 - x1) * 2.5;
+      p.vy = (y2 - y1) * 2.5;
+      p.vz = (z2 - z1) * 2.5;
+    }
   }
 
   update(dt) {
