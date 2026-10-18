@@ -131,7 +131,33 @@ html, body {
   grid-auto-rows: 82px;
   gap: 6px;
   align-content: start;
+  overflow-y: auto; /* страховка: ничего не пропадает за краем панели */
 }
+/* Меню стройки (8 кнопок): 2 колонки × 4 ряда горизонтальных кнопок —
+   ровно вписывается в 174px панели, имена зданий читаются целиком. */
+#cmd-grid.compact {
+  flex: 0 0 320px;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: 40px;
+  gap: 4px;
+}
+#cmd-grid.compact .cmd {
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 8px;
+}
+#cmd-grid.compact .cmd canvas { width: 20px; height: 20px; flex: 0 0 20px; }
+#cmd-grid.compact .cmd-label {
+  flex: 1;
+  font-size: 11px;
+  line-height: 1.12;
+  text-align: left;
+}
+#cmd-grid.compact .cmd-cost { font-size: 10px; margin-left: auto; }
+/* В компактных кнопках хоткей — обычный элемент в строке, иначе он
+   абсолютом налезает на цену. */
+#cmd-grid.compact .cmd kbd { position: static; transform: none; margin-left: 6px; }
 .cmd {
   position: relative;
   background: linear-gradient(#333d49, #222932);

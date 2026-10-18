@@ -1,26 +1,22 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0A0A0F">
   <title>Рулетка — мини-игра | AXIIOM</title>
-  <meta name="description" content="Рулетка без риска: делайте ставки фишками, крутите колесо и изучайте шансы. Демо-мини-игра от AXIIOM.">
+  <meta name="description" content="Европейская рулетка: 37 секторов, честные выплаты, фишки от 5 до 100. Банк сохраняется между сессиями, стрик и ежедневные миссии. Мини-игра AXIIOM.">
   <link rel="canonical" href="https://bestdeejay-design.github.io/minigames/roulette/">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bestdeejay-design.github.io/minigames/roulette/">
   <meta property="og:title" content="Рулетка — мини-игра | AXIIOM">
-  <meta property="og:description" content="Рулетка без риска: делайте ставки фишками, крутите колесо и изучайте шансы. Демо-мини-игра от AXIIOM.">
-  <meta property="og:image" content="https://axiiom.ru/og-image.png">
+  <meta property="og:description" content="Европейская рулетка с фишками и честными выплатами. Банк сохраняется, стрик и миссии.">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Рулетка — мини-игра | AXIIOM">
-  <meta name="twitter:description" content="Рулетка без риска: делайте ставки фишками, крутите колесо и изучайте шансы. Демо-мини-игра от AXIIOM.">
+  <meta name="twitter:description" content="Европейская рулетка. Держи стрик.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🎰</text></svg>">
-  <meta name="theme-color" content="#0A0A0F">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="grid-overlay"></div>
@@ -30,41 +26,86 @@
     <a class="back" href="../">← Каталог</a>
     <span class="brand">AXIIOM</span>
   </header>
-  <div id="hud">
-    <span>💰 <span id="balance">1000</span></span>
-    <span>🎲 <span id="bet-total">0</span></span>
-    <button id="btn-mute" aria-label="Звук">🔊</button>
-    <span id="result-label"></span>
-  </div>
-  <canvas id="gameCanvas"></canvas>
-  <div id="betting">
-    <div id="num-grid"></div>
-    <div id="outside-bets">
-      <button data-bet="1-18">1-18</button>
-      <button data-bet="19-36">19-36</button>
-      <button data-bet="red" class="b-red">Красное</button>
-      <button data-bet="black" class="b-black">Чёрное</button>
-      <button data-bet="odd">Нечёт</button>
-      <button data-bet="even">Чёт</button>
+  <div id="welcome">
+    <span class="w-badge">AXIIOM · Мини-игры</span>
+    <h1>Рулетка</h1>
+    <div class="deco-row" id="deco-row" aria-hidden="true"></div>
+    <p>Европейское колесо на <b>37 секторов</b>. Ставь на число (×35) или на шансы (×2). Играй на фишки — <b>банк сохраняется</b> между сессиями, никаких реальных денег.</p>
+    <div class="w-records">
+      <span class="w-rec"><span>Банк</span><b id="w-money">0</b></span>
+      <span class="w-rec"><span>Рекорд</span><b id="w-best">0</b></span>
+      <span class="w-rec"><span>Стрик</span><b id="w-streak">🔥 0</b></span>
     </div>
-    <div id="chip-row">
-      <span>Ставка:</span>
-      <button class="chip-btn active" data-val="10">10</button>
-      <button class="chip-btn" data-val="25">25</button>
-      <button class="chip-btn" data-val="100">100</button>
-      <button id="btn-clear">✕</button>
-      <button id="btn-spin">КРУТИТЬ!</button>
+    <button id="btn-play">За стол</button>
+    <button id="btn-reset-bank" class="w-ghost">Сбросить банк до 1000</button>
+    <span class="w-hint">только фишки · без реальных ставок · всё хранится у вас</span>
+  </div>
+  <div id="game" class="hidden">
+    <section id="stats">
+      <div class="stat"><span class="stat-label">Банк</span><span class="stat-value gold" id="money-val">0</span></div>
+      <div class="stat"><span class="stat-label">Ставка</span><span class="stat-value" id="bet-val">0</span></div>
+      <div class="stat"><span class="stat-label">Рекорд</span><span class="stat-value" id="best-val">0</span></div>
+      <div class="stat"><span class="stat-label">Выпало</span><span class="stat-value" id="result-val">—</span></div>
+    </section>
+    <div id="meta-bar">
+      <span class="m-chip" id="streak-chip" title="Серия дней: заходи каждый день, награды миссий растут до ×1.5">🔥 <b id="streak-n">0</b><i id="mult-n">×1.0</i></span>
+      <button class="m-chip as-btn" id="missions-chip">🎯 Миссии <b id="missions-n">0/3</b></button>
+    </div>
+    <div id="table-scroll">
+      <div id="canvas-wrap">
+        <canvas id="gc"></canvas>
+      </div>
+      <div id="controls">
+        <div id="chips-row">
+          <button class="chip-btn" data-val="5">5</button>
+          <button class="chip-btn active" data-val="10">10</button>
+          <button class="chip-btn" data-val="25">25</button>
+          <button class="chip-btn" data-val="50">50</button>
+          <button class="chip-btn" data-val="100">100</button>
+        </div>
+        <div id="num-grid"></div>
+        <div id="outside-bets">
+          <button data-bet="red" class="ob red">Красное</button>
+          <button data-bet="black" class="ob black">Чёрное</button>
+          <button data-bet="odd" class="ob">Нечёт</button>
+          <button data-bet="even" class="ob">Чёт</button>
+          <button data-bet="1-18" class="ob">1–18</button>
+          <button data-bet="19-36" class="ob">19–36</button>
+        </div>
+      </div>
+    </div>
+    <div id="bottom">
+      <button id="btn-spin">Крутить</button>
+      <button id="btn-clear">Убрать</button>
+      <button id="btn-missions">Миссии</button>
+      <button id="btn-menu">В меню</button>
+      <button id="btn-sound" aria-label="Звук">🔊</button>
     </div>
   </div>
-  <div id="overlay" class="hidden">
+  <div id="modal" class="hidden">
+    <div class="modal-card" id="modal-card">
+      <span class="modal-badge" id="modal-badge">Результат</span>
+      <div id="modal-title">Выпало 0</div>
+      <div id="modal-score"></div>
+      <div class="modal-actions">
+        <button id="modal-btn">Ещё!</button>
+        <a id="modal-btn2" href="../">Каталог</a>
+      </div>
+    </div>
+  </div>
+  <div id="mmodal" class="hidden">
     <div class="modal-card">
-      <div id="overlay-title"></div>
-      <div id="overlay-sub"></div>
-      <button id="btn-next">Ещё!</button>
+      <span class="modal-badge">Ежедневные задания</span>
+      <div id="mmodal-title">Миссии дня</div>
+      <div id="mmodal-list"></div>
+      <p class="mmodal-note">Каждая выполненная миссия даёт бонусные фишки. Набор обновляется в полночь МСК.</p>
+      <div class="modal-actions">
+        <button id="mmodal-btn">Продолжить</button>
+      </div>
     </div>
   </div>
+  <div id="toasts"></div>
 </div>
-  <div id="toast-container"></div>
 <script src="game.js"></script>
 </body>
 </html>

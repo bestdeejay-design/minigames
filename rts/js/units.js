@@ -688,7 +688,11 @@ export function updateProjectiles(st, dt) {
 // Урон и смерть. Смерть помечает объект — массивы чистятся в тике.
 // ------------------------------------------------------------
 export function damageEntity(st, victim, dmg, attacker) {
-  if (!victim || victim.dead || victim.garrison) return; // в бункере неуязвим
+  if (!victim || victim.dead) return;
+  // Неуязвима в бункере только пехота. У зданий garrison — это массив
+  // гарнизона (пустой массив истинен!), раньше эта строка делала ВСЕ
+  // постройки бессмертными — вражескую базу было невозможно разрушить.
+  if (victim.kind === 'unit' && victim.garrison) return;
   victim.hp -= dmg;
   victim.flashT = 0.14;
   // Тревога для игрока — не чаще раза в 8 секунд.

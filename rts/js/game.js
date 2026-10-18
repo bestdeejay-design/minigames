@@ -210,6 +210,9 @@ export class Game {
     this.canvas.style.width = this.cssW + 'px';
     this.canvas.style.height = this.cssH + 'px';
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Размеры панелей UI — чтобы краевой скролл не срабатывал над ними.
+    this.uiTop = document.getElementById('topbar')?.offsetHeight || 0;
+    this.uiBottom = document.getElementById('bottom-panel')?.offsetHeight || 0;
     this.clampCam();
   }
 
@@ -283,7 +286,9 @@ export class Game {
           cmds.push({ code: 'KeyX', icon: 'stop', label: 'Назад', on: () => { st.buildMenu = false; } });
         }
       }
-      cmds.push({ code: 'KeyS', icon: 'stop', label: 'Стоп', on: () => this.hooks.stopSelected() });
+      // «Стоп» не показываем в открытом меню стройки: 7 зданий + «Назад»
+      // заполняют компактную сетку 2×4 ровно целиком.
+      if (!st.buildMenu) cmds.push({ code: 'KeyS', icon: 'stop', label: 'Стоп', on: () => this.hooks.stopSelected() });
     }
     return cmds;
   }

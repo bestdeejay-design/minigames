@@ -516,6 +516,9 @@ function rebuildPanel(game, sel) {
   }
 
   // --- Кнопки команд (от игры — контекстный список) ---
+  // Меню стройки — 8 кнопок: в компактной сетке 2×4 они гарантированно
+  // помещаются в панель (обычные ряды по 82px обрезали всё ниже второго).
+  els.cmdGrid.classList.toggle('compact', !!st.buildMenu && !st.placing);
   const cmds = game.getCommands();
   for (const c of cmds) {
     const btn = document.createElement('button');
