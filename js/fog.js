@@ -44,6 +44,7 @@ export class Fog {
     for (const unit of game.units) {
       if (unit.team === 'player' && unit.hp > 0) reveal(unit.x, unit.y, UNIT_TYPES[unit.type].vision);
     }
+    for (const relay of game.relays || []) if (relay.owner === 'player') reveal(relay.x, relay.y, RULES.relayVision);
     this.mini.clearRect(0, 0, MAP_SIZE, MAP_SIZE);
     for (let ty = 0; ty < MAP_SIZE; ty++) {
       for (let tx = 0; tx < MAP_SIZE; tx++) {

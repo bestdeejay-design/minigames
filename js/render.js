@@ -35,6 +35,27 @@ function drawMineral(ctx, mineral, now) {
   ctx.beginPath(); ctx.moveTo(3, 4); ctx.lineTo(10, -2); ctx.lineTo(5, 11); ctx.closePath(); ctx.fill();
   ctx.restore();
 }
+function drawRelay(ctx, relay, selected, now) {
+  const color = relay.owner ? TEAM_COLORS[relay.owner].main : '#e5be78';
+  const pulse = 2 * Math.sin(now * .002 + relay.index);
+  ctx.save(); ctx.translate(relay.x, relay.y);
+  ctx.fillStyle = 'rgba(4,15,21,.68)';
+  ctx.beginPath(); ctx.ellipse(0, 8, 22, 10, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = selected ? 3 : 2;
+  ctx.beginPath(); ctx.arc(0, 0, 16 + pulse, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0, 0, 25, -.9, 1.5); ctx.stroke();
+  ctx.strokeStyle = relay.control > 0 ? TEAM_COLORS.player.bright : relay.control < 0 ? TEAM_COLORS.enemy.bright : color;
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(0, 0, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.abs(relay.control)); ctx.stroke();
+  ctx.shadowColor = color; ctx.shadowBlur = relay.owner ? 18 : 9;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(9, 0); ctx.lineTo(0, 11); ctx.lineTo(-9, 0); ctx.closePath(); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#071b21'; ctx.font = '800 9px system-ui'; ctx.textAlign = 'center';
+  ctx.fillText(String(relay.index), 0, 3);
+  ctx.restore();
+}
 function drawBuilding(ctx, building, selected, now) {
   const size = building.size * TILE_SIZE;
   const x = building.tx * TILE_SIZE, y = building.ty * TILE_SIZE;
@@ -75,6 +96,37 @@ function drawBuilding(ctx, building, selected, now) {
     roundRect(ctx, inner + innerSize * .26, top + innerSize * .33, innerSize * .48, innerSize * .43, 4); ctx.fill();
     ctx.fillStyle = team.main;
     ctx.fillRect(inner + innerSize * .43, top + innerSize * .41, innerSize * .14, innerSize * .2);
+  } else if (building.type === 'turret') {
+    ctx.fillStyle = '#152e36';
+    ctx.beginPath(); ctx.arc(building.x, building.y, 20, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = team.bright; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(building.x, building.y, 16, 0, Math.PI * 2); ctx.stroke();
+    ctx.save(); ctx.translate(building.x, building.y); ctx.rotate(now * .00045 + building.id);
+    ctx.fillStyle = team.main; roundRect(ctx, -6, -22, 12, 37, 3); ctx.fill();
+    ctx.fillStyle = '#e5f7e8'; ctx.fillRect(-3, -25, 6, 8);
+    ctx.restore();
+    for (const ox of [x + 7, x + size - 12]) for (const oy of [y + 7, y + size - 12]) {
+      ctx.fillStyle = team.main; ctx.fillRect(ox, oy, 5, 5);
+    }
+  } else if (building.type === 'workshop') {
+    ctx.fillStyle = '#162c33';
+    roundRect(ctx, inner, top, innerSize, innerSize, 7); ctx.fill();
+    ctx.strokeStyle = team.main; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(building.x, building.y, 20, 0, Math.PI * 2); ctx.stroke();
+    ctx.save(); ctx.translate(building.x, building.y); ctx.rotate(now * .0003);
+    for (let i = 0; i < 6; i++) { ctx.rotate(Math.PI / 3); ctx.fillStyle = team.main; ctx.fillRect(-4, -27, 8, 9); }
+    ctx.restore();
+    ctx.fillStyle = team.bright;
+    ctx.beginPath(); ctx.arc(building.x, building.y, 7, 0, Math.PI * 2); ctx.fill();
+  } else if (building.type === 'outpost') {
+    ctx.fillStyle = '#132f39'; roundRect(ctx, inner, top, innerSize, innerSize, 7); ctx.fill();
+    ctx.strokeStyle = team.main; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(inner + 6, top + innerSize - 8); ctx.lineTo(building.x, top + 6);
+    ctx.lineTo(inner + innerSize - 6, top + innerSize - 8); ctx.stroke();
+    ctx.shadowColor = team.main; ctx.shadowBlur = 13;
+    ctx.fillStyle = team.bright; ctx.beginPath(); ctx.arc(building.x, building.y, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = team.main; ctx.fillRect(inner + 4, top + 5, 7, 7); ctx.fillRect(inner + innerSize - 11, top + 5, 7, 7);
   } else {
     ctx.fillStyle = '#223d41';
     roundRect(ctx, inner, top, innerSize, innerSize, 7); ctx.fill();
@@ -131,6 +183,28 @@ function drawUnit(ctx, unit, selected, now) {
       ctx.shadowColor = '#8ce9f3'; ctx.shadowBlur = 8; ctx.fillStyle = '#9de4ee';
       ctx.beginPath(); ctx.moveTo(-7, -5); ctx.lineTo(-3, -9); ctx.lineTo(0, -5); ctx.lineTo(-3, -1); ctx.closePath(); ctx.fill();
     }
+  } else if (unit.type === 'scout') {
+    ctx.fillStyle = '#112f37';
+    ctx.beginPath(); ctx.moveTo(13, 0); ctx.lineTo(-8, -10); ctx.lineTo(-5, 0); ctx.lineTo(-8, 10); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = team.main; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = team.bright; ctx.beginPath(); ctx.arc(1, 0, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(235,255,241,.56)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(0, 0, 14 + Math.sin(now*.006+unit.id)*2, -.5, .6); ctx.stroke();
+  } else if (unit.type === 'guardian') {
+    ctx.fillStyle = '#223137';
+    roundRect(ctx, -15, -13, 27, 26, 7); ctx.fill();
+    ctx.fillStyle = team.dark; ctx.fillRect(-14,-13,9,26);
+    ctx.fillStyle = team.main; roundRect(ctx, -10, -11, 21, 22, 5); ctx.fill();
+    ctx.fillStyle = team.bright; ctx.fillRect(0, -5, 7, 10);
+    ctx.fillStyle = '#a9bcb9'; ctx.fillRect(10,-6,13,4); ctx.fillRect(10,3,13,4);
+    ctx.fillStyle = '#102a2d'; ctx.fillRect(-16,-16,8,6); ctx.fillRect(-16,10,8,6);
+  } else if (unit.type === 'support') {
+    ctx.fillStyle = '#253b47';
+    ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = team.main; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = '#d5efff'; ctx.fillRect(-2,-7,4,14); ctx.fillRect(-7,-2,14,4);
+    ctx.fillStyle = team.main; ctx.fillRect(-13,-3,4,6); ctx.fillRect(9,-3,4,6);
   } else {
     ctx.fillStyle = '#213840';
     ctx.fillRect(-8, -10, 15, 20);
@@ -187,6 +261,11 @@ export class Renderer {
     const sourceWidth = Math.min(this.width, WORLD_SIZE - x), sourceHeight = Math.min(this.height, WORLD_SIZE - y);
     if (sourceWidth > 0 && sourceHeight > 0) ctx.drawImage(game.map.terrainCanvas, x, y, sourceWidth, sourceHeight, 0, 0, sourceWidth, sourceHeight);
     ctx.save(); ctx.translate(-x, -y);
+    for (const relay of game.relays) {
+      if (relay.x < x - 32 || relay.y < y - 32 || relay.x > x + this.width + 32 || relay.y > y + this.height + 32) continue;
+      if (game.fog && !game.fog.isExplored(relay.tx, relay.ty)) continue;
+      drawRelay(ctx, relay, game.selection.includes(relay.id), now);
+    }
     for (const mineral of game.minerals) {
       if (mineral.amount <= 0 || mineral.x < x - 25 || mineral.y < y - 25 || mineral.x > x + this.width + 25 || mineral.y > y + this.height + 25) continue;
       if (game.fog && !game.fog.isExplored(mineral.tx, mineral.ty)) continue;
@@ -213,9 +292,9 @@ export class Renderer {
         ctx.strokeStyle = '#10252b'; ctx.strokeText(effect.text, effect.x, effect.y);
         ctx.fillStyle = effect.color; ctx.fillText(effect.text, effect.x, effect.y);
       } else {
-        ctx.strokeStyle = effect.kind === 'explosion' ? '#ffcf89' : TEAM_COLORS[effect.team].main;
+        ctx.strokeStyle = effect.kind === 'explosion' ? '#ffcf89' : effect.kind === 'repair' ? '#b4e4ff' : TEAM_COLORS[effect.team].main;
         ctx.lineWidth = effect.kind === 'explosion' ? 3 : 2;
-        const radius = effect.kind === 'explosion' ? (1 - effect.life / effect.maxLife) * 34 : (1 - effect.life / effect.maxLife) * 11;
+        const radius = effect.kind === 'explosion' ? (1 - effect.life / effect.maxLife) * 34 : effect.kind === 'repair' ? 16 + (1 - effect.life / effect.maxLife) * 18 : (1 - effect.life / effect.maxLife) * 11;
         ctx.beginPath(); ctx.arc(effect.x, effect.y, radius, 0, Math.PI * 2); ctx.stroke();
       }
       ctx.restore();
@@ -281,6 +360,14 @@ export class Renderer {
       ctx.fillRect(mineral.x / WORLD_SIZE * this.miniWidth - 1, mineral.y / WORLD_SIZE * this.miniHeight - 1, 2, 2);
     }
     if (game.fog) ctx.drawImage(game.fog.minimapCanvas, 0, 0, this.miniWidth, this.miniHeight);
+    for (const relay of game.relays) {
+      if (game.fog && !game.fog.isExplored(relay.tx, relay.ty)) continue;
+      const color = relay.owner === 'player' ? TEAM_COLORS.player.bright
+        : relay.owner === 'enemy' && (!game.fog || game.fog.isVisible(relay.tx, relay.ty)) ? TEAM_COLORS.enemy.bright : '#e5be78';
+      const rx = relay.x / WORLD_SIZE * this.miniWidth, ry = relay.y / WORLD_SIZE * this.miniHeight;
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.moveTo(rx,ry-4); ctx.lineTo(rx+4,ry); ctx.lineTo(rx,ry+4); ctx.lineTo(rx-4,ry); ctx.closePath(); ctx.fill();
+    }
     for (const building of game.buildings) {
       if (building.hp <= 0 || !this.visible(game, building)) continue;
       ctx.fillStyle = TEAM_COLORS[building.team].main;

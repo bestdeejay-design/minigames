@@ -1,4 +1,4 @@
-import { BUILDING_TYPES, RULES, TILE_SIZE, UNIT_TYPES, WORLD_SIZE } from './config.js';
+import { BUILDING_TYPES, RULES, TILE_SIZE, UNIT_TYPES, UPGRADES, WORLD_SIZE } from './config.js';
 import { worldToTile } from './map.js';
 
 export class Input {
@@ -139,7 +139,11 @@ export class Input {
     }
     if (event.code === 'Escape') { this.cancelMode(); return; }
     if (event.ctrlKey || event.metaKey || event.altKey) return;
-    const shortcuts = { KeyB: 'house', KeyR: 'barracks', KeyW: 'worker', KeyM: 'marine', KeyS: 'stop', KeyA: 'attackMove', KeyG: 'gather' };
+    const shortcuts = {
+      KeyB:'house', KeyR:'barracks', KeyT:'turret', KeyF:'workshop', KeyO:'outpost',
+      KeyW:'worker', KeyM:'marine', KeyC:'scout', KeyH:'guardian', KeyE:'support',
+      KeyD:'drills', KeyP:'plating', KeyJ:'weapons', KeyS:'stop', KeyA:'attackMove', KeyG:'gather',
+    };
     if (shortcuts[event.code]) this.handleCommand(shortcuts[event.code]);
   }
   rightClick(world) {
@@ -158,6 +162,8 @@ export class Input {
       units.filter(unit => unit.type !== 'worker').forEach(unit => this.game.orderMove(unit, world.x, world.y));
     } else if (target?.team === 'enemy') {
       units.forEach(unit => this.game.orderAttack(unit, target.id));
+    } else if (target?.kind === 'relay') {
+      this.game.orderGroupMove(units, target.x, target.y);
     } else if (target?.kind === 'building' && target.team === 'player' && target.progress < 1 && workers.length) {
       workers.forEach(worker => this.game.orderBuild(worker, target));
     } else this.game.orderGroupMove(units, world.x, world.y);
@@ -182,8 +188,12 @@ export class Input {
     if (this.game.mode !== 'running') return;
     const selected = this.game.selected().filter(e => e.team === 'player');
     const workers = selected.filter(e => e.kind === 'unit' && e.type === 'worker');
-    if (command === 'house' || command === 'barracks') {
+    if (BUILDING_TYPES[command] && command !== 'command') {
       if (!workers.length) return;
+      if (!this.game.canBuild(command)) {
+        this.game.announce(`Сначала постройте: ${BUILDING_TYPES[BUILDING_TYPES[command].requires].name}`, 'warning');
+        this.game.audio?.play('error'); return;
+      }
       if (this.game.player.minerals < BUILDING_TYPES[command].cost) {
         this.game.announce('Недостаточно минералов', 'warning'); this.game.audio?.play('error'); return;
       }
@@ -191,12 +201,18 @@ export class Input {
       this.attackMove = false;
       this.ui.setCommandHint?.('Выберите место постройки · Esc или ПКМ — отмена');
       this.game.announce('Выберите место для постройки', 'normal');
-    } else if (command === 'worker' || command === 'marine') {
-      const building = selected.find(e => e.kind === 'building' && BUILDING_TYPES[e.type].trains === command);
+    } else if (UNIT_TYPES[command]) {
+      const building = selected.find(e => e.kind === 'building' && BUILDING_TYPES[e.type].trains.includes(command));
       if (building && this.game.train(building, command)) {
         this.game.announce(`${UNIT_TYPES[command].name}: добавлен в очередь`, 'normal');
         this.game.audio?.play('train');
       } else { this.game.announce('Не хватает минералов, места или лимита населения', 'warning'); this.game.audio?.play('error'); }
+    } else if (UPGRADES[command]) {
+      const building = selected.find(e => e.kind === 'building' && UPGRADES[command].building === e.type);
+      if (building && this.game.research(building, command)) {
+        this.game.announce(`${UPGRADES[command].name}: исследование началось`, 'normal');
+        this.game.audio?.play('research');
+      } else { this.game.announce('Улучшение недоступно: проверьте ресурсы и очередь', 'warning'); this.game.audio?.play('error'); }
     } else if (command === 'stop') {
       selected.filter(e => e.kind === 'unit').forEach(unit => this.game.orderStop(unit));
       this.game.audio?.play('order');
