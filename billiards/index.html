@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0A0A0F">
-  <title>Бильярд — мини-игра | AXIIOM</title>
-  <meta name="description" content="Портретный бильярд: пирамида шаров, шесть луз, прицельная траектория с отскоками. Уровни, стрик и ежедневные миссии. Бесплатная мини-игра AXIIOM.">
+  <title>Кладезь — бильярд-головоломка | AXIIOM</title>
+  <meta name="description" content="Космический шутер «Кладезь»: веди корабль пальцем, отбивай волны врагов, собирай дропы оружия и щита, побеждай боссов. Вызов дня, стрик и ежедневные миссии. Бесплатно, в браузере.">
   <link rel="canonical" href="https://bestdeejay-design.github.io/minigames/billiards/">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bestdeejay-design.github.io/minigames/billiards/">
-  <meta property="og:title" content="Бильярд — мини-игра | AXIIOM">
-  <meta property="og:description" content="Пирамида, шесть луз и предсказание траектории. Уровни, стрик и миссии.">
+  <meta property="og:title" content="Кладезь — бильярд-головоломка | AXIIOM">
+  <meta property="og:description" content="Веди корабль, отбивай волны, качай оружие и держи стрик. Боссы, дропы, вызов дня и миссии.">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Бильярд — мини-игра | AXIIOM">
-  <meta name="twitter:description" content="Пирамида, лузы и траектория с отскоками. Держи стрик.">
+  <meta name="twitter:title" content="Кладезь — бильярд-головоломка | AXIIOM">
+  <meta name="twitter:description" content="Веди корабль, отбивай волны, качай оружие и держи стрик.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🎱</text></svg>">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -28,17 +28,23 @@
   </header>
   <div id="welcome">
     <span class="w-badge">AXIIOM · Мини-игры</span>
-    <h1>Бильярд</h1>
-    <div class="deco-row" id="deco-row" aria-hidden="true"></div>
-    <p>Оттяни кий от шара и отпусти. Пунктир покажет <b>траекторию с отскоками</b>. Забивай шары в лузы: боковые дают больше очков. Ходов ровно по числу шаров — трать их с умом.</p>
+    <h1>Кладезь</h1>
+    <div class="ship-row" aria-hidden="true">
+      <i class="d-red"></i><i class="d-gold"></i><i class="d-purple"></i><i class="d-gold"></i><i class="d-cyan"></i>
+    </div>
+    <p>Оттягивай кий от белого шара и отпускай. <b>Призрачная траектория</b> покажет первый рикошет, алмазные вставки помогут прицелиться. Забивай шары сериями — <b>комбо ×2</b> за два и больше за удар. 30 уровней, потом бесконечный калибр.</p>
     <span class="w-daily-chip" id="daily-chip"><span class="dot"></span><span id="daily-date">Вызов дня</span></span>
     <div class="w-records">
       <span class="w-rec"><span>Рекорд дня</span><b id="w-daily-best">0</b></span>
       <span class="w-rec"><span>Рекорд</span><b id="w-best">0</b></span>
       <span class="w-rec"><span>Стрик</span><b id="w-streak">🔥 0</b></span>
     </div>
+    <div id="mode-switch">
+      <button id="mode-daily" class="active">Вызов дня</button>
+      <button id="mode-free">Свободная</button>
+    </div>
     <button id="btn-play">Играть</button>
-    <span class="w-hint">спокойный темп · без таймеров · рекорды хранятся у вас</span>
+    <span class="w-hint">веди пальцем · автоогонь · рекорды хранятся у вас</span>
   </div>
   <div id="game" class="hidden">
     <section id="stats">
@@ -49,42 +55,43 @@
     </section>
     <div id="meta-bar">
       <span class="m-chip" id="streak-chip" title="Серия дней: заходи каждый день, множитель растёт до ×1.5">🔥 <b id="streak-n">0</b><i id="mult-n">×1.0</i></span>
-      <span class="m-chip" id="shots-chip">Ходов <b id="shots-n">0</b></span>
-      <button class="m-chip as-btn" id="missions-chip">🎯 Миссии <b id="missions-n">0/3</b></button>
+      <span class="m-chip" id="shots-chip">Ходов <b id="shots-n">4</b></span><button class="m-chip as-btn" id="missions-chip">🎯 Миссии <b id="missions-n">0/3</b></button>
     </div>
+    <div id="hull-wrap"><div id="hull-fill"></div><span id="hull-shield"></span></div>
     <div id="canvas-wrap">
       <canvas id="gc"></canvas>
+      <div id="announce" class="hidden"></div>
     </div>
     <div id="bottom">
-      <button id="btn-new">Уровень заново</button>
+      <button id="btn-restart">Заново</button>
       <button id="btn-missions">Миссии</button>
       <button id="btn-menu">В меню</button>
-      <button id="btn-sound" aria-label="Звук">🔊</button>
+      <button id="btn-sound" title="Звук">🔊</button>
     </div>
   </div>
   <div id="modal" class="hidden">
-    <div class="modal-card" id="modal-card">
-      <span class="modal-badge" id="modal-badge">Партия окончена</span>
-      <div id="modal-title">Партия</div>
-      <div id="modal-score"></div>
+    <div class="modal-card">
+      <span class="modal-badge" id="modal-badge">Игра окончена</span>
+      <h2 id="modal-title">Корабль потерян</h2>
+      <p id="modal-score"></p>
       <div class="modal-actions">
-        <button id="modal-btn">Дальше</button>
-        <a id="modal-btn2" href="../">Каталог</a>
+        <button id="modal-btn">Ещё раз</button>
+        <button id="modal-btn2">В меню</button>
       </div>
     </div>
   </div>
   <div id="mmodal" class="hidden">
     <div class="modal-card">
-      <span class="modal-badge">Ежедневные задания</span>
-      <div id="mmodal-title">Миссии дня</div>
+      <span class="modal-badge">Ежедневные миссии</span>
+      <h2>Задания дня</h2>
       <div id="mmodal-list"></div>
-      <p class="mmodal-note">Каждая выполненная миссия даёт бонусные очки. Набор обновляется в полночь МСК.</p>
+      <p class="mm-note">Награда за миссию: <b>+25 × множитель стрика</b> к счёту при выполнении. Обновляются каждый день.</p>
       <div class="modal-actions">
-        <button id="mmodal-btn">Продолжить</button>
+        <button id="mmodal-btn">Понятно</button>
       </div>
     </div>
   </div>
-  <div id="toasts"></div>
+  <div id="toasts" aria-live="polite"></div>
 </div>
 <script src="game.js"></script>
 </body>
