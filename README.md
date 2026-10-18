@@ -26,15 +26,15 @@
 | 🎱 Кладезь | бильярд 2.0: призрачная траектория, комбо, 30 уровней и миссии | [играть](https://bestdeejay-design.github.io/minigames/billiards/) |
 | 🧨 Разлом | брейкер: рой шаров, вызов дня, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/breaker/) |
 | ⚔️ Звёздный рубеж | RTS: кампания, оборона с волнами, две расы (люди/кхарид), техника, турели, ремонт | [играть](https://bestdeejay-design.github.io/minigames/rts/) |
-| 🪙 Coin Tap | монетный дождь: бомбы, бонусы, вызов дня и миссии | [играть](https://bestdeejay-design.github.io/minigames/coin-tap/) |
+| 🪙 Золотая жила | Coin Tap 2.0: 3D-флип монет, бомбы, магниты, серия до ×3 | [играть](https://bestdeejay-design.github.io/minigames/coin-tap/) |
 | 💠 Кристаллы | merge-drop: физика слияний, вызов дня | [играть](https://bestdeejay-design.github.io/minigames/crystals/) |
 | 🔫 Штурм | рейкастинг-шутер: боссы, дробовик, мини-карта и миссии | [играть](https://bestdeejay-design.github.io/minigames/fps3d/) |
 | 🧩 Три в ряд | головоломка | [играть](https://bestdeejay-design.github.io/minigames/match3/) |
-| 🎮 Платформер | 8 уровней, монеты, шипы, coyote time, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/platformer/) |
+| 🎮 Руины | платформер 2.0: coyote-time, слизни, ключ и дверь, 12 уровней | [играть](https://bestdeejay-design.github.io/minigames/platformer/) |
 | 🏎 Ночной поток | ночная трасса: риск ×2, нитро, три сектора, вызов дня | [играть](https://bestdeejay-design.github.io/minigames/race/) |
-| 🎰 Рулетка | европейское колесо, сохраняемый банк, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/roulette/) |
+| 🎰 Золотое колесо | рулетка 2.0: реальный стол, дефлекторы, лента истории | [играть](https://bestdeejay-design.github.io/minigames/roulette/) |
 | 👾 Импульс | космический шутер: боссы, щит, оружие, вызов дня и миссии | [играть](https://bestdeejay-design.github.io/minigames/shooter/) |
-| 🎯 Рогатка | кристаллы-мишени, баллистика, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/sling/) |
+| 🎯 Хрустальный тир | рогатка 2.0: хрустальные ромбы, осколки, сквозные выстрелы | [играть](https://bestdeejay-design.github.io/minigames/sling/) |
 | 🧱 Тетрис | падающие блоки: SRS, T-спины, Спринт | [играть](https://bestdeejay-design.github.io/minigames/tetris/) |
 | 🏙 Мегаполис | тайкун 2.0: офисы, кафе, люксы, лифт, день/ночь и сохраняемый город | [играть](https://bestdeejay-design.github.io/minigames/tycoon/) |
 
