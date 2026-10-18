@@ -70,6 +70,29 @@ export const UNITS = {
     hdesc: 'Тяжёлая пушка, осколки задевают всех вокруг цели',
     adesc: 'Громадина; его плевок взрывается снопом осколков',
   },
+  medic: {
+    key: 'medic', hname: 'Медик', aname: 'Спорыш', hp: 60, dmg: 2, range: 26, cooldown: 1.0,
+    sightTiles: 7, speed: 100, r: 9, supply: 1, cost: 75, trainTime: 16,
+    canMine: false, canBuild: false, projectile: 'none', canHeal: true, healRate: 6,
+    hdesc: 'Лечит раненую пехоту рядом (6 ОЗ/с); скальпель — лишь для самообороны',
+    adesc: 'Спора-нянька: латает сородичей заживляющей слизью (6 ОЗ/с)',
+  },
+  flamer: {
+    key: 'flamer', hname: 'Огнемётчик', aname: 'Жгут', hp: 75, dmg: 12, range: 74, cooldown: 0.9,
+    sightTiles: 7, speed: 90, r: 10, supply: 1, cost: 75, trainTime: 15,
+    canMine: false, canBuild: false, projectile: 'shell',
+    splash: { r: 32, frac: 0.7 },
+    hdesc: 'Огненная струя выжигает группы врагов; страшен в упор, уязвим издали',
+    adesc: 'Кислотный сноп по площади; в упор разрывает даже броню',
+  },
+  arty: {
+    key: 'arty', hname: 'САУ «Гром»', aname: 'Метатель', hp: 160, dmg: 46, range: 400, cooldown: 3.6,
+    sightTiles: 10, speed: 48, r: 13, supply: 3, cost: 220, trainTime: 34,
+    canMine: false, canBuild: false, vehicle: true, projectile: 'shell',
+    splash: { r: 62, frac: 0.65 },
+    hdesc: 'Осадное орудие: бьёт на 12 тайлов осколками по площади; медлителен и беззащитен вблизи',
+    adesc: 'Мечет взрывные споры через полкарты; держите его позади роя',
+  },
 };
 
 // --- Здания ---
@@ -78,16 +101,57 @@ export const UNITS = {
 // garrisonCap — сколько пехоты помещается (бункер/кокон); requires — какое
 // здание должно быть достроено, прежде чем это можно ставить.
 export const BUILDINGS = {
-  cc:       { key: 'cc',       hname: 'Командный центр', aname: 'Гнездо-улей', w: 4, h: 3, hp: 1500, cost: 400, buildTime: 30, supplyGain: 10, sightTiles: 9, produces: 'worker' },
-  depot:    { key: 'depot',    hname: 'Дом',             aname: 'Нарост-кладовая', w: 2, h: 2, hp: 500,  cost: 100, buildTime: 14, supplyGain: 8,  sightTiles: 5, produces: null   },
-  barracks: { key: 'barracks', hname: 'Казарма',         aname: 'Инкубатор', w: 3, h: 2, hp: 1000, cost: 150, buildTime: 20, supplyGain: 0,  sightTiles: 6, produces: 'marine' },
+  cc:       { key: 'cc',       hname: 'Командный центр', aname: 'Гнездо-улей', w: 4, h: 3, hp: 1500, cost: 400, buildTime: 30, supplyGain: 10, sightTiles: 9, produces: 'worker',
+    hdesc: 'Штаб базы: обучает рабочих, принимает минералы, +10 населения',
+    adesc: 'Сердце улья: растит сборщиков, принимает эрг-кристаллы, +10 населения' },
+  depot:    { key: 'depot',    hname: 'Дом',             aname: 'Нарост-кладовая', w: 2, h: 2, hp: 500,  cost: 100, buildTime: 14, supplyGain: 8,  sightTiles: 5, produces: null,
+    hdesc: 'Жильё колонистов: +8 населения. Без домов армия не растёт',
+    adesc: 'Живой склад: расширяет улей, +8 населения' },
+  barracks: { key: 'barracks', hname: 'Казарма',         aname: 'Инкубатор', w: 3, h: 2, hp: 1000, cost: 150, buildTime: 20, supplyGain: 0,  sightTiles: 6, produces: ['marine', 'flamer', 'medic'],
+    hdesc: 'Обучает пехоту: морпехи, огнемётчики и медики. Очередь — до 5 юнитов',
+    adesc: 'Выводит из икры жалящих, жгутов и спорышей. Очередь — до 5 юнитов' },
   turret:   { key: 'turret',   hname: 'Турель «Скорпион»', aname: 'Жвала', w: 1, h: 1, hp: 380, cost: 100, buildTime: 12, supplyGain: 0, sightTiles: 9,
-              attack: true, dmg: 8, range: 150, cooldown: 0.65, projectile: 'bullet' },
-  wall:     { key: 'wall',     hname: 'Секция стены',    aname: 'Хитиновая стена', w: 1, h: 1, hp: 900,  cost: 30,  buildTime: 5,  supplyGain: 0,  sightTiles: 2 },
+              attack: true, dmg: 8, range: 150, cooldown: 0.65, projectile: 'bullet',
+    hdesc: 'Автоматическая пушка: сама находит и обстреливает врагов в радиусе 150',
+    adesc: 'Жвала-башня: плюётся шипами по всем чужакам поблизости' },
+  wall:     { key: 'wall',     hname: 'Секция стены',    aname: 'Хитиновая стена', w: 1, h: 1, hp: 900,  cost: 30,  buildTime: 5,  supplyGain: 0,  sightTiles: 2,
+    hdesc: 'Дешёвая преграда: 900 прочности — задержит рой и технику',
+    adesc: 'Хитиновый барьер: живая стена улья' },
   bunker:   { key: 'bunker',   hname: 'Бункер',          aname: 'Кокон', w: 2, h: 2, hp: 1100, cost: 120, buildTime: 16, supplyGain: 0,  sightTiles: 8,
-              garrisonCap: 4, range: 140 },
+              garrisonCap: 4, range: 140,
+    hdesc: 'Прячет до 4 пехотинцев: внутри они неуязвимы и стреляют сами. ПКМ — занять',
+    adesc: 'Кокон: 4 бойца прячутся внутри и жалят через щели' },
   factory:  { key: 'factory',  hname: 'Завод техники',   aname: 'Яма выводка', w: 3, h: 3, hp: 1300, cost: 250, buildTime: 35, supplyGain: 0,  sightTiles: 7,
-              produces: ['buggy', 'tank'], requires: 'barracks' },
+              produces: ['buggy', 'tank', 'arty'], requires: 'barracks',
+    hdesc: 'Производит технику: багги, танки и САУ. Нужна казарма',
+    adesc: 'Яма выводка: выползают скорчи, колоссы и метатели. Нужен инкубатор' },
+  lab:      { key: 'lab',      hname: 'Лаборатория',     aname: 'Узел эволюции', w: 3, h: 3, hp: 900,  cost: 200, buildTime: 32, supplyGain: 0,  sightTiles: 6,
+              requires: 'barracks', research: true,
+    hdesc: 'Исследует улучшения армии: оружие, броня пехоты, орудия и плиты техники',
+    adesc: 'Узел эволюции: грани роя крепнут с каждым исследованием' },
+};
+
+// --- Улучшения (исследуются в Лаборатории / Узле эволюции) ---
+// Бонусы применяются автоматически ко ВСЕМ своим юнитам (и новым тоже):
+//   infAtk — +3 к урону пехоты за уровень; vehAtk — +5 к урону техники;
+//   infArm — −2 к получаемому урону пехоты;  vehArm — −3 у техники.
+export const UPGRADES = {
+  infAtk: { key: 'infAtk', hname: 'Оружие пехоты', aname: 'Заточка шипов', max: 3,
+    costs: [100, 175, 250], times: [40, 55, 70],
+    hdesc: 'Калибровка стволов и огнесмесей: +3 урона пехоте за уровень',
+    adesc: 'Шипы и кислота крепнут: +3 урона пехоте за уровень' },
+  infArm: { key: 'infArm', hname: 'Броня пехоты', aname: 'Панцирь', max: 3,
+    costs: [100, 175, 250], times: [40, 55, 70],
+    hdesc: 'Композитные щитки: −2 к получаемому урону пехоты за уровень',
+    adesc: 'Хитиновые пластины: −2 к получаемому урону пехоты за уровень' },
+  vehAtk: { key: 'vehAtk', hname: 'Орудия техники', aname: 'Жвалы выводка', max: 3,
+    costs: [100, 175, 250], times: [45, 60, 75],
+    hdesc: 'Длиннее ствол — дальше смерть: +5 урона технике за уровень',
+    adesc: 'Крупнейшие жвала улья: +5 урона тяжёлым существам за уровень' },
+  vehArm: { key: 'vehArm', hname: 'Плиты техники', aname: 'Хитиновый панцирь', max: 3,
+    costs: [100, 175, 250], times: [45, 60, 75],
+    hdesc: 'Навесная броня: −3 к получаемому урону техники за уровень',
+    adesc: 'Многослойный панцирь: −3 к получаемому урону за уровень' },
 };
 
 // --- ИИ противника (базовый профиль; миссии переопределяют) ---
@@ -103,6 +167,10 @@ export const AI = {
   factory: false,        // строить ли завод техники
   maxBuggies: 0,         // лимит быстрых единиц
   maxTanks: 0,           // лимит тяжёлых единиц
+  medics: 0,             // лимит медиков/спорышей
+  flamers: 0,            // лимит огнемётчиков/жгутов
+  arty: 0,               // лимит САУ/метателей
+  research: false,       // строить ли лабораторию и исследовать улучшения
   repair: false,         // чинить ли здания и технику
 };
 

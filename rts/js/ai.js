@@ -7,9 +7,9 @@
 // ИИ не симулирует туман войны — видит всю карту (классическое
 // «читерство» простых RTS-ИИ, допустимо для аркады).
 // ============================================================
-import { AI, BUILDINGS, UNITS, SUPPLY_MAX, TILE } from './config.js';
+import { AI, BUILDINGS, UNITS, UPGRADES, SUPPLY_MAX, TILE } from './config.js';
 import { orderGather, orderBuild, orderAttack, orderRepair, spawnUnit } from './units.js';
-import { canPlace, placeBuildingCmd, enqueueUnit } from './buildings.js';
+import { canPlace, placeBuildingCmd, enqueueUnit, startResearch } from './buildings.js';
 import { pathToRect } from './pathfinding.js';
 
 export class AIController {
@@ -69,6 +69,15 @@ export class AIController {
         wave.push(u);
       }
     }
+    // Поздние волны разнообразятся по профилю: жгуты — каждая вторая, САУ — каждая пятая.
+    if (this.defWaveNum % 2 === 0 && this.p.flamers > 0) {
+      for (let i = 0; i < 2; i++) {
+        wave.push(spawnUnit(st, 'enemy', 'flamer', cc.x + (Math.random() - 0.5) * TILE * 4, cc.y + TILE * 2.5));
+      }
+    }
+    if (this.defWaveNum % 5 === 4 && this.p.arty > 0) {
+      wave.push(spawnUnit(st, 'enemy', 'arty', cc.x + (Math.random() - 0.5) * TILE * 3, cc.y + TILE * 4));
+    }
     const target = nearestPlayerBuilding(st, cc);
     for (const u of wave) if (target) orderAttack(st, u, target);
 
@@ -126,12 +135,52 @@ export class AIController {
       }
     }
 
-    // 5) Казармы: первая сразу, вторая по времени.
+    // 5) Казармы: первая сразу, вторая по времени; лаборатория — по профилю.
     if (barracks.length < 1 && money >= BUILDINGS.barracks.cost) {
       this.tryPlace(st, 'barracks');
     } else if (st.time > P.secondBarracksAt && barracks.length < 2 &&
                money >= BUILDINGS.barracks.cost + 100) {
       this.tryPlace(st, 'barracks');
+    }
+    if (P.research && barracks.some((b) => b.done)) {
+      const labs = st.buildings.filter((b) => mine(b) && b.type === 'lab');
+      const labPending = st.buildings.some((b) => mine(b) && !b.done && b.type === 'lab');
+      if (!labs.length && !labPending && money >= BUILDINGS.lab.cost + 80) {
+        this.tryPlace(st, 'lab');
+      }
+    }
+
+    // 5b) Исследования: каждая свободная лаборатория качает первый доступный апгрейд.
+    if (P.research) {
+      const labs = st.buildings.filter((b) => mine(b) && b.done && b.type === 'lab');
+      for (const lab of labs) {
+        if (lab.res) continue;
+        for (const key of ['infAtk', 'vehAtk', 'infArm', 'vehArm']) {
+          const u = UPGRADES[key];
+          const lvl = st.tech.enemy[key] || 0;
+          if (lvl < u.max && st.minerals.enemy >= u.costs[lvl] + 80) {
+            startResearch(st, lab, key);
+            break;
+          }
+        }
+      }
+    }
+
+    // 5c) Казармы производят смешанную пехоту по профилю: жгуты → медики → морпехи.
+    const cnt = (type) => st.units.filter((u) => mine(u) && u.type === type).length;
+    const queued = (b, type) => b.queue.filter((q) => q.type === type).length;
+    for (const br of barracks) {
+      if (!br.done || br.queue.length >= 2) continue;
+      if (P.flamers > 0 && money >= UNITS.flamer.cost &&
+          cnt('flamer') + queued(br, 'flamer') < P.flamers && cap - used >= 1) {
+        enqueueUnit(st, br, 'flamer');
+      } else if (P.medics > 0 && money >= UNITS.medic.cost &&
+          cnt('medic') + queued(br, 'medic') < P.medics && cap - used >= 1) {
+        enqueueUnit(st, br, 'medic');
+      } else if (money >= UNITS.marine.cost &&
+          cnt('marine') + queued(br, 'marine') < P.maxMarines && cap - used >= 1) {
+        enqueueUnit(st, br, 'marine');
+      }
     }
 
     // 6) Турели у базы — по профилю миссии.
@@ -142,7 +191,7 @@ export class AIController {
       }
     }
 
-    // 7) Завод техники и техника — по профилю миссии.
+    // 7) Завод техники и техника — по профилю миссии (САУ приоритетнее танка).
     if (P.factory && barracks.some((b) => b.done)) {
       const factories = st.buildings.filter((b) => mine(b) && b.type === 'factory');
       if (!factories.length && money >= BUILDINGS.factory.cost + 50) {
@@ -150,10 +199,13 @@ export class AIController {
       }
       const buggies = st.units.filter((u) => mine(u) && u.type === 'buggy');
       const tanks = st.units.filter((u) => mine(u) && u.type === 'tank');
+      const artys = st.units.filter((u) => mine(u) && u.type === 'arty');
       for (const f of factories) {
         if (!f.done || f.queue.length >= 2) continue;
-        const queued = f.queue.reduce((s, q) => s + (q.type === 'buggy' ? 1 : 2), 0);
-        if (money >= UNITS.tank.cost && tanks.length + queued < P.maxTanks && cap - used >= 3) {
+        const queued = f.queue.reduce((s, q) => s + (q.type === 'buggy' ? 1 : q.type === 'arty' ? 2 : 2), 0);
+        if (P.arty > 0 && money >= UNITS.arty.cost && artys.length + f.queue.filter((q) => q.type === 'arty').length < P.arty && cap - used >= 3) {
+          enqueueUnit(st, f, 'arty');
+        } else if (money >= UNITS.tank.cost && tanks.length + queued < P.maxTanks && cap - used >= 3) {
           enqueueUnit(st, f, 'tank');
         } else if (money >= UNITS.buggy.cost && buggies.length + queued < P.maxBuggies && cap - used >= 2) {
           enqueueUnit(st, f, 'buggy');
@@ -222,6 +274,14 @@ function nearestPlayerBuilding(st, unit) {
     if (b.dead || b.side !== 'player') continue;
     const d = Math.hypot(b.x - unit.x, b.y - unit.y);
     if (d < bd) { bd = d; best = b; }
+  }
+  // Стелс-миссия: зданий у игрока нет — волны преследуют сам отряд.
+  if (!best) {
+    for (const u of st.units) {
+      if (u.dead || u.side !== 'player' || u.garrison) continue;
+      const d = Math.hypot(u.x - unit.x, u.y - unit.y);
+      if (d < bd) { bd = d; best = u; }
+    }
   }
   return best;
 }

@@ -3,7 +3,7 @@
 // очереди производства, население (supply), оборона (турели),
 // гарнизоны (бункеры), отрисовка.
 // ============================================================
-import { TILE, BUILDINGS, UNITS, SUPPLY_MAX, BULLET_SPEED, COLORS } from './config.js';
+import { TILE, BUILDINGS, UNITS, SUPPLY_MAX, BULLET_SPEED, COLORS, UPGRADES, fname } from './config.js';
 import { nearestFreeTileAround } from './pathfinding.js';
 import { orderBuild, orderMove, spawnUnit, addEffect, shoot, acquireTarget, releaseGarrison } from './units.js';
 import { distToRectPx } from './pathfinding.js';
@@ -27,6 +27,7 @@ export class Building {
     this.hp = done ? this.cfg.hp : Math.max(1, this.cfg.hp * 0.15);
     this.maxHp = this.cfg.hp;
     this.queue = [];                     // [{type, t, total, hold}]
+    this.res = null;                     // текущее исследование лаборатории {key, lvl, t, total}
     this.rally = null;                   // точка сбора (ПКМ по земле)
     this.garrison = [];                  // пехота внутри (бункер)
     this.cd = 0;                         // перезарядка (турель)
@@ -99,13 +100,59 @@ export function cancelQueueItem(st, b, i) {
   b.queue.splice(i, 1);
 }
 
+// Запустить исследование улучшения. Коды: ok | money | busy | max | wrong.
+export function startResearch(st, b, key) {
+  const u = UPGRADES[key];
+  if (!u || !b || b.dead || !b.done || !b.cfg.research) return 'wrong';
+  if (b.res) return 'busy';
+  const lvl = (st.tech[b.side] && st.tech[b.side][key]) || 0;
+  if (lvl >= u.max) return 'max';
+  const cost = u.costs[lvl];
+  if (st.minerals[b.side] < cost) return 'money';
+  st.minerals[b.side] -= cost;
+  b.res = { key, lvl: lvl + 1, t: u.times[lvl], total: u.times[lvl] };
+  return 'ok';
+}
+
+// Отменить текущее исследование (возврат минералов).
+export function cancelResearch(st, b) {
+  if (!b.res) return;
+  const u = UPGRADES[b.res.key];
+  if (u) st.minerals[b.side] += u.costs[b.res.lvl - 1];
+  b.res = null;
+}
+
 // Тик зданий: производство, автострельба турелей, огонь гарнизона
 // бункера. Прогресс стройки ведут рабочие (updateBuild в units.js).
 export function updateBuildings(st, dt, grid) {
   for (const b of st.buildings) {
     if (b.dead) continue;
     b.flashT = Math.max(0, b.flashT - dt);
+    // Дым из повреждённого здания (арт): редкие клубы над корпусом.
+    if (b.done && b.hp < b.maxHp * 0.5 && Math.random() < dt * 2.2) {
+      addEffect(st, {
+        kind: 'smoke',
+        x: b.x + (Math.random() - 0.5) * b.w * TILE * 0.6,
+        y: b.y + (Math.random() - 0.5) * b.h * TILE * 0.5,
+        t: 0, life: 1.3,
+      });
+    }
     if (!b.done) continue;
+
+    // --- Исследования (лаборатория) ---
+    if (b.res) {
+      b.res.t -= dt;
+      if (b.res.t <= 0) {
+        const key = b.res.key;
+        st.tech[b.side][key] = b.res.lvl;
+        b.res = null;
+        if (b.side === 'player') {
+          const u = UPGRADES[key];
+          st.game.ui.toast('Улучшение завершено: ' + fname(u, b.faction) + ' ур. ' + st.tech.player[key]);
+          st.game.sound.ready();
+        }
+      }
+    }
 
     // --- Производство ---
     if (b.queue.length) {
@@ -286,6 +333,42 @@ export function drawBuilding(ctx, b, ghost = false, camX = 0, camY = 0) {
       }
       ctx.fillStyle = '#b7f0c8';
       ctx.fillRect(px + w / 2 - 1, py + 4, 2, h - 8);
+    } else if (b.type === 'lab') {
+      // Узел эволюции: жерло с парящими гранями-кристаллами.
+      ctx.fillStyle = '#3a2f4c';
+      ctx.beginPath(); ctx.ellipse(px + w / 2, py + h / 2 + 5, w * 0.42, h * 0.36, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#241c34';
+      ctx.beginPath(); ctx.ellipse(px + w / 2, py + h / 2 + 2, w * 0.26, h * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#9ff5b8'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(px + w / 2, py + h / 2 + 2, w * 0.18, h * 0.13, 0, 0, Math.PI * 2); ctx.stroke();
+      // Три парящие грани на разной высоте (мнимая левитация).
+      const floats = [[-10, -6, 5], [4, -12, 6], [12, -3, 4.4]];
+      for (const [fx, fy, fr] of floats) {
+        ctx.fillStyle = '#b7f0c8';
+        ctx.beginPath();
+        ctx.moveTo(px + w / 2 + fx - fr, py + h / 2 + fy);
+        ctx.lineTo(px + w / 2 + fx, py + h / 2 + fy - fr * 1.6);
+        ctx.lineTo(px + w / 2 + fx + fr, py + h / 2 + fy);
+        ctx.closePath(); ctx.fill();
+      }
+    } else if (b.type === 'lab') {
+      // Узел эволюции: жерло с парящими гранями-кристаллами.
+      ctx.fillStyle = '#3a2f4c';
+      ctx.beginPath(); ctx.ellipse(px + w / 2, py + h / 2 + 5, w * 0.42, h * 0.36, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#241c34';
+      ctx.beginPath(); ctx.ellipse(px + w / 2, py + h / 2 + 2, w * 0.26, h * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#9ff5b8'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(px + w / 2, py + h / 2 + 2, w * 0.18, h * 0.13, 0, 0, Math.PI * 2); ctx.stroke();
+      // Три парящие грани на разной высоте (мнимая левитация).
+      const floats = [[-10, -6, 5], [4, -12, 6], [12, -3, 4.4]];
+      for (const [fx, fy, fr] of floats) {
+        ctx.fillStyle = '#b7f0c8';
+        ctx.beginPath();
+        ctx.moveTo(px + w / 2 + fx - fr, py + h / 2 + fy);
+        ctx.lineTo(px + w / 2 + fx, py + h / 2 + fy - fr * 1.6);
+        ctx.lineTo(px + w / 2 + fx + fr, py + h / 2 + fy);
+        ctx.closePath(); ctx.fill();
+      }
     } else if (b.type === 'factory') {
       // Яма выводка: кратер с икрой и щупальцами по краю.
       ctx.fillStyle = '#3a2f4c';
@@ -394,6 +477,20 @@ export function drawBuilding(ctx, b, ghost = false, camX = 0, camY = 0) {
       ctx.ellipse(px + 8 + i * 11, py + h - 4, 5.5, 3.4, 0, 0, Math.PI * 2);
       ctx.fill();
     }
+  } else if (b.type === 'lab') {
+    // Лаборатория: купол-обсерватория с тарелкой антенны.
+    ctx.fillStyle = '#6b727a';
+    ctx.fillRect(px + 3, py + 10, w - 6, h - 16);
+    ctx.fillStyle = '#565c64';
+    ctx.beginPath(); ctx.arc(px + w / 2 - 6, py + h / 2, 13, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = col;
+    ctx.fillRect(px + 3, py + 10, w - 6, 4);
+    ctx.strokeStyle = '#c8cdd4'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px + w - 10, py + 8); ctx.lineTo(px + w - 10, py - 6); ctx.stroke();
+    ctx.strokeStyle = col; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(px + w - 10, py - 8, 5, Math.PI * 0.15, Math.PI * 0.95); ctx.stroke();
+    ctx.fillStyle = '#ffd977';
+    ctx.beginPath(); ctx.arc(px + 8, py + 6, 2.5, 0, Math.PI * 2); ctx.fill();
   } else if (b.type === 'factory') {
     // Завод техники: цех с воротами, труба с дымом, шестерня.
     ctx.fillStyle = '#6b727a';
