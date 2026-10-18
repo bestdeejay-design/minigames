@@ -10,6 +10,7 @@ export class Input {
     this.keys = new Set();
     this.pointer = { x: 0, y: 0, inside: false };
     this.dragBox = null;
+    this.panning = null;
     this.buildType = null;
     this.attackMove = false;
     this.lastGroup = 0;
@@ -36,6 +37,13 @@ export class Input {
     this.canvas.addEventListener('pointerleave', () => { this.pointer.inside = false; });
     this.canvas.addEventListener('pointermove', event => {
       const point = this.localPoint(event);
+      if (this.panning && event.pointerId === this.panning.pointerId) {
+        this.game.camera.x -= point.x - this.panning.x;
+        this.game.camera.y -= point.y - this.panning.y;
+        this.game.clampCamera(this.renderer.width, this.renderer.height);
+        this.panning.x = point.x; this.panning.y = point.y;
+        return;
+      }
       this.pointer.x = point.x; this.pointer.y = point.y;
       if (this.dragBox && event.pointerId === this.dragBox.pointerId) {
         this.dragBox.endX = point.x; this.dragBox.endY = point.y;
@@ -52,6 +60,10 @@ export class Input {
         event.preventDefault();
         if (this.buildType || this.attackMove) { this.cancelMode(); return; }
         this.rightClick(world);
+      } else if (event.button === 1) {
+        event.preventDefault();
+        this.panning = { pointerId: event.pointerId, x: point.x, y: point.y };
+        this.canvas.setPointerCapture(event.pointerId);
       } else if (event.button === 0) {
         event.preventDefault();
         if (this.buildType) { this.placeBuilding(world); return; }
@@ -68,6 +80,11 @@ export class Input {
       }
     });
     this.canvas.addEventListener('pointerup', event => {
+      if (this.panning && event.pointerId === this.panning.pointerId) {
+        this.panning = null;
+        if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
+        return;
+      }
       if (!this.dragBox || event.pointerId !== this.dragBox.pointerId) return;
       const box = this.dragBox;
       this.dragBox = null;
@@ -87,10 +104,14 @@ export class Input {
     });
     this.canvas.addEventListener('pointercancel', event => {
       if (this.dragBox?.pointerId === event.pointerId) this.dragBox = null;
+      if (this.panning?.pointerId === event.pointerId) this.panning = null;
     });
     this.canvas.addEventListener('lostpointercapture', event => {
       if (this.dragBox?.pointerId === event.pointerId) this.dragBox = null;
+      if (this.panning?.pointerId === event.pointerId) this.panning = null;
     });
+    this.canvas.addEventListener('auxclick', event => { if (event.button === 1) event.preventDefault(); });
+    this.canvas.addEventListener('mousedown', event => { if (event.button === 1) event.preventDefault(); });
     window.addEventListener('keydown', event => this.keyDown(event));
     window.addEventListener('keyup', event => this.keys.delete(event.code));
     window.addEventListener('blur', () => { this.keys.clear(); this.dragBox = null; });
@@ -233,7 +254,7 @@ export class Input {
     if (this.keys.has('ArrowRight')) dx++;
     if (this.keys.has('ArrowUp')) dy--;
     if (this.keys.has('ArrowDown')) dy++;
-    if (this.pointer.inside && !this.dragBox) {
+    if (this.pointer.inside && !this.dragBox && !this.panning) {
       const zone = RULES.edgeScrollZone;
       if (this.pointer.x < zone) dx--;
       if (this.pointer.x > this.renderer.width - zone) dx++;
