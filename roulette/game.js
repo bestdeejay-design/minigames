@@ -1,553 +1,175 @@
 'use strict';
-/* Рулетка — европейское колесо в стиле AXIIOM. canvas + vanilla JS, без зависимостей.
-   Мета: стрик, ежедневные миссии, рекорд банка. Банк сохраняется между сессиями.
-   Пересборка: один цикл отрисовки, сохраняемый банк, миссии, welcome-экран. */
-
-// ---------- утилиты ----------
-const $ = id => document.getElementById(id);
-const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+/* ═══════════════ ЗОЛОТОЕ КОЛЕСО v2.0 · рулетка · AXIIOM canon ═══════════════ */
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const rand=(a,b)=>a+Math.random()*(b-a);
+const TAU=Math.PI*2;
 function xmur3(str){let h=1779033703^str.length;for(let i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=h<<13|h>>>19;}return function(){h=Math.imul(h^h>>>16,2246822507);h=Math.imul(h^h>>>13,3266489909);return (h^=h>>>16)>>>0;};}
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
-function lsGet(k, d){ try{ const v = localStorage.getItem(k); return v===null? d : JSON.parse(v); }catch(e){ return d; } }
-function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
-
-const dateFmt = new Intl.DateTimeFormat('sv-SE', {timeZone:'Europe/Moscow', year:'numeric', month:'2-digit', day:'2-digit'});
-const moscowDate = off => dateFmt.format(new Date(Date.now() + off*864e5));
-const today=moscowDate(0), yesterday=moscowDate(-1);
-
-// ---------- DOM ----------
-const canvas=$('gc'), ctx=canvas.getContext('2d');
-const el={
-  welcome:$('welcome'), game:$('game'),
-  money:$('money-val'), betV:$('bet-val'), bestV:$('best-val'), resultV:$('result-val'),
-  streakN:$('streak-n'), multN:$('mult-n'), missionsN:$('missions-n'),
-  wMoney:$('w-money'), wBest:$('w-best'), wStreak:$('w-streak'),
-  modal:$('modal'), modalCard:$('modal-card'), modalBadge:$('modal-badge'), modalTitle:$('modal-title'), modalScore:$('modal-score'),
-  mmodal:$('mmodal'), mlist:$('mmodal-list'), toasts:$('toasts'),
-  decoRow:$('deco-row'), numGrid:$('num-grid'), btnSpin:$('btn-spin')
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v);}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+const fmt=n=>Math.floor(n).toLocaleString('ru-RU');
+const now=new Date();
+const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Moscow'}).format(now);
+const yDate=new Date(now.getTime()-86400000);
+const yesterday=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Moscow'}).format(yDate);
+/* ─── Аудио ─── */
+let AC=null,master=null;
+function audioInit(){ if(AC)return; try{ AC=new (window.AudioContext||window.webkitAudioContext)(); master=AC.createGain(); master.gain.value=muted?0:0.5; master.connect(AC.destination);}catch(e){} }
+function tone(freq,dur,type,vol,slide,delay){ if(!AC||muted)return; const t0=AC.currentTime+(delay||0); const o=AC.createOscillator(),g=AC.createGain(); o.type=type||'sine'; o.frequency.setValueAtTime(freq,t0); if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,freq+slide),t0+dur); g.gain.setValueAtTime(vol||.15,t0); g.gain.exponentialRampToValueAtTime(.001,t0+dur); o.connect(g);g.connect(master); o.start(t0);o.stop(t0+dur+.02); }
+const sfx={
+  tick(sp){ tone(900+sp*220,.03,'square',clamp(.02+sp*.05,.02,.08)); },
+  drop(){ tone(500,.08,'triangle',.14,-180); },
+  chip(){ tone(1500,.04,'square',.08); tone(1200,.05,'square',.06,0,.03); },
+  win(){ [523,659,784,1046,1318].forEach((f,i)=>tone(f,.15,'triangle',.15,0,i*.07)); },
+  lose(){ tone(240,.3,'sine',.12,-90); },
+  bank(){ [392,523,659,784].forEach((f,i)=>tone(f,.12,'sine',.13,0,i*.08)); },
+  click(){ tone(700,.05,'square',.07); },
 };
-
-// ---------- звук ----------
-let AC=null;
-let muted=lsGet('roulette.muted', false);
-function audio(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==='suspended') AC.resume(); return AC; }
-function tone(f0, f1, dur, type, vol, when){
-  if(muted) return; const ac=audio(); if(!ac) return;
-  const t=ac.currentTime+(when||0);
-  const o=ac.createOscillator(), g=ac.createGain();
-  o.type=type||'sine'; o.frequency.setValueAtTime(f0, t);
-  if(f1&&f1!==f0) o.frequency.exponentialRampToValueAtTime(Math.max(f1,1), t+dur);
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol||0.1, t+0.012);
-  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
-  o.connect(g).connect(ac.destination); o.start(t); o.stop(t+dur+0.02);
-}
-const snd={
-  chip(){ tone(1400, 1000, 0.05, 'triangle', 0.05); },
-  spin(){ tone(220, 380, 0.5, 'sawtooth', 0.03); },
-  tick(){ tone(1900, 1900, 0.03, 'square', 0.02); },
-  win(){ [523,659,784,1047,1319].forEach((f,i)=>tone(f, f, 0.17, 'sine', 0.06, i*0.09)); },
-  lose(){ tone(220, 130, 0.35, 'sine', 0.04); },
-  mission(){ tone(880, 880, 0.1, 'sine', 0.1); tone(1174, 1174, 0.16, 'sine', 0.1, 0.1); },
-  record(){ [659,784,1047,1319].forEach((f,i)=>tone(f, f, 0.18, 'sine', 0.06, i*0.105)); },
-  click(){ tone(440, 440, 0.04, 'sine', 0.05); }
-};
-
-// ---------- стрик ----------
-const getMult = s => 1 + Math.min(Math.max(s-1,0),10)*0.05;
-let streak = lsGet('roulette.streak', 0), lastDay = lsGet('roulette.lastDay', '');
-function effStreak(){ return (lastDay===today || lastDay===yesterday) ? streak : 0; }
-function refreshMult(){ mult = effStreak()>0 ? getMult(streak) : 1; }
-function markDay(){
-  if(lastDay===today){ mult=getMult(streak); return; }
-  streak = (lastDay===yesterday) ? (streak||0)+1 : 1;
-  lastDay = today;
-  lsSet('roulette.streak', streak); lsSet('roulette.lastDay', lastDay);
-  mult = getMult(streak);
-  if(streak>1) toast(`🔥 Стрик <b>${streak}</b> · награды миссий ×<b>${mult.toFixed(2)}</b>`);
-}
-let mult=1; refreshMult();
-
-// ---------- тосты ----------
-function toast(html){
-  const d=document.createElement('div'); d.className='toast'; d.innerHTML=html;
-  el.toasts.appendChild(d);
-  requestAnimationFrame(()=>d.classList.add('show'));
-  setTimeout(()=>{ d.classList.remove('show'); setTimeout(()=>d.remove(), 300); }, 2600);
-}
-
-// ---------- миссии ----------
-const MISSIONS=[
-  {id:'wins3',     t:()=>'Выиграй 3 спина (за день)',               n:3,  cum:true},
-  {id:'bank1500',  t:()=>'Доведи банк до 1500',                     n:1500},
-  {id:'red5',      t:()=>'Поставь на красное 5 раз (за день)',      n:5,  cum:true},
-  {id:'straight1', t:()=>'Угадай число точно (×35)',                n:1},
-  {id:'spins10',   t:()=>'Сделай 10 спинов (за день)',              n:10, cum:true},
-  {id:'black2',    t:()=>'Выиграй на чёрное 2 раза (за день)',      n:2,  cum:true},
-  {id:'profit300', t:()=>'Получи +300 за один спин',                n:300},
-  {id:'hitZero',   t:()=>'Выиграй, когда выпал зеро',               n:1}
-];
-let missions=[], mState=lsGet('roulette.missions.'+today, {});
-let mDirty=false;
-function flushMissions(){ if(!mDirty) return; mDirty=false; lsSet('roulette.missions.'+today, mState); }
-function pickMissions(){
-  const seed = xmur3('roulette-missions-'+today)();
-  const rng = mulberry32(seed);
-  const pool = MISSIONS.slice(); missions=[];
-  for(let k=0;k<3;k++){
-    const i = Math.floor(rng()*pool.length) % pool.length;
-    missions.push(pool.splice(i,1)[0]);
-  }
-}
-function missionProgress(id, val){
-  const def = missions.find(m=>m.id===id); if(!def) return;
-  const st = mState[id] || {p:0, done:false};
-  if(st.done) return;
-  const before=st.p;
-  st.p = def.cum ? st.p + val : Math.max(st.p, val);
-  if(st.p!==before) mDirty=true;
-  mState[id]=st;
-  if(st.p >= def.n){
-    st.done = true; st.p = def.n; mDirty=true;
-    const reward = Math.round(50*mult);
-    bank += reward;
-    toast(`🎯 Миссия: <b>${def.t()}</b> · +<b>${reward}</b> фишек`);
-    snd.mission();
-  }
-  renderMissionsChip();
-}
-function renderMissionsChip(){ el.missionsN.textContent = missions.filter(m=>(mState[m.id]||{}).done).length+'/3'; }
-function renderMissionsModal(){
-  el.mlist.innerHTML = missions.map(m=>{
-    const st = mState[m.id] || {p:0, done:false};
-    const pct = Math.min(100, Math.round(st.p/m.n*100));
-    return `<div class="mission-item ${st.done?'done':''}">
-      <div class="mission-top"><span>${m.t()}</span><span class="m-state">${st.done?'✓':Math.min(st.p,m.n)+'/'+m.n}</span></div>
-      <div class="mission-bar"><i style="width:${pct}%"></i></div>
-    </div>`;
-  }).join('');
-}
-
-// ---------- колесо ----------
+/* ─── Хранилище/мета ─── */
+const K_BANK='rl.bank',K_BEST='rl.best',K_STREAK='rl.streak',K_LASTDAY='rl.lastDay',K_MUTE='rl.muted',K_MISS='rl.missions.'+today,K_BONUS='rl.bonus.'+today;
+const el={ bank:$('bank-val'),bet:$('bet-val'),best:$('best-val'),last:$('last-val'),streakN:$('streak-n'),multN:$('mult-n'),missionsN:$('missions-n'),wBest:$('w-best'),wStreak:$('w-streak'),wDaily:$('w-daily-best'),gc:$('gc'),history:$('history') };
+const cv=el.gc,ctx=cv.getContext('2d');
+/* ─── Состояние ─── */
+let muted=lsGet(K_MUTE,false);
+let mode='daily';
+let bank=lsGet(K_BANK,1000),best=lsGet(K_BEST,1000);
+let dailyBest=lsGet('rl.dailybest.'+today,bank>0?bank:1000);
+let streak=lsGet(K_STREAK,0),lastDay=lsGet(K_LASTDAY,'');
+let mult=1;
+let bets={},chip=10,spinning=false;
+let wheelA=0,wheelV=0,ballA=0,ballV=0,ballR=1,ballState='rest',restPocket=-1,deflectors=0;
+let history=[],winCells=[],flyChips=[];
+const ORDER=[0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
 const REDS=new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
-const WHEEL_ORDER=[0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
-const SECTOR_COUNT=37, SECTOR_ANGLE=Math.PI*2/SECTOR_COUNT;
-const PAYOUTS={straight:35, red:1, black:1, odd:1, even:1, '1-18':1, '19-36':1};
-
-function numColor(n){ return n===0?'#2E5C46':REDS.has(n)?'#8A3A3A':'#1E1E2E'; }
-
-let cw=0, ch=0, dpr=1;
-function fitCanvas(){
-  const rect=canvas.parentElement.getBoundingClientRect();
-  dpr=Math.min(window.devicePixelRatio||1, 2);
-  cw=Math.floor(rect.width);
-  ch=Math.floor(cw*0.72);
-  canvas.width=cw*dpr; canvas.height=ch*dpr;
-  canvas.style.width=cw+'px'; canvas.style.height=ch+'px';
-  ctx.setTransform(dpr,0,0,dpr,0,0);
+let dailyRng=Math.random;
+const sr=(a,b)=>a+dailyRng()*(b-a);
+/* ─── Мета ─── */
+function effStreak(){ return (lastDay===today||lastDay===yesterday)?streak:0; }
+function getMult(s){ return 1+Math.min(Math.max(s-1,0),10)*0.05; }
+function touchStreak(){ if(lastDay===today){ mult=getMult(streak); return; } streak=(lastDay===yesterday)?(streak||0)+1:1; lastDay=today; lsSet(K_STREAK,streak); lsSet(K_LASTDAY,lastDay); mult=getMult(streak); if(streak>1)toast(`🔥 Стрик <b>${streak}</b> · бонус миссий ×<b>${mult.toFixed(2)}</b>`); }
+const MISSIONS=[
+  {id:'win5',    name:'5 победных спинов',        target:5,  track:'wins'},
+  {id:'red3',    name:'3 выигрыша на красном',    target:3,  track:'reds'},
+  {id:'dozen2',  name:'2 выигрыша на дюжине',     target:2,  track:'dozens'},
+  {id:'bank2k',  name:'Банк $2000 и больше',      target:2000,track:'bank'},
+  {id:'straight',name:'Выигрыш на числе (×35)',   target:1,  track:'straights'},
+  {id:'spins20', name:'Сделать 20 спинов',        target:20, track:'spins'},
+  {id:'chips20', name:'Поставить 20 фишек',       target:20, track:'chips'},
+  {id:'rich3k',  name:'Поймать банк $3000',       target:3000,track:'bank'},
+];
+let missionData=lsGet(K_MISS,{p:{},done:{}});
+if(!missionData.p)missionData={p:{},done:{}};
+function saveMissions(){ lsSet(K_MISS,missionData); }
+function missionAward(mid){ if(missionData.done[mid])return; missionData.done[mid]=1; saveMissions(); const bonus=Math.round(60*mult); bank+=bonus; lsSet(K_BANK,bank); toast(`🎯 Миссия выполнена: <b>+$${bonus}</b> в банк`); sfx.bank(); refreshMissionsUI(); refreshStats(); }
+function missionTick(track,val,absolute){ MISSIONS.forEach(m=>{ if(m.track!==track||missionData.done[m.id])return; if(absolute){ if(val>(missionData.p[m.id]||0))missionData.p[m.id]=val; } else missionData.p[m.id]=(missionData.p[m.id]||0)+val; if(missionData.p[m.id]>=m.target)missionAward(m.id); }); saveMissions(); refreshMissionsUI(); }
+function refreshMissionsUI(){ const done=MISSIONS.filter(m=>missionData.done[m.id]).length; el.missionsN.textContent=done+'/3'; }
+function renderMissionsModal(){ const list=$('mmodal-list'); list.innerHTML=''; MISSIONS.forEach(m=>{ const p=Math.min(missionData.p[m.id]||0,m.target); const done=!!missionData.done[m.id]; const d=document.createElement('div'); d.className='mm-item'+(done?' done':''); d.innerHTML=`<span class="mm-check">✓</span><span class="mm-body"><span class="mm-name">${m.name}</span><span class="mm-prog"><b>${fmt(p)}</b> / ${fmt(m.target)}</span></span>`; list.appendChild(d); }); }
+function toast(html){ const t=document.createElement('span'); t.className='toast'; t.innerHTML=html; $('toasts').appendChild(t); setTimeout(()=>t.classList.add('out'),2600); setTimeout(()=>t.remove(),3000); }
+/* ─── Ставки ─── */
+function totalBets(){ return Object.values(bets).reduce((a,b)=>a+b,0); }
+function placeBet(key){ if(spinning)return; if(bank<chip){ toast('Не хватает фишек в банке'); return; } bank-=chip; lsSet(K_BANK,bank); bets[key]=(bets[key]||0)+chip; sfx.chip(); missionTick('chips',1); refreshStats(); renderChips(); }
+function clearBets(){ if(spinning||!Object.keys(bets).length)return; bank+=totalBets(); lsSet(K_BANK,bank); bets={}; sfx.click(); refreshStats(); renderChips(); }
+function renderChips(){ document.querySelectorAll('.cell').forEach(c=>{ const k=c.dataset.bet; c.querySelector('.bet-chip')?.remove(); if(bets[k]){ const b=document.createElement('span'); b.className='bet-chip'; b.textContent=bets[k]; c.appendChild(b); } c.classList.remove('win'); }); }
+/* ─── Спин ─── */
+function spin(){ if(spinning)return; const tb=totalBets(); if(tb<=0){ toast('Сделай ставку на стол'); return; } if(bank<0)return; spinning=true; $('btn-spin').disabled=true; missionTick('spins',1); missionTick('bank',bank,true);
+  /* результат: daily детерминирован, свободная — случайна */
+  const idx=mode==='daily'?Math.floor(dailyRng()*37):Math.floor(Math.random()*37);
+  const targetNum=ORDER[idx];
+  wheelV=sr(4.5,6.5); ballV=-sr(11,14); ballR=1; ballState='rim'; deflectors=0; restPocket=-1;
+  window.__target={idx,targetNum,tb};
+  const bgT=Math.abs(ballV)/wheelV; window.__bgT=bgT;
 }
-
-// ---------- состояние ----------
-let bank=lsGet('roulette.bank', 1000);
-let best=lsGet('roulette.best', 0);
-let dailyBest=lsGet('roulette.daily.'+today, 0);
-let chipValue=10;
-let bets={};
-let totalBet=0;
-let wheelAngle=0, _rawAngle=0;
-let spinning=false, result=null;
-let spinStartAngle=0, spinTargetAngle=0, spinStartTime=0, spinDuration=3500;
-let sparks=[];
-let animId=null, lastT=0, paused=false;
-let spinsCount=0, redBets=0, winsCount=0, blackWins=0;
-
-function saveBank(){ lsSet('roulette.bank', Math.round(bank)); }
-
-// ---------- ставки ----------
-function buildBetGrid(){
-  el.numGrid.innerHTML='';
-  const zero=document.createElement('button');
-  zero.dataset.bet='n0'; zero.className='b-green';
-  zero.innerHTML='<span>0</span>';
-  zero.addEventListener('click',()=>placeBet('n0'));
-  el.numGrid.appendChild(zero);
-  for(let n=1;n<=36;n++){
-    const btn=document.createElement('button');
-    btn.dataset.bet='n'+n;
-    btn.className=REDS.has(n)?'b-red':'b-black';
-    btn.innerHTML='<span>'+n+'</span>';
-    btn.addEventListener('click',()=>placeBet('n'+n));
-    el.numGrid.appendChild(btn);
-  }
+function settle(num){
+  const tb=totalBets(); let win=0; winCells=[];
+  const color=num===0?'green':(REDS.has(num)?'red':'black');
+  for(const [k,v] of Object.entries(bets)){ if(k[0]==='n'){ const n=+k.slice(1); if(n===num){ win+=v*36; winCells.push('n'+n); } }
+    else if(k==='red'&&color==='red'){ win+=v*2; winCells.push('red'); }
+    else if(k==='black'&&color==='black'){ win+=v*2; winCells.push('black'); }
+    else if(k==='even'&&num!==0&&num%2===0){ win+=v*2; winCells.push('even'); }
+    else if(k==='odd'&&num%2===1){ win+=v*2; winCells.push('odd'); }
+    else if(k==='d1'&&num>=1&&num<=12){ win+=v*3; winCells.push('d1'); }
+    else if(k==='d2'&&num>=13&&num<=24){ win+=v*3; winCells.push('d2'); }
+    else if(k==='d3'&&num>=25&&num<=36){ win+=v*3; winCells.push('d3'); } }
+  bank+=win; lsSet(K_BANK,bank);
+  history.unshift(num); history=history.slice(0,12); renderHistory();
+  el.last.textContent=num; el.last.style.color=num===0?'#7EC8E3':(REDS.has(num)?'#E4545F':'#C7C7CC');
+  /* рекорды */
+  if(bank>best){ best=bank; lsSet(K_BEST,best); }
+  if(bank>dailyBest){ dailyBest=bank; lsSet('rl.dailybest.'+today,dailyBest); }
+  missionTick('bank',bank,true);
+  if(win>0){ sfx.win(); toast(num===0?`🟢 Зеро! Выигрыш <b>$${fmt(win)}</b>`:`${color==='red'?'🔴':'⚫'} <b>${num}</b> · выигрыш <b>$${fmt(win)}</b>`); missionTick('wins',1); if(color==='red'&&(bets.red))missionTick('reds',1); if((bets.d1||bets.d2||bets.d3)&&(winCells.some(c=>c[0]==='d')))missionTick('dozens',1); if(winCells.some(c=>c[0]==='n'))missionTick('straights',1);
+    renderChips(); winCells.forEach(c=>{ const elc=document.querySelector(`[data-bet="${c}"]`); if(elc)elc.classList.add('win'); });
+    flyChips.push({t:0}); }
+  else { sfx.lose(); toast(`${num===0?'🟢 Зеро':(color==='red'?'🔴':'⚫')+' '+num} · мимо`); }
+  bets={}; renderChips(); refreshStats(); spinning=false; $('btn-spin').disabled=false;
+  /* банк обнулился? */
+  if(bank<10){ setTimeout(()=>{ if(bank<10){ bank=1000; lsSet(K_BANK,bank); toast('💸 Банк на нуле — выдали кредит <b>$1000</b>'); sfx.bank(); refreshStats(); } },900); } }
+function renderHistory(){ el.history.innerHTML=''; history.forEach(n=>{ const c=document.createElement('span'); c.className='h-cell '+(n===0?'green':(REDS.has(n)?'red':'black')); c.textContent=n; el.history.appendChild(c); }); }
+/* ─── Рендер колеса ─── */
+function render(){ const w=cv.width,h=cv.height,cx=w/2,cy=h/2; const R=w/2-6;
+  ctx.clearRect(0,0,w,h);
+  /* обод */
+  ctx.fillStyle='#17171F'; ctx.beginPath(); ctx.arc(cx,cy,R+4,0,TAU); ctx.fill();
+  ctx.strokeStyle='rgba(212,165,116,.55)'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(cx,cy,R+3,0,TAU); ctx.stroke();
+  /* сектора */
+  const seg=TAU/37;
+  for(let i=0;i<37;i++){ const num=ORDER[i]; const a0=wheelA+i*seg,a1=a0+seg;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a0,a1); ctx.closePath();
+    ctx.fillStyle=num===0?'#2E5C43':(REDS.has(num)?'#7E3434':'#1B1B24'); ctx.fill();
+    ctx.strokeStyle='rgba(212,165,116,.35)'; ctx.lineWidth=1; ctx.stroke();
+    /* номер */
+    const am=a0+seg/2; ctx.save(); ctx.translate(cx+Math.cos(am)*(R-11),cy+Math.sin(am)*(R-11)); ctx.rotate(am+Math.PI/2); ctx.fillStyle='#F5F5F7'; ctx.font='600 8px Inter,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(num,0,0); ctx.restore(); }
+  /* дефлекторы */
+  for(let i=0;i<8;i++){ const a=wheelA*.4+i*TAU/8; ctx.fillStyle='rgba(212,165,116,.8)'; ctx.beginPath(); ctx.arc(cx+Math.cos(a)*R*.62,cy+Math.sin(a)*R*.62,2.4,0,TAU); ctx.fill(); }
+  /* ступица */
+  ctx.fillStyle='#14141C'; ctx.beginPath(); ctx.arc(cx,cy,R*.3,0,TAU); ctx.fill(); ctx.strokeStyle='rgba(212,165,116,.5)'; ctx.lineWidth=2; ctx.stroke(); ctx.fillStyle='rgba(212,165,116,.35)'; ctx.beginPath(); ctx.arc(cx,cy,R*.08,0,TAU); ctx.fill();
+  /* шар */
+  const br=ballR; const ballRpx=R*(br>.5?(.82+ (1-br)*.14):.96);
+  const drawA=(ballState==='rest'&&restPocket>=0)?(wheelA+restPocket*TAU/37+TAU/74):ballA;
+  ctx.fillStyle='#F2EADC'; ctx.shadowColor='rgba(255,240,210,.9)'; ctx.shadowBlur=10; ctx.beginPath(); ctx.arc(cx+Math.cos(drawA)*ballRpx,cy+Math.sin(drawA)*ballRpx,5.5,0,TAU); ctx.fill(); ctx.shadowBlur=0;
+  /* приземление: подсветка кармана */
+  if(ballState==='rest'&&restPocket>=0){ const am=wheelA+restPocket*TAU/37+TAU/74; ctx.strokeStyle='rgba(212,165,116,.9)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx+Math.cos(am)*(R-9),cy+Math.sin(am)*(R-9),7,0,TAU); ctx.stroke(); }
+  /* летящие фишки выигрыша */
+  flyChips.forEach(fc=>{ ctx.globalAlpha=1-fc.t; const fr=R*.5*(1-fc.t); ctx.fillStyle='#EFC878'; ctx.beginPath(); ctx.arc(cx+Math.cos(fc.t*9)*fr,cy+Math.sin(fc.t*9)*fr,6,0,TAU); ctx.fill(); }); ctx.globalAlpha=1; }
+function update(dt){
+  if(spinning){
+    wheelA+=wheelV*dt; wheelV*=Math.pow(.35,dt); /* медленное торможение колеса */
+    if(ballState==='rim'){ ballA+=ballV*dt; ballV*=Math.pow(.42,dt);
+      const tickSp=Math.abs(ballV)/12; if(Math.random()<dt*Math.abs(ballV)*3)sfx.tick(tickSp);
+      if(Math.abs(ballV)<2.6){ /* дефлекторы */ ballState='fall'; } }
+    else if(ballState==='fall'){ ballA+=ballV*dt; ballV*=Math.pow(.12,dt); ballR-=dt*.5;
+      if(Math.random()<dt*8){ ballA+=rand(-.06,.06); sfx.tick(.5); }
+      if(ballR<=.45){ /* захват кармана */ const seg=TAU/37; let idx=Math.floor(((((ballA-wheelA)%TAU)+TAU)%TAU)/seg); idx=clamp(idx,0,36); restPocket=idx; ballState='rest';
+        const num=ORDER[idx]; sfx.drop(); setTimeout(()=>settle(num),650); } } }
+  else { wheelA+=0.05*dt; }
+  flyChips=flyChips.filter(fc=>{ fc.t+=dt*1.4; return fc.t<1; });
 }
-function placeBet(key){
-  if(spinning) return;
-  if(bank<chipValue){ toast('Недостаточно фишек — минимальная ставка <b>5</b>'); return; }
-  bank-=chipValue; totalBet+=chipValue;
-  bets[key]=(bets[key]||0)+chipValue;
-  if(key==='red') { redBets++; missionProgress('red5',1); }
-  snd.chip();
-  updateHUD(); updateGrid();
-}
-function clearBets(){
-  if(spinning) return;
-  for(const key in bets) bank+=bets[key];
-  bets={}; totalBet=0;
-  updateHUD(); updateGrid();
-}
-function updateGrid(){
-  document.querySelectorAll('#num-grid button, #outside-bets .ob').forEach(btn=>{
-    const key=btn.dataset.bet;
-    const amt=bets[key];
-    let chip=btn.querySelector('.chip-count');
-    if(amt>0){
-      if(!chip){ chip=document.createElement('span'); chip.className='chip-count'; btn.appendChild(chip); }
-      chip.textContent=amt;
-    } else if(chip) chip.remove();
-  });
-}
-function updateHUD(){
-  el.money.textContent=Math.round(bank);
-  el.betV.textContent=Math.round(totalBet);
-  el.bestV.textContent=best;
-  el.wMoney.textContent=Math.round(bank);
-  el.wBest.textContent=best;
-  el.wStreak.textContent='🔥 '+effStreak();
-  el.streakN.textContent=effStreak();
-  el.multN.textContent='×'+mult.toFixed(2);
-  el.btnSpin.disabled=totalBet===0||spinning;
-}
-
-// ---------- отрисовка колеса ----------
-function drawWheel(){
-  const cx=cw/2, cy=ch/2;
-  const outerR=Math.min(cw,ch)*0.44;
-
-  ctx.fillStyle='#0B0B14';
-  ctx.fillRect(0,0,cw,ch);
-
-  ctx.fillStyle='rgba(0,0,0,.45)';
-  ctx.beginPath(); ctx.arc(cx+2,cy+3,outerR+6,0,Math.PI*2); ctx.fill();
-
-  ctx.beginPath(); ctx.arc(cx,cy,outerR+4,0,Math.PI*2);
-  ctx.fillStyle='#221A10'; ctx.fill();
-  // золотые ромбы
-  const diamondR=outerR+2;
-  for(let i=0;i<8;i++){
-    const da=i*Math.PI/4+wheelAngle;
-    const dx=cx+Math.cos(da)*diamondR, dy=cy+Math.sin(da)*diamondR;
-    ctx.fillStyle='#D4A574';
-    ctx.beginPath();
-    ctx.moveTo(dx,dy-3); ctx.lineTo(dx+2,dy); ctx.lineTo(dx,dy+3); ctx.lineTo(dx-2,dy);
-    ctx.closePath(); ctx.fill();
-  }
-
-  for(let i=0;i<SECTOR_COUNT;i++){
-    const a0=i*SECTOR_ANGLE+wheelAngle, a1=a0+SECTOR_ANGLE;
-    const n=WHEEL_ORDER[i];
-    ctx.beginPath();
-    ctx.moveTo(cx,cy);
-    ctx.arc(cx,cy,outerR,a0,a1);
-    ctx.closePath();
-    ctx.fillStyle=numColor(n);
-    ctx.fill();
-    ctx.strokeStyle='rgba(10,10,15,.6)'; ctx.lineWidth=0.6; ctx.stroke();
-  }
-
-  const innerR=outerR*0.64;
-  ctx.beginPath(); ctx.arc(cx,cy,innerR,0,Math.PI*2);
-  ctx.fillStyle='#12121A'; ctx.fill();
-  ctx.strokeStyle='#8A7350'; ctx.lineWidth=2; ctx.stroke();
-  for(let i=0;i<12;i++){
-    const da=i*Math.PI/6+wheelAngle;
-    const dx=cx+Math.cos(da)*(innerR-2), dy=cy+Math.sin(da)*(innerR-2);
-    ctx.fillStyle=i%2===0?'rgba(255,255,255,.2)':'rgba(212,165,116,.2)';
-    ctx.beginPath(); ctx.arc(dx,dy,2,0,Math.PI*2); ctx.fill();
-  }
-
-  const hubR=innerR*0.55;
-  ctx.beginPath(); ctx.arc(cx,cy,hubR,0,Math.PI*2);
-  ctx.fillStyle='#1A1A24'; ctx.fill();
-  ctx.strokeStyle='#5C4A30'; ctx.lineWidth=1.5; ctx.stroke();
-  const grad=ctx.createRadialGradient(cx-hubR*0.2,cy-hubR*0.2,0,cx,cy,hubR);
-  grad.addColorStop(0,'#3A2C1C'); grad.addColorStop(1,'#1A1424');
-  ctx.beginPath(); ctx.arc(cx,cy,hubR*0.7,0,Math.PI*2);
-  ctx.fillStyle=grad; ctx.fill();
-
-  ctx.save();
-  for(let i=0;i<SECTOR_COUNT;i++){
-    const mid=(i+0.5)*SECTOR_ANGLE+wheelAngle;
-    const n=WHEEL_ORDER[i];
-    const r=(outerR+innerR)/2;
-    const x=cx+Math.cos(mid)*r, y=cy+Math.sin(mid)*r;
-    ctx.translate(x,y);
-    ctx.rotate(mid+Math.PI/2);
-    ctx.fillStyle='#EDEDF0';
-    ctx.font=`bold ${Math.max(7,Math.round(outerR*0.09))}px Inter, sans-serif`;
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(n,0,0);
-    ctx.rotate(-mid-Math.PI/2);
-    ctx.translate(-x,-y);
-  }
-  ctx.restore();
-
-  // указатель
-  ctx.fillStyle='#E4545F';
-  ctx.beginPath();
-  ctx.moveTo(cx-7, cy-outerR-13);
-  ctx.lineTo(cx+7, cy-outerR-13);
-  ctx.lineTo(cx, cy-outerR+1);
-  ctx.closePath(); ctx.fill();
-  ctx.strokeStyle='#F08A94'; ctx.lineWidth=1; ctx.stroke();
-}
-function drawBall(progress){
-  const cx=cw/2, cy=ch/2;
-  const outerR=Math.min(cw,ch)*0.44;
-  if(spinning&&progress<1){
-    const ballAngle=wheelAngle+Math.sin(progress*12)*(1-progress)*4+progress*6;
-    const br=outerR*(0.88-progress*0.22);
-    for(let t=1;t<=3;t++){
-      const ta=ballAngle-t*0.15;
-      ctx.beginPath();
-      ctx.arc(cx+Math.cos(ta)*br, cy+Math.sin(ta)*br, outerR*0.055*(1-t*0.2), 0, Math.PI*2);
-      ctx.fillStyle=`rgba(255,255,255,${0.2-t*0.05})`; ctx.fill();
-    }
-    ctx.beginPath();
-    ctx.arc(cx+Math.cos(ballAngle)*br, cy+Math.sin(ballAngle)*br, outerR*0.055, 0, Math.PI*2);
-    ctx.fillStyle='#EDEDF0'; ctx.fill();
-    ctx.strokeStyle='#D4A574'; ctx.lineWidth=1; ctx.stroke();
-  } else if(result!==null){
-    const idx=WHEEL_ORDER.indexOf(result);
-    const mid=(idx+0.5)*SECTOR_ANGLE+wheelAngle;
-    const br=outerR*0.57;
-    const bx=cx+Math.cos(mid)*br, by=cy+Math.sin(mid)*br;
-    const size=outerR*0.05;
-    ctx.beginPath(); ctx.arc(bx,by,size+3,0,Math.PI*2);
-    ctx.strokeStyle='rgba(212,165,116,.35)'; ctx.lineWidth=2; ctx.stroke();
-    ctx.beginPath(); ctx.arc(bx,by,size,0,Math.PI*2);
-    ctx.fillStyle='#EDEDF0'; ctx.fill();
-    ctx.strokeStyle='#D4A574'; ctx.lineWidth=1.5; ctx.stroke();
-  }
-}
-function draw(){
-  drawWheel();
-  drawBall(spinProgress());
-  // конфетти
-  for(let i=sparks.length-1;i>=0;i--){
-    const p=sparks[i];
-    p.x+=p.vx; p.y+=p.vy; p.vy+=0.07; p.life--;
-    if(p.life<=0){ sparks.splice(i,1); continue; }
-    ctx.globalAlpha=Math.max(0,p.life/p.max);
-    ctx.fillStyle=p.c;
-    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
-  }
-  ctx.globalAlpha=1;
-}
-const spinProgress=()=>spinning?Math.min((performance.now()-spinStartTime)/spinDuration,1):1;
-
-function confetti(){
-  const cx=cw/2, cy=ch/2;
-  for(let i=0;i<34;i++){
-    const a=Math.random()*Math.PI*2, v=1.5+Math.random()*3.5;
-    sparks.push({x:cx, y:cy, vx:Math.cos(a)*v, vy:Math.sin(a)*v-1.5, life:44, max:44, r:1.5+Math.random()*2.5,
-      c:['#E8B04B','#D4A574','#F5D9A8','#8B9D83'][(Math.random()*4)|0]});
-  }
-}
-
-// ---------- спин ----------
-function startSpin(){
-  if(totalBet===0||spinning) return;
-  const resultNum=Math.floor(Math.random()*37);
-  result=resultNum;
-  const idx=WHEEL_ORDER.indexOf(resultNum);
-  const sectorMid=(idx+0.5)*SECTOR_ANGLE;
-  const finalAngle=-Math.PI/2-sectorMid;
-  const finalNorm=((finalAngle%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
-  const fullTurns=5+Math.floor(Math.random()*4);
-  spinStartAngle=_rawAngle;
-  const extra=finalNorm-(spinStartAngle%(Math.PI*2));
-  spinTargetAngle=spinStartAngle+fullTurns*Math.PI*2+(extra>=0?extra:extra+Math.PI*2);
-  spinStartTime=performance.now();
-  spinning=true;
-  el.btnSpin.disabled=true;
-  el.resultV.textContent='…';
-  snd.spin();
-  let tickN=0;
-  const rattle=setInterval(()=>{
-    tickN++;
-    if(!spinning||muted){ clearInterval(rattle); return; }
-    snd.tick();
-    if(tickN>26) clearInterval(rattle);
-  },130);
-  updateHUD();
-}
-function stepSpin(){
-  if(!spinning) return;
-  const progress=spinProgress();
-  const eased=1-Math.pow(1-progress,3);
-  _rawAngle=spinStartAngle+(spinTargetAngle-spinStartAngle)*eased;
-  wheelAngle=_rawAngle%(Math.PI*2);
-  if(progress>=1){
-    _rawAngle=spinTargetAngle;
-    wheelAngle=spinTargetAngle%(Math.PI*2);
-    spinning=false;
-    payOut();
-  }
-}
-
-// ---------- выплаты ----------
-function payOut(){
-  let win=0, straightHit=false;
-  const n=result;
-  const isRed=REDS.has(n);
-  const isEven=n!==0&&n%2===0;
-  const isOdd=n!==0&&n%2===1;
-  for(const key in bets){
-    const amt=bets[key];
-    if(key==='n'+n){ win+=amt+amt*PAYOUTS.straight; straightHit=true; }
-    else if(key==='red'&&isRed) win+=amt+amt*PAYOUTS.red;
-    else if(key==='black'&&!isRed&&n!==0){ win+=amt+amt*PAYOUTS.black; }
-    else if(key==='odd'&&isOdd) win+=amt+amt*PAYOUTS.odd;
-    else if(key==='even'&&isEven) win+=amt+amt*PAYOUTS.even;
-    else if(key==='1-18'&&n>=1&&n<=18) win+=amt+amt*PAYOUTS['1-18'];
-    else if(key==='19-36'&&n>=19&&n<=36) win+=amt+amt*PAYOUTS['19-36'];
-  }
-  if(bets['black']&&!isRed&&n!==0) blackWins++;
-  bets={}; totalBet=0;
-  bank+=win;
-  spinsCount++;
-  missionProgress('spins10',1);
-  missionProgress('bank1500', Math.round(bank));
-  if(win>0){
-    winsCount++;
-    missionProgress('wins3',1);
-    missionProgress('profit300', Math.round(win));
-    if(straightHit) missionProgress('straight1',1);
-    if(n===0) missionProgress('hitZero',1);
-  }
-  if(blackWins>0) missionProgress('black2', blackWins);
-
-  markDay();
-  const isDailyRec=Math.round(bank)>dailyBest;
-  if(isDailyRec){ dailyBest=Math.round(bank); lsSet('roulette.daily.'+today, dailyBest); }
-  const isRec=Math.round(bank)>best;
-  if(isRec){ best=Math.round(bank); lsSet('roulette.best', best); }
-  flushMissions(); saveBank();
-
-  const color=n===0?'зелёное':isRed?'красное':'чёрное';
-  el.resultV.textContent=n+' '+(isRed?'●':n===0?'◆':'●');
-  snd[win>0?'win':'lose']();
-  if(win>0) confetti();
-  if(isRec&&best>1000){ toast('🏆 Новый рекорд банка: <b>'+best+'</b>!'); snd.record(); }
-
-  el.modalBadge.textContent=isRec?'Новый рекорд банка':(win>0?'Выигрыш':'Проигрыш');
-  el.modalBadge.classList.toggle('record', isRec);
-  el.modalCard.classList.toggle('modal-record', isRec);
-  el.modalTitle.textContent=win>0?`+${Math.round(win)} фишек`:`Выпало ${n}`;
-  el.modalScore.innerHTML=`Число <b>${n}</b> (${color}) · Банк: <b>${Math.round(bank)}</b> · Спин #${spinsCount}`;
-  el.modalBtn.textContent='Ещё!';
-  el.modalBtn.onclick=()=>{
-    snd.click();
-    el.modal.classList.add('hidden');
-    if(bank<5){
-      bank=1000; saveBank();
-      toast('Банк закончился — выдано <b>1000</b> фишек на новый заход');
-    }
-    updateHUD();
-  };
-  el.modal.classList.remove('hidden');
-  updateHUD(); updateGrid();
-}
-
-// ---------- цикл ----------
-function loop(now){
-  animId=requestAnimationFrame(loop);
-  if(!lastT) lastT=now;
-  const delta=Math.min(now-lastT,100); lastT=now;
-  if(!paused){
-    stepSpin();
-  }
-  draw();
-}
-
-// ---------- ввод/экраны ----------
-el.btnSpin.addEventListener('click',()=>startSpin());
-$('btn-clear').addEventListener('click',()=>{ clearBets(); });
-document.querySelectorAll('.chip-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.chip-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    chipValue=parseInt(btn.dataset.val);
-    snd.click();
-  });
-});
-document.querySelectorAll('#outside-bets .ob').forEach(btn=>{
-  btn.addEventListener('click',()=>placeBet(btn.dataset.bet));
-});
-
-$('btn-play').addEventListener('click',()=>{ snd.click(); startGame(); });
-$('btn-menu').addEventListener('click',()=>{ snd.click(); toMenu(); });
-$('btn-missions').addEventListener('click',openMissions);
-$('missions-chip').addEventListener('click',openMissions);
-$('mmodal-btn').addEventListener('click',()=>{ snd.click(); el.mmodal.classList.add('hidden'); });
-function openMissions(){ snd.click(); renderMissionsModal(); el.mmodal.classList.remove('hidden'); }
-
-$('btn-reset-bank').addEventListener('click',()=>{
-  snd.click();
-  bank=1000; bets={}; totalBet=0;
-  saveBank(); updateHUD();
-  toast('Банк сброшен до <b>1000</b> фишек');
-});
-
-function updateSoundBtn(){ $('btn-sound').textContent=muted?'🔇':'🔊'; }
-$('btn-sound').addEventListener('click',()=>{
-  muted=!muted; lsSet('roulette.muted', muted);
-  updateSoundBtn(); if(!muted) snd.click();
-});
-updateSoundBtn();
-
-document.addEventListener('visibilitychange',()=>{ paused=document.hidden; });
-
-function startGame(){
-  el.welcome.classList.add('hidden');
-  el.modal.classList.add('hidden');
-  el.game.classList.remove('hidden');
-  fitCanvas();
-  updateHUD(); updateGrid();
-}
-function toMenu(){
-  el.game.classList.add('hidden');
-  el.modal.classList.add('hidden');
-  el.welcome.classList.remove('hidden');
-  saveBank();
-  updateHUD();
-}
-
-function onResize(){
-  if(el.game.classList.contains('hidden')) return;
-  fitCanvas();
-}
-window.addEventListener('resize', onResize);
-if(window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
-
-// ---------- init ----------
-(function init(){
-  for(let i=0;i<7;i++) el.decoRow.appendChild(document.createElement('i'));
-  pickMissions(); renderMissionsChip();
-  buildBetGrid();
-  fitCanvas();
-  updateHUD();
-  animId=requestAnimationFrame(loop);
-})();
-
-// ---------- debug hooks ----------
+/* ─── Цикл ─── */
+let last=0,acc=0,rafId=0; const STEP=1/60;
+function loop(ts){ rafId=requestAnimationFrame(loop); if(!last)last=ts; let dtms=ts-last; last=ts; if(dtms>200)dtms=200; acc+=dtms; let guard=0; while(acc>=STEP*1000&&guard++<6){ update(STEP); acc-=STEP*1000; } el.bank.textContent='$'+fmt(bank); render(); }
+/* ─── Ввод ─── */
+document.querySelectorAll('.cell').forEach(c=>c.addEventListener('click',()=>{ audioInit(); placeBet(c.dataset.bet); }));
+document.querySelectorAll('.chip-btn').forEach(c=>c.addEventListener('click',()=>{ audioInit(); chip=+c.dataset.chip; document.querySelectorAll('.chip-btn').forEach(x=>x.classList.remove('active')); c.classList.add('active'); sfx.click(); }));
+$('btn-spin').addEventListener('click',()=>{ audioInit(); spin(); });
+$('btn-clear').addEventListener('click',()=>{ audioInit(); clearBets(); });
+$('btn-missions').addEventListener('click',()=>{ renderMissionsModal(); $('mmodal').classList.remove('hidden'); });
+$('missions-chip').addEventListener('click',()=>{ renderMissionsModal(); $('mmodal').classList.remove('hidden'); });
+$('mmodal-btn').addEventListener('click',()=>$('mmodal').classList.add('hidden'));
+$('btn-menu').addEventListener('click',()=>{ $('game').classList.add('hidden'); $('welcome').classList.remove('hidden'); refreshWelcome(); });
+$('btn-play').addEventListener('click',()=>{ audioInit(); touchStreak(); if(mode==='daily')dailyRng=mulberry32(xmur3('roulette-'+today)()); else dailyRng=Math.random;
+  /* ежедневный бонус */
+  if(!lsGet(K_BONUS,false)){ bank+=150; lsSet(K_BANK,bank); lsSet(K_BONUS,true); toast('🎁 Бонус дня: <b>+$150</b>'); sfx.bank(); }
+  $('welcome').classList.add('hidden'); $('game').classList.remove('hidden'); refreshStats(); renderChips(); renderHistory(); if(!rafId)rafId=requestAnimationFrame(loop); });
+function syncSoundBtn(){ $('btn-sound').textContent=muted?'🔇':'🔊'; }
+$('btn-sound').addEventListener('click',()=>{ muted=!muted; lsSet(K_MUTE,muted); if(master)master.gain.value=muted?0:0.5; syncSoundBtn(); if(!muted){ audioInit(); sfx.click(); } });
+function refreshStats(){ el.bank.textContent='$'+fmt(bank); el.bet.textContent='$'+fmt(totalBets()); el.best.textContent='$'+fmt(best); }
+function refreshWelcome(){ el.wBest.textContent='$'+fmt(best); el.wStreak.textContent='🔥 '+effStreak(); el.wDaily.textContent='$'+fmt(dailyBest); $('daily-date').textContent='Ежедневный бонус $150'; }
+document.querySelector('.chip-btn[data-chip="10"]').classList.add('active');
+refreshWelcome(); refreshStats(); refreshMissionsUI(); syncSoundBtn(); renderHistory();
+/* ─── Debug-хук ─── */
 window.__rl={
-  get balance(){ return Math.round(bank); },
-  get spinning(){ return spinning; },
-  get result(){ return result; },
-  get best(){ return best; },
-  get missionsDone(){ return missions.filter(m=>(mState[m.id]||{}).done).length; },
-  bet(key){ placeBet(key); },
-  spin(){ startSpin(); },
-  flush(){ flushMissions(); saveBank(); },
+  spin, state(){ return {bank,bets:JSON.parse(JSON.stringify(bets)),spinning,history:[...history],last:history[0]??null,running:!$('game').classList.contains('hidden'),mode}; },
+  bet:(k,v)=>{ chip=v||10; placeBet(k); }, addBank:n=>{ bank+=n; lsSet(K_BANK,bank); }, settle:num=>settle(num),
+  missions:()=>missionData, records:()=>({best:lsGet(K_BEST,0),bank,daily:dailyBest,streak:lsGet(K_STREAK,0),today}),
 };
