@@ -1,684 +1,193 @@
 'use strict';
-/* Coin Tap — монетный дождь в стиле AXIIOM. canvas + vanilla JS, без зависимостей.
-   Мета: вызов дня (seed от даты МСК), стрик-множитель, ежедневные миссии, рекорды.
-   Пересборка: полностью векторные предметы (без эмодзи), fixed timestep, миссии, стрик. */
-
-// ---------- утилиты ----------
-const $ = id => document.getElementById(id);
-const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+/* ═══════════════ ЗОЛОТАЯ ЖИЛА v2.0 · реакция-аркада · AXIIOM canon ═══════════════ */
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const rand=(a,b)=>a+Math.random()*(b-a);
+const TAU=Math.PI*2;
 function xmur3(str){let h=1779033703^str.length;for(let i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=h<<13|h>>>19;}return function(){h=Math.imul(h^h>>>16,2246822507);h=Math.imul(h^h>>>13,3266489909);return (h^=h>>>16)>>>0;};}
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
-function lsGet(k, d){ try{ const v = localStorage.getItem(k); return v===null? d : JSON.parse(v); }catch(e){ return d; } }
-function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
-
-const dateFmt = new Intl.DateTimeFormat('sv-SE', {timeZone:'Europe/Moscow', year:'numeric', month:'2-digit', day:'2-digit'});
-const moscowDate = off => dateFmt.format(new Date(Date.now() + off*864e5));
-const today=moscowDate(0), yesterday=moscowDate(-1);
-
-const STEP_MS=1000/60;
-
-// ---------- DOM ----------
-const canvas=$('gc'), ctx=canvas.getContext('2d');
-const el={
-  welcome:$('welcome'), game:$('game'),
-  levelV:$('level-val'), daily:$('daily-val'), best:$('best-val'), livesV:$('lives-val'),
-  streakN:$('streak-n'), multN:$('mult-n'), missionsN:$('missions-n'), targetN:$('target-n'),
-  wDaily:$('w-daily-best'), wBest:$('w-best'), wStreak:$('w-streak'),
-  modal:$('modal'), modalCard:$('modal-card'), modalBadge:$('modal-badge'), modalTitle:$('modal-title'),
-  modalScore:$('modal-score'), modalLegend:$('modal-legend'), modalBtn:$('modal-btn'),
-  mmodal:$('mmodal'), mlist:$('mmodal-list'), toasts:$('toasts'), dailyDate:$('daily-date'),
-  decoRow:$('deco-row')
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v);}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+const fmt=n=>Math.floor(n).toLocaleString('ru-RU');
+const now=new Date();
+const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Moscow'}).format(now);
+const yDate=new Date(now.getTime()-86400000);
+const yesterday=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Moscow'}).format(yDate);
+/* ─── Аудио ─── */
+let AC=null,master=null;
+function audioInit(){ if(AC)return; try{ AC=new (window.AudioContext||window.webkitAudioContext)(); master=AC.createGain(); master.gain.value=muted?0:0.5; master.connect(AC.destination);}catch(e){} }
+function tone(freq,dur,type,vol,slide,delay){ if(!AC||muted)return; const t0=AC.currentTime+(delay||0); const o=AC.createOscillator(),g=AC.createGain(); o.type=type||'sine'; o.frequency.setValueAtTime(freq,t0); if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,freq+slide),t0+dur); g.gain.setValueAtTime(vol||.15,t0); g.gain.exponentialRampToValueAtTime(.001,t0+dur); o.connect(g);g.connect(master); o.start(t0);o.stop(t0+dur+.02); }
+function noiseB(dur,vol,fc){ if(!AC||muted)return; const n=Math.floor(AC.sampleRate*dur); const buf=AC.createBuffer(1,n,AC.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n); const src=AC.createBufferSource(); src.buffer=buf; const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=fc||800; const g=AC.createGain(); g.gain.value=vol; src.connect(f);f.connect(g);g.connect(master); src.start(); }
+const sfx={
+  coin(c){ const p=1+Math.min(c,20)*.04; tone(880*p,.09,'triangle',.14); tone(1320*p,.11,'triangle',.1,0,.05); },
+  big(){ [660,880,1100,1320,1760].forEach((f,i)=>tone(f,.1,'triangle',.13,0,i*.05)); },
+  bomb(){ noiseB(.5,.5,600); tone(70,.4,'sawtooth',.3,-30); },
+  magnet(){ tone(220,.4,'sine',.12,300); tone(440,.5,'sine',.08,500,.1); },
+  miss(){ tone(240,.14,'triangle',.1,-80); },
+  life(){ tone(200,.3,'sawtooth',.2,-100); },
+  win(){ [523,659,784,1046].forEach((f,i)=>tone(f,.14,'triangle',.14,0,i*.08)); },
+  over(){ tone(300,.5,'sawtooth',.2,-220); noiseB(.6,.4,700); },
+  click(){ tone(700,.05,'square',.07); },
 };
-
-// ---------- звук ----------
-let AC=null;
-let muted=lsGet('cointap.muted', false);
-function audio(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==='suspended') AC.resume(); return AC; }
-function tone(f0, f1, dur, type, vol, when){
-  if(muted) return; const ac=audio(); if(!ac) return;
-  const t=ac.currentTime+(when||0);
-  const o=ac.createOscillator(), g=ac.createGain();
-  o.type=type||'sine'; o.frequency.setValueAtTime(f0, t);
-  if(f1&&f1!==f0) o.frequency.exponentialRampToValueAtTime(Math.max(f1,1), t+dur);
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol||0.1, t+0.012);
-  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
-  o.connect(g).connect(ac.destination); o.start(t); o.stop(t+dur+0.02);
-}
-let comboPitch=0;
-const snd={
-  coin(){ comboPitch=Math.min(9, comboPitch+1); tone(760+comboPitch*70, 760+comboPitch*70, 0.08, 'sine', 0.05); tone(1140+comboPitch*70, 1140+comboPitch*70, 0.09, 'sine', 0.04, 0.04); },
-  bomb(){ tone(150, 60, 0.35, 'sawtooth', 0.09); tone(75, 40, 0.4, 'square', 0.05); },
-  power(){ [520,660,880].forEach((f,i)=>tone(f, f, 0.09, 'triangle', 0.045, i*0.055)); },
-  shield(){ tone(980, 1200, 0.14, 'triangle', 0.05); },
-  win(){ [523,659,784,1047].forEach((f,i)=>tone(f, f, 0.16, 'sine', 0.06, i*0.095)); },
-  over(){ [392,330,262,196].forEach((f,i)=>tone(f, f, 0.2, 'sine', 0.05, i*0.13)); },
-  mission(){ tone(880, 880, 0.1, 'sine', 0.1); tone(1174, 1174, 0.16, 'sine', 0.1, 0.1); },
-  record(){ [659,784,1047,1319].forEach((f,i)=>tone(f, f, 0.18, 'sine', 0.06, i*0.105)); },
-  click(){ tone(440, 440, 0.04, 'sine', 0.05); }
-};
-
-// ---------- стрик ----------
-const getMult = s => 1 + Math.min(Math.max(s-1,0),10)*0.05;
-let streak = lsGet('cointap.streak', 0), lastDay = lsGet('cointap.lastDay', '');
-function effStreak(){ return (lastDay===today || lastDay===yesterday) ? streak : 0; }
-function refreshMult(){ mult = effStreak()>0 ? getMult(streak) : 1; }
-function markDay(){
-  if(lastDay===today){ mult=getMult(streak); return; }
-  streak = (lastDay===yesterday) ? (streak||0)+1 : 1;
-  lastDay = today;
-  lsSet('cointap.streak', streak); lsSet('cointap.lastDay', lastDay);
-  mult = getMult(streak);
-  if(streak>1) toast(`🔥 Стрик <b>${streak}</b> · очки ×<b>${mult.toFixed(2)}</b>`);
-}
-let mult=1; refreshMult();
-
-// ---------- тосты ----------
-function toast(html){
-  const d=document.createElement('div'); d.className='toast'; d.innerHTML=html;
-  el.toasts.appendChild(d);
-  requestAnimationFrame(()=>d.classList.add('show'));
-  setTimeout(()=>{ d.classList.remove('show'); setTimeout(()=>d.remove(), 300); }, 2600);
-}
-
-// ---------- миссии ----------
+/* ─── Хранилище/мета ─── */
+const K_BEST='ct.best',K_DAILY='ct.daily.'+today,K_STREAK='ct.streak',K_LASTDAY='ct.lastDay',K_MUTE='ct.muted',K_MISS='ct.missions.'+today;
+const el={ score:$('score-val'),daily:$('daily-val'),best:$('best-val'),lives:$('lives-val'),combo:$('combo-n'),goal:$('goal-n'),streakN:$('streak-n'),multN:$('mult-n'),missionsN:$('missions-n'),wDaily:$('w-daily-best'),wBest:$('w-best'),wStreak:$('w-streak'),gc:$('gc') };
+const W=400,H=580,STEP=1/60;
+const cv=el.gc,ctx=cv.getContext('2d');
+let dpr=1;
+function fitCanvas(){ dpr=Math.min(window.devicePixelRatio||1,2); cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+'px'; cv.style.height=H+'px'; ctx.setTransform(dpr,0,0,dpr,0,0); }
+fitCanvas(); window.addEventListener('resize',fitCanvas);
+/* ─── Состояние ─── */
+let muted=lsGet(K_MUTE,false),mode='daily';
+let running=false,over=false;
+let score=0,mult=1,best=lsGet(K_BEST,0),dailyBest=lsGet(K_DAILY,0);
+let streak=lsGet(K_STREAK,0),lastDay=lsGet(K_LASTDAY,'');
+let dailyRng=Math.random;
+const sr=(a,b)=>a+(mode==='daily'?dailyRng():Math.random())*(b-a);
+const spick=arr=>arr[(mode==='daily'?dailyRng():Math.random())*arr.length|0];
+let objs=[],parts=[],texts=[],rings=[];
+let lives=3,combo=0,comboMult=1,level=1,goal=10,goalScore=0,magnetT=0;
+let spawnT=.5,shake=0,glitterT=0;
+/* ─── Мета ─── */
+function effStreak(){ return (lastDay===today||lastDay===yesterday)?streak:0; }
+function getMult(s){ return 1+Math.min(Math.max(s-1,0),10)*0.05; }
+function touchStreak(){ if(lastDay===today){ mult=getMult(streak); return; } streak=(lastDay===yesterday)?(streak||0)+1:1; lastDay=today; lsSet(K_STREAK,streak); lsSet(K_LASTDAY,lastDay); mult=getMult(streak); if(streak>1)toast(`🔥 Стрик <b>${streak}</b> · очки ×<b>${mult.toFixed(2)}</b>`); }
 const MISSIONS=[
-  {id:'level3',    t:()=>'Дойди до 3-го уровня',                    n:3},
-  {id:'level5',    t:()=>'Дойди до 5-го уровня',                    n:5},
-  {id:'coins25',   t:()=>'Собери 25 монет (за день)',               n:25, cum:true},
-  {id:'golds10',   t:()=>'Собери 10 золотых монет (за день)',       n:10, cum:true},
-  {id:'shield2',   t:()=>'Спасись щитом от 2 бомб (за день)',       n:2, cum:true},
-  {id:'nobomb2',   t:()=>'Пройди 2 уровня без бомб (за день)',      n:2, cum:true},
-  {id:'magnet2',   t:()=>'Активируй 2 магнита (за день)',           n:2, cum:true},
-  {id:'full3',     t:()=>'Пройди уровень без потери жизней',        n:1}
+  {id:'tap50',    name:'Поймать 50 монет',            target:50, track:'taps'},
+  {id:'combo10',  name:'Серия ×2.0 и выше',           target:10, track:'hotcombo'},
+  {id:'big5',     name:'Поймать 5 больших монет',     target:5,  track:'bigs'},
+  {id:'dodge10',  name:'Пропустить 10 бомб мимо',     target:10, track:'dodges'},
+  {id:'magnet3',  name:'Активировать 3 магнита',      target:3,  track:'magnets'},
+  {id:'level10',  name:'Достичь 10-го уровня',        target:10, track:'level'},
+  {id:'score300', name:'Набрать 300 очков за игру',   target:300,track:'score'},
+  {id:'perfect1', name:'Уровень без потери жизни',    target:1,  track:'perfect'},
 ];
-let missions=[], mState=lsGet('cointap.missions.'+today, {});
-let mDirty=false;
-function flushMissions(){ if(!mDirty) return; mDirty=false; lsSet('cointap.missions.'+today, mState); }
-function pickMissions(){
-  const seed = xmur3('cointap-missions-'+today)();
-  const rng = mulberry32(seed);
-  const pool = MISSIONS.slice(); missions=[];
-  for(let k=0;k<3;k++){
-    const i = Math.floor(rng()*pool.length) % pool.length;
-    missions.push(pool.splice(i,1)[0]);
-  }
+let missionData=lsGet(K_MISS,{p:{},done:{}});
+if(!missionData.p)missionData={p:{},done:{}};
+function saveMissions(){ lsSet(K_MISS,missionData); }
+function missionAward(mid){ if(missionData.done[mid])return; missionData.done[mid]=1; saveMissions(); const bonus=Math.round(25*mult); if(running&&!over){ score+=bonus; goalScore+=bonus; } toast(`🎯 Миссия выполнена: <b>+${bonus}</b>`); sfx.win(); refreshMissionsUI(); }
+function missionTick(track,val,absolute){ MISSIONS.forEach(m=>{ if(m.track!==track||missionData.done[m.id])return; if(absolute){ if(val>(missionData.p[m.id]||0))missionData.p[m.id]=val; } else missionData.p[m.id]=(missionData.p[m.id]||0)+val; if(missionData.p[m.id]>=m.target)missionAward(m.id); }); saveMissions(); refreshMissionsUI(); }
+function refreshMissionsUI(){ const done=MISSIONS.filter(m=>missionData.done[m.id]).length; el.missionsN.textContent=done+'/3'; }
+function renderMissionsModal(){ const list=$('mmodal-list'); list.innerHTML=''; MISSIONS.forEach(m=>{ const p=Math.min(missionData.p[m.id]||0,m.target); const done=!!missionData.done[m.id]; const d=document.createElement('div'); d.className='mm-item'+(done?' done':''); d.innerHTML=`<span class="mm-check">✓</span><span class="mm-body"><span class="mm-name">${m.name}</span><span class="mm-prog"><b>${fmt(p)}</b> / ${fmt(m.target)}</span></span>`; list.appendChild(d); }); }
+function toast(html){ const t=document.createElement('span'); t.className='toast'; t.innerHTML=html; $('toasts').appendChild(t); setTimeout(()=>t.classList.add('out'),2600); setTimeout(()=>t.remove(),3000); }
+function announce(big,sub){ const a=document.getElementById('announce'); a.innerHTML=`<span class="an-big">${big}</span>${sub?`<span class="an-sub">${sub}</span>`:''}`; a.classList.remove('hidden'); clearTimeout(annT); annT=setTimeout(()=>a.classList.add('hidden'),1600); }
+function part(x,y,vx,vy,life,color,size){ parts.push({x,y,vx,vy,life,maxLife:life,color,size}); }
+function glitter(x,y,n,color){ for(let i=0;i<n;i++){ const a=Math.random()*TAU,v=rand(40,170); part(x,y,Math.cos(a)*v,Math.sin(a)*v,rand(.35,.8),color,rand(1.5,3.4)); } }
+function floatTxt(x,y,txt,color,size){ texts.push({x,y,txt,color,size:size||13,life:.9,maxLife:.9}); }
+/* ─── Объекты ─── */
+function spawnObj(){ const roll=sr(0,1); let type='coin'; if(roll<.10)type='big'; else if(roll<.24)type='bomb'; else if(roll<.31)type='magnet';
+  const pad=44; const x=sr(pad,W-pad),y=sr(70,H-90);
+  if(objs.some(o=>Math.hypot(o.x-x,o.y-y)<70))return;
+  const life=type==='big'?1.9:(type==='bomb'?2.6:(type==='magnet'?2.2:2.1+Math.min(level*.02,.5)));
+  const r=type==='big'?24:(type==='bomb'?20:(type==='magnet'?20:16));
+  objs.push({type,x,y,r,life,maxLife:life,t:Math.random()*TAU,flip:Math.random()*TAU,dying:0}); }
+function levelGoal(n){ return 8+n*3+(n>10?(n-10)*6:0); }
+function loadLevel(n){ level=n; goal=levelGoal(n); goalScore=0; objs=[]; parts=[];texts=[];rings=[]; spawnT=.4; el.goal.textContent='0/'+goal; announce('УРОВЕНЬ '+n,'цель: '+goal); }
+function comboHit(){ combo++; comboMult=1+Math.min(combo*.1,2); if(comboMult>=2)missionTick('hotcombo',1); el.combo.textContent='×'+comboMult.toFixed(1); }
+function comboBreak(){ if(combo>=3)floatTxt(W/2,120,'серия прервана','#8E8E93',12); combo=0; comboMult=1; el.combo.textContent='×1.0'; }
+function tapObj(o){ if(o.dying)return;
+  if(o.type==='bomb'){ o.dying=.01; sfx.bomb(); lives--; el.lives.textContent=lives; shake=16; glitter(o.x,o.y,30,'#E4545F'); floatTxt(o.x,o.y-24,'−1 ЖИЗНЬ','#E4545F',15); comboBreak(); if(lives<=0)gameOver(); return; }
+  o.dying=.01; comboHit();
+  if(o.type==='coin'){ const pts=Math.round(1*comboMult*mult*10); score+=pts; goalScore+=pts; missionTick('taps',1); sfx.coin(combo); glitter(o.x,o.y,12,'#FFD9A8'); floatTxt(o.x,o.y-22,'+'+pts,'#FFD9A8',13); }
+  else if(o.type==='big'){ const pts=Math.round(5*comboMult*mult*10); score+=pts; goalScore+=pts; missionTick('bigs',1); sfx.big(); glitter(o.x,o.y,26,'#E8B04B'); floatTxt(o.x,o.y-26,'+'+pts+' ×5','#E8B04B',16); }
+  else if(o.type==='magnet'){ missionTick('magnets',1); magnetT=3; sfx.magnet(); glitter(o.x,o.y,16,'#7EC8E3'); floatTxt(o.x,o.y-24,'МАГНИТ!','#7EC8E3',15); }
+  el.score.textContent=fmt(score); el.goal.textContent=Math.min(goalScore,goal)+'/'+goal;
+  if(goalScore>=goal){ missionTick('level',level,true); if(lives===3&&level>1)missionTick('perfect',1); sfx.win(); announce('ЦЕЛЬ ДОСТИГНУТА','+'+Math.round(30*mult)+' бонус'); score+=Math.round(30*mult); el.score.textContent=fmt(score); setTimeout(()=>{ if(running&&!over)loadLevel(level+1); },1300); } }
+function update(dt){
+  if(over)return;
+  spawnT-=dt*(1+level*.05); if(spawnT<=0){ spawnObj(); spawnT=Math.max(.45,sr(.7,1.3)-level*.02); }
+  if(magnetT>0){ magnetT-=dt; magnetCollect(dt); }
+  glitterT-=dt; if(glitterT<=0){ glitterT=.4; part(sr(20,W-20),sr(60,H-60),rand(-8,8),rand(-14,-4),rand(1,2),'rgba(212,165,116,.5)',1.6); }
+  for(let i=objs.length-1;i>=0;i--){ const o=objs[i]; o.t+=dt; o.flip+=dt*(o.type==='bomb'?2:3.4);
+    if(o.type==='coin'||o.type==='big'){ o.y+=Math.sin(o.t*2.4)*.18; }
+    if(o.dying>0){ o.dying+=dt*4; if(o.dying>=1){ objs.splice(i,1); } continue; }
+    o.life-=dt; if(o.life<=0){ objs.splice(i,1); if(o.type==='coin'||o.type==='big')comboBreak(); else if(o.type==='bomb'){ missionTick('dodges',1); } } }
+  parts=parts.filter(p=>{ p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=160*dt; return p.life>0; });
+  texts=texts.filter(t=>{ t.life-=dt; t.y-=30*dt; return t.life>0; });
+  rings=rings.filter(r=>{ r.life-=dt; r.r+=180*dt; return r.life>0; });
+  if(shake>0)shake=Math.max(0,shake-dt*40);
 }
-function missionProgress(id, val){
-  const def = missions.find(m=>m.id===id); if(!def) return;
-  const st = mState[id] || {p:0, done:false};
-  if(st.done) return;
-  const before=st.p;
-  st.p = def.cum ? st.p + val : Math.max(st.p, val);
-  if(st.p!==before) mDirty=true;
-  mState[id]=st;
-  if(st.p >= def.n){
-    st.done = true; st.p = def.n; mDirty=true;
-    const reward = Math.round(25*mult);
-    score += reward;
-    toast(`🎯 Миссия: <b>${def.t()}</b> · +<b>${reward}</b>`);
-    snd.mission();
-  }
-  renderMissionsChip();
-}
-function renderMissionsChip(){ el.missionsN.textContent = missions.filter(m=>(mState[m.id]||{}).done).length+'/3'; }
-function renderMissionsModal(){
-  el.mlist.innerHTML = missions.map(m=>{
-    const st = mState[m.id] || {p:0, done:false};
-    const pct = Math.min(100, Math.round(st.p/m.n*100));
-    return `<div class="mission-item ${st.done?'done':''}">
-      <div class="mission-top"><span>${m.t()}</span><span class="m-state">${st.done?'✓':Math.min(st.p,m.n)+'/'+m.n}</span></div>
-      <div class="mission-bar"><i style="width:${pct}%"></i></div>
-    </div>`;
-  }).join('');
-}
-
-// ---------- типы предметов (вектор) ----------
-const TYPES={
-  coin:   {size:30, points:1, color:'#E8B04B', label:'Монета +1'},
-  gold:   {size:36, points:3, color:'#E8C9A0', label:'Золотая +3'},
-  bomb:   {size:28, points:0, color:'#E4545F', label:'Бомба — не тапай'},
-  magnet: {size:24, points:0, color:'#7A6A8F', label:'Магнит — тянет монеты'},
-  slow:   {size:24, points:0, color:'#5F7E8A', label:'Замедление'},
-  curse:  {size:24, points:0, color:'#6B4E7E', label:'Проклятье — сжимает'},
-  speed:  {size:24, points:0, color:'#C96A6A', label:'Ускорение — опасно'},
-  shield: {size:24, points:0, color:'#8B9D83', label:'Щит от одной бомбы'},
-};
-const TYPE_KEYS=Object.keys(TYPES);
-
-const GROUP_SUBS=[
-  {text:'Собери монеты — тапай по ним!'},
-  {text:'Золотые монеты дают +3'},
-  {text:'Появились бомбы — не задень их', types:['coin','gold','bomb']},
-  {text:'Магниты притягивают монеты к центру', types:['coin','gold','bomb','magnet']},
-  {text:'Замедление и проклятье в mixes', types:['coin','gold','bomb','magnet','slow','curse']},
-  {text:'Всё сразу — держи фокус!', types:TYPE_KEYS},
-];
-
-function getLevelConfig(level){
-  const t=Math.min((level-1)/49, 1);
-  const group = level<=3?0 : level<=6?1 : level<=10?2 : level<=20?3 : level<=35?4 : 5;
-  const targets=[3,5,7,10,10,10];
-  const spawnIntervals=[46,44,42,39,35,30];   // в шагах (1/60 c)
-  const speedMults=[1,1.2,1.5,1.9,2.4,3.2];
-  const weightsByGroup=[
-    {coin:100},
-    {coin:85, gold:15},
-    {coin:75, gold:10, bomb:10, magnet:5},
-    {coin:60, gold:8, bomb:15, magnet:5, slow:5, curse:4, speed:2, shield:1},
-    {coin:45, gold:5, bomb:20, magnet:5, slow:5, curse:7, speed:8, shield:5},
-    {coin:30, gold:3, bomb:27, magnet:5, slow:5, curse:10, speed:12, shield:8},
-  ];
-  const w=weightsByGroup[group];
-  return {
-    spawnInterval: Math.round((spawnIntervals[group]||46)-t*9),
-    speedMult:(speedMults[group]||1)+t*0.6,
-    target:targets[group],
-    group, weights:w, types:Object.keys(w),
-  };
-}
-
-// ---------- траектории ----------
-function pickTrajectory(level){
-  const r=rng();
-  if(level<=5){ if(r<0.6) return 'straight'; if(r<0.9) return 'sine'; return 'zigzag'; }
-  if(level<=15){ if(r<0.35) return 'straight'; if(r<0.55) return 'sine'; if(r<0.73) return 'zigzag'; if(r<0.88) return 'diagonal'; return 'bounce'; }
-  if(r<0.2) return 'straight';
-  if(r<0.38) return 'sine';
-  if(r<0.55) return 'zigzag';
-  if(r<0.73) return 'diagonal';
-  return 'bounce';
-}
-
-// ---------- состояние ----------
-let mode='daily';
-let cw=0, ch=0, dpr=1;
-let level=1, score=0, lives=3, hasShield=false;
-let items=[], pops=[], effects={};
-let shake=0, spawnTimer=0, stunTimer=0;
-let gameRunning=false, itemId=0, cfg=null;
-let levelBombHits=0, levelLostLives=0, comboWindow=[], lastCoinStep=-999;
-let animId=null, acc=0, lastT=0, frameId=0, paused=false;
-let rng=Math.random;
-let dailyBest=lsGet('cointap.daily.'+today, 0), best=lsGet('cointap.level', 0);
-let coinsTotal=0, goldsTotal=0;
-
-function fitCanvas(){
-  const rect=canvas.parentElement.getBoundingClientRect();
-  dpr=Math.min(window.devicePixelRatio||1, 2);
-  cw=Math.floor(rect.width); ch=Math.floor(rect.height);
-  canvas.width=cw*dpr; canvas.height=ch*dpr;
-  canvas.style.width=cw+'px'; canvas.style.height=ch+'px';
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-}
-
-// ---------- предмет ----------
-class Item{
-  constructor(type){
-    this.id=itemId++;
-    this.type=type;
-    this.info=TYPES[type];
-    this.size=this.info.size;
-    this.x=this.size+Math.random()*(cw-this.size*2);
-    this.y=-this.size;
-    this.baseSpeed=2.5*(cfg?cfg.speedMult:1);
-    this.collected=false;
-    this.rot=Math.random()*Math.PI*2;
-    this.sparkle=Math.random()*100;
-    this.trajectory=pickTrajectory(level);
-    this.startX=this.x;
-    this.txPhase=Math.random()*Math.PI*2;
-    this.diagDir=Math.random()<0.5?-1:1;
-    this.bounceDir=Math.random()<0.5?-1:1;
-  }
-  getSpeed(){
-    let s=this.baseSpeed;
-    if(effects.slow) s*=0.45;
-    if(effects.speed) s*=2.2;
-    return s;
-  }
-  update(){
-    if(this.collected) return;
-    const speed=this.getSpeed();
-    this.y+=speed;
-    if(this.trajectory==='sine'){
-      this.x=this.startX+Math.sin(this.y*0.04+this.txPhase)*55;
-    } else if(this.trajectory==='zigzag'){
-      this.x=this.startX+Math.sin(Math.floor(this.y*0.06)*1.2+this.txPhase)*45;
-    } else if(this.trajectory==='diagonal'){
-      this.x+=this.diagDir*0.9;
-      if(this.x<this.size){ this.x=this.size; this.diagDir=1; }
-      if(this.x>cw-this.size){ this.x=cw-this.size; this.diagDir=-1; }
-    } else if(this.trajectory==='bounce'){
-      this.x+=this.bounceDir*1.8;
-      if(this.x<this.size){ this.x=this.size; this.bounceDir=1; }
-      if(this.x>cw-this.size){ this.x=cw-this.size; this.bounceDir=-1; }
-    }
-    if(effects.magnet && this.type!=='bomb'){
-      const dx=cw/2-this.x;
-      this.x+=dx*0.025;
-    }
-    this.rot+=0.01;
-    this.sparkle+=0.05;
-  }
-  radius(){ return effects.curse&&this.type!=='curse' ? this.size*0.62 : this.size; }
-  draw(){
-    if(this.collected) return;
-    const s=this.radius();
-    const x=this.x, y=this.y;
-    // свечение
-    ctx.fillStyle=hexA(this.info.color, 0.14);
-    ctx.beginPath(); ctx.arc(x, y, s+5, 0, Math.PI*2); ctx.fill();
-    drawGlyph(this.type, x, y, s, this.sparkle);
-  }
-  contains(tx, ty){
-    if(this.collected) return false;
-    const s=this.radius();
-    const dx=tx-this.x, dy=ty-this.y;
-    return dx*dx+dy*dy<=s*s;
-  }
-}
-
-// векторные глифы предметов
-function drawGlyph(type, x, y, s, sparkle){
-  switch(type){
-    case 'coin':{
-      ctx.fillStyle='#E8B04B';
-      ctx.beginPath(); ctx.arc(x,y,s*0.92,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle='#B08D57';
-      ctx.beginPath(); ctx.arc(x,y,s*0.6,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle='#14100B';
-      ctx.font=`bold ${Math.round(s*0.72)}px Inter, sans-serif`;
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText('★', x, y+1);
-      break;
-    }
-    case 'gold':{
-      const g=ctx.createRadialGradient(x-3,y-3,1,x,y,s);
-      g.addColorStop(0,'#F5E2B8'); g.addColorStop(0.7,'#E8C9A0'); g.addColorStop(1,'#B08D57');
-      ctx.fillStyle=g;
-      ctx.beginPath(); ctx.arc(x,y,s*0.9,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle='#F5F5F7'; ctx.lineWidth=1.2;
-      ctx.beginPath(); ctx.arc(x,y,s*0.55,0,Math.PI*2); ctx.stroke();
-      // искра
-      const a=sparkle;
-      ctx.fillStyle='rgba(255,255,255,.75)';
-      ctx.beginPath(); ctx.arc(x+Math.cos(a)*s*0.5, y+Math.sin(a)*s*0.5, 2.4, 0, Math.PI*2); ctx.fill();
-      break;
-    }
-    case 'bomb':{
-      ctx.fillStyle='#1A1A22';
-      ctx.beginPath(); ctx.arc(x,y,s*0.8,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle='rgba(255,255,255,.18)';
-      ctx.beginPath(); ctx.arc(x-s*0.25,y-s*0.3,s*0.2,0,Math.PI*2); ctx.fill();
-      // фитиль
-      ctx.strokeStyle='#8A7350'; ctx.lineWidth=1.6;
-      ctx.beginPath(); ctx.moveTo(x, y-s*0.75); ctx.quadraticCurveTo(x+4, y-s*1.15, x+8, y-s*0.95); ctx.stroke();
-      const fl=0.5+0.5*Math.sin(Date.now()*0.02);
-      ctx.fillStyle=`rgba(232,176,75,${0.5+fl*0.5})`;
-      ctx.beginPath(); ctx.arc(x+8, y-s*0.95, 2.4+fl, 0, Math.PI*2); ctx.fill();
-      break;
-    }
-    case 'magnet':{
-      ctx.strokeStyle='#7A6A8F'; ctx.lineWidth=s*0.34; ctx.lineCap='butt';
-      ctx.beginPath(); ctx.arc(x, y-s*0.12, s*0.5, Math.PI, 0); ctx.stroke();
-      ctx.fillStyle='#C9CDD4';
-      ctx.fillRect(x-s*0.68, y-s*0.14, s*0.34, s*0.3);
-      ctx.fillRect(x+s*0.34, y-s*0.14, s*0.34, s*0.3);
-      ctx.lineCap='butt';
-      break;
-    }
-    case 'slow':{
-      ctx.strokeStyle='#5F7E8A'; ctx.lineWidth=2.4;
-      ctx.beginPath(); ctx.arc(x, y, s*0.62, 0, Math.PI*2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y-s*0.42); ctx.moveTo(x, y); ctx.lineTo(x+s*0.3, y+s*0.12); ctx.stroke();
-      break;
-    }
-    case 'curse':{
-      ctx.strokeStyle='#6B4E7E'; ctx.lineWidth=2.6;
-      const pulse=1+0.08*Math.sin(Date.now()*0.008);
-      ctx.beginPath(); ctx.arc(x, y, s*0.6*pulse, 0, Math.PI*2); ctx.stroke();
-      ctx.fillStyle='#6B4E7E';
-      ctx.beginPath(); ctx.arc(x, y, s*0.2, 0, Math.PI*2); ctx.fill();
-      break;
-    }
-    case 'speed':{
-      ctx.fillStyle='#C96A6A';
-      ctx.beginPath();
-      ctx.moveTo(x+s*0.28, y-s*0.75);
-      ctx.lineTo(x-s*0.35, y+s*0.1);
-      ctx.lineTo(x-s*0.02, y+s*0.1);
-      ctx.lineTo(x-s*0.28, y+s*0.75);
-      ctx.lineTo(x+s*0.35, y-s*0.1);
-      ctx.lineTo(x+s*0.02, y-s*0.1);
-      ctx.closePath(); ctx.fill();
-      break;
-    }
-    case 'shield':{
-      ctx.strokeStyle='#8B9D83'; ctx.lineWidth=2.4;
-      ctx.beginPath();
-      ctx.moveTo(x, y-s*0.7);
-      ctx.lineTo(x+s*0.55, y-s*0.4);
-      ctx.quadraticCurveTo(x+s*0.55, y+s*0.35, x, y+s*0.7);
-      ctx.quadraticCurveTo(x-s*0.55, y+s*0.35, x-s*0.55, y-s*0.4);
-      ctx.closePath(); ctx.stroke();
-      ctx.fillStyle='rgba(139,157,131,.3)';
-      ctx.fill();
-      break;
-    }
-  }
-}
-function hexA(hex, a){
-  const h=hex.replace('#','');
-  return `rgba(${parseInt(h.substr(0,2),16)},${parseInt(h.substr(2,2),16)},${parseInt(h.substr(4,2),16)},${a})`;
-}
-
-// ---------- эффекты тапа ----------
-class Pop{
-  constructor(x, y, color){
-    this.x=x; this.y=y; this.life=1; this.size=10; this.color=color;
-    this.particles=[];
-    for(let i=0;i<6;i++){
-      const a=(Math.PI*2/6)*i+Math.random()*0.3;
-      this.particles.push({vx:Math.cos(a)*(2+Math.random()*3), vy:Math.sin(a)*(2+Math.random()*3), size:2+Math.random()*4, x:0, y:0});
-    }
-  }
-  update(){
-    this.life-=0.04; this.size+=0.5;
-    for(const p of this.particles){
-      p.vx*=0.97; p.vy*=0.97; p.x+=p.vx; p.y+=p.vy;
-    }
-  }
-  draw(){
-    if(this.life<=0) return;
-    ctx.globalAlpha=this.life;
-    ctx.strokeStyle=this.color; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.stroke();
-    ctx.fillStyle=this.color;
-    for(const p of this.particles){
-      ctx.beginPath(); ctx.arc(this.x+p.x, this.y+p.y, p.size*this.life, 0, Math.PI*2); ctx.fill();
-    }
-    ctx.globalAlpha=1;
-  }
-}
-
-// ---------- спавн ----------
-function pickType(){
-  const types=cfg.types;
-  const weights=types.map(t=>cfg.weights[t]);
-  const total=weights.reduce((a,b)=>a+b,0);
-  let r=rng()*total;
-  for(let i=0;i<types.length;i++){
-    r-=weights[i];
-    if(r<=0) return types[i];
-  }
-  return types[0];
-}
-function spawnItem(){
-  if(!gameRunning) return;
-  if(items.filter(i=>!i.collected).length>18) return;
-  items.push(new Item(pickType()));
-}
-
-// ---------- тап ----------
-function handleTap(x, y){
-  if(!gameRunning||stunTimer>0) return;
-  for(let i=items.length-1;i>=0;i--){
-    const item=items[i];
-    if(!item.contains(x, y)) continue;
-    item.collected=true;
-    const type=item.type;
-    if(type==='coin'||type==='gold'){
-      const pts=type==='gold'?3:1;
-      score+=pts;
-      if(type==='coin'){ coinsTotal++; missionProgress('coins25',1); } else { goldsTotal++; missionProgress('golds10',1); }
-      pops.push(new Pop(item.x, item.y, TYPES[type].color));
-      snd.coin();
-      if(score>cfg.target) score=cfg.target;
-      updateHUD();
-      if(score>=cfg.target){ levelComplete(); return; }
-    }
-    else if(type==='bomb'){
-      if(hasShield){
-        hasShield=false;
-        missionProgress('shield2',1);
-        pops.push(new Pop(item.x, item.y, '#8B9D83'));
-        snd.shield(); shake=4;
-      } else {
-        lives--; levelBombHits++; levelLostLives++;
-        shake=8; stunTimer=20;
-        snd.bomb();
-        pops.push(new Pop(item.x, item.y, '#E4545F'));
-        updateHUD();
-        if(lives<=0){ gameOver(); return; }
-      }
-    }
-    else if(type==='magnet'){ effects.magnet=180; snd.power(); pops.push(new Pop(item.x, item.y, TYPES.magnet.color)); missionProgress('magnet2',1); }
-    else if(type==='slow'){ effects.slow=180; snd.power(); pops.push(new Pop(item.x, item.y, TYPES.slow.color)); }
-    else if(type==='curse'){ effects.curse=180; pops.push(new Pop(item.x, item.y, TYPES.curse.color)); }
-    else if(type==='speed'){ effects.speed=180; pops.push(new Pop(item.x, item.y, TYPES.speed.color)); }
-    else if(type==='shield'){ hasShield=true; snd.shield(); pops.push(new Pop(item.x, item.y, TYPES.shield.color)); }
-    updateHUD();
-    break;
-  }
-}
-
-// ---------- уровни ----------
-function showLevelStart(){
-  cfg=getLevelConfig(level);
-  el.modalBadge.textContent='Уровень '+level;
-  el.modalTitle.textContent='Цель: '+cfg.target+' очков';
-  el.modalScore.textContent=GROUP_SUBS[cfg.group].text;
-  const showTypes=GROUP_SUBS[cfg.group].types||cfg.types;
-  el.modalLegend.innerHTML=showTypes.map(t=>`<span class="lg"><i style="background:${TYPES[t].color}"></i>${TYPES[t].label}</span>`).join('');
-  el.modalBtn.textContent='Начать';
-  el.modalBtn.onclick=()=>{ snd.click(); startLevel(); };
-  el.modal.classList.remove('hidden');
-}
-function startLevel(){
-  el.modal.classList.add('hidden');
-  comboPitch=0; score=0;
-  items=[]; pops=[]; effects={};
-  spawnTimer=0; stunTimer=0;
-  levelBombHits=0; levelLostLives=0;
-  gameRunning=true; itemId=0;
-  updateHUD();
-}
-function levelComplete(){
-  gameRunning=false;
-  comboPitch=0;
-  snd.win();
-  if(levelBombHits===0&&levelLostLives===0) missionProgress('nobomb2',1);
-  if(levelLostLives===0) missionProgress('full3',1);
-  missionProgress('level3', level+1);
-  missionProgress('level5', level+1);
-  const final=Math.round(level*mult);
-  markDay();
-  const isDailyRec=final>dailyBest;
-  if(isDailyRec){ dailyBest=final; lsSet('cointap.daily.'+today, dailyBest); }
-  const isRec=level>best;
-  if(isRec){ best=level; lsSet('cointap.level', best); }
-  flushMissions();
-  el.modalBadge.textContent=isRec?'Новый рекорд':'Уровень пройден';
-  el.modalBadge.classList.toggle('record', isRec);
-  el.modalCard.classList.toggle('modal-record', isRec);
-  el.modalTitle.textContent='Уровень '+level+' пройден';
-  el.modalScore.textContent='Жизни: '+lives+' · Рекорд уровня: '+best;
-  el.modalLegend.innerHTML='';
-  el.modalBtn.textContent='Дальше →';
-  el.modalBtn.onclick=()=>{ snd.click(); level++; showLevelStart(); };
-  el.modal.classList.remove('hidden');
-  showWelcomeRecords(); updateHUD();
-}
-function gameOver(){
-  gameRunning=false;
-  comboPitch=0;
-  markDay();
-  const final=Math.round((level-1)*mult);
-  const isDailyRec=final>dailyBest;
-  if(isDailyRec){ dailyBest=final; lsSet('cointap.daily.'+today, dailyBest); }
-  const isRec=(level-1)>best;
-  if(isRec){ best=level-1; lsSet('cointap.level', best); }
-  flushMissions();
-  snd.over();
-  el.modalBadge.textContent=isRec?'Новый рекорд':'Забег окончен';
-  el.modalBadge.classList.toggle('record', isRec);
-  el.modalCard.classList.toggle('modal-record', isRec);
-  el.modalTitle.textContent='Жизни кончились';
-  el.modalScore.textContent='Дошёл до уровня '+level+' · Рекорд уровня: '+best;
-  el.modalLegend.innerHTML='';
-  el.modalBtn.textContent='Заново с 1 уровня';
-  el.modalBtn.onclick=()=>{ snd.click(); level=1; lives=3; hasShield=false; showLevelStart(); };
-  el.modal.classList.remove('hidden');
-  showWelcomeRecords(); updateHUD();
-}
-
-// ---------- шаг логики ----------
-function update(){
-  frameId++;
-  if(!gameRunning) return;
-  if(stunTimer>0) stunTimer--;
-  spawnTimer++;
-  if(spawnTimer>=cfg.spawnInterval){ spawnTimer=0; spawnItem(); }
-  for(const item of items) item.update();
-  items=items.filter(i=>!i.collected&&i.y<ch+50);
-  for(const p of pops) p.update();
-  pops=pops.filter(p=>p.life>0);
-  for(const key of Object.keys(effects)){
-    effects[key]--;
-    if(effects[key]<=0) delete effects[key];
-  }
-  if(shake>0){ shake*=0.85; if(shake<0.5) shake=0; }
-}
-
-// ---------- отрисовка ----------
-function draw(){
+function magnetCollect(dt){ window.__mcT=(window.__mcT||0)-dt; if(window.__mcT>0)return; window.__mcT=.4; const coins=objs.filter(o=>(o.type==='coin'||o.type==='big')&&!o.dying); if(coins.length){ const c=coins[0]; tapObj(c); } }
+/* ═══ РЕНДЕР ═══ */
+function render(){ ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#07070B'; ctx.fillRect(0,0,W,H);
+  /* жила: золотые прожилки на фоне */
+  ctx.strokeStyle='rgba(212,165,116,.07)'; ctx.lineWidth=2;
+  for(let i=0;i<5;i++){ ctx.beginPath(); const bx=(i*97)%W; ctx.moveTo(bx,0); ctx.quadraticCurveTo(bx+60,H*.4,bx-40,H); ctx.stroke(); }
   ctx.save();
-  if(shake>0) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
-  ctx.clearRect(0,0,cw,ch);
-  for(const item of items) item.draw();
-  for(const p of pops) p.draw();
+  if(shake>0)ctx.translate(rand(-shake,shake)*.5,rand(-shake,shake)*.4);
+  /* фоновые блёстки */
+  parts.forEach(p=>{ ctx.globalAlpha=clamp(p.life/p.maxLife,0,1); ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,TAU); ctx.fill(); }); ctx.globalAlpha=1;
+  /* объекты */
+  objs.forEach(o=>drawObj(o));
+  /* поле магнита */
+  if(magnetT>0){ const a=.25+Math.sin(performance.now()*.012)*.12; ctx.strokeStyle=`rgba(126,200,227,${a})`; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(W/2,H-40,60+Math.sin(performance.now()*.006)*8,0,TAU); ctx.stroke(); ctx.fillStyle=`rgba(126,200,227,${a*.4})`; ctx.beginPath(); ctx.arc(W/2,H-40,46,0,TAU); ctx.fill(); }
+  /* кольца */
+  rings.forEach(r=>{ ctx.globalAlpha=clamp(r.life/r.maxLife,0,1); ctx.strokeStyle=r.color; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(r.x,r.y,r.r,0,TAU); ctx.stroke(); }); ctx.globalAlpha=1;
+  /* тексты */
+  texts.forEach(t=>{ ctx.globalAlpha=clamp(t.life/t.maxLife,0,1); ctx.font=`700 ${t.size}px Inter,sans-serif`; ctx.textAlign='center'; ctx.fillStyle=t.color; ctx.fillText(t.txt,t.x,t.y); }); ctx.globalAlpha=1;
   ctx.restore();
-}
-
-// ---------- HUD ----------
-function updateHUD(){
-  el.levelV.textContent=level;
-  el.daily.textContent=dailyBest;
-  el.best.textContent=best;
-  el.livesV.textContent=lives;
-  el.targetN.textContent=score+'/'+(cfg?cfg.target:10);
-}
-function showWelcomeRecords(){
-  el.wDaily.textContent=dailyBest;
-  el.wBest.textContent=best;
-  el.wStreak.textContent='🔥 '+effStreak();
-}
-
-// ---------- цикл ----------
-function loop(now){
-  animId=requestAnimationFrame(loop);
-  if(!lastT) lastT=now;
-  let delta=now-lastT; lastT=now;
-  if(paused){ draw(); return; }
-  delta=Math.min(delta,100);
-  acc+=delta;
-  let steps=0;
-  while(acc>=STEP_MS&&steps<4){ update(); acc-=STEP_MS; steps++; }
-  if(steps===4) acc=0;
-  flushMissions();
-  draw();
-}
-
-// ---------- ввод ----------
-canvas.addEventListener('touchstart',e=>{
-  e.preventDefault();
-  const t=e.touches[0], r=canvas.getBoundingClientRect();
-  handleTap(t.clientX-r.left, t.clientY-r.top);
-},{passive:false});
-canvas.addEventListener('mousedown',e=>{
-  const r=canvas.getBoundingClientRect();
-  handleTap(e.clientX-r.left, e.clientY-r.top);
-});
-
-// ---------- экраны ----------
-function startGame(){
-  el.welcome.classList.add('hidden');
-  el.game.classList.remove('hidden');
-  fitCanvas();
-  level=1; lives=3; hasShield=false;
-  showLevelStart();
-}
-function toMenu(){
-  gameRunning=false;
-  el.game.classList.add('hidden');
-  el.modal.classList.add('hidden');
-  el.welcome.classList.remove('hidden');
-  showWelcomeRecords();
-}
-
-$('btn-play').addEventListener('click',()=>{ snd.click(); startGame(); });
-$('btn-new').addEventListener('click',()=>{ snd.click(); gameRunning=false; lives=3; hasShield=false; level=1; showLevelStart(); });
-$('btn-menu').addEventListener('click',()=>{ snd.click(); toMenu(); });
-$('btn-missions').addEventListener('click',openMissions);
-$('missions-chip').addEventListener('click',openMissions);
-$('mmodal-btn').addEventListener('click',()=>{ snd.click(); el.mmodal.classList.add('hidden'); });
-function openMissions(){ snd.click(); renderMissionsModal(); el.mmodal.classList.remove('hidden'); }
-
-function updateSoundBtn(){ $('btn-sound').textContent=muted?'🔇':'🔊'; }
-$('btn-sound').addEventListener('click',()=>{
-  muted=!muted; lsSet('cointap.muted', muted);
-  updateSoundBtn(); if(!muted) snd.click();
-});
-updateSoundBtn();
-
-function setMode(m){
-  mode=m;
-  $('mode-daily').classList.toggle('active', m==='daily');
-  $('mode-free').classList.toggle('active', m==='free');
-  // пересид операции: seed применяется в startLevel через rng
-  rng=(m==='daily')?mulberry32(xmur3('cointap-daily-'+today)()):Math.random;
-}
-$('mode-daily').addEventListener('click',()=>{ snd.click(); setMode('daily'); });
-$('mode-free').addEventListener('click', ()=>{ snd.click(); setMode('free'); });
-
-document.addEventListener('visibilitychange',()=>{ paused=document.hidden; if(!document.hidden) lastT=0; });
-
-function onResize(){
-  if(el.game.classList.contains('hidden')) return;
-  fitCanvas();
-  for(const it of items){
-    it.x=clamp(it.x, it.size, cw-it.size);
-    it.startX=clamp(it.startX, it.size, cw-it.size);
-  }
-}
-window.addEventListener('resize', onResize);
-if(window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
-
-['keydown','pointerdown','touchstart'].forEach(ev=>document.addEventListener(ev, audio, {passive:true}));
-
-// ---------- init ----------
-(function init(){
-  for(let i=0;i<7;i++) el.decoRow.appendChild(document.createElement('i'));
-  el.dailyDate.textContent='Вызов дня · '+today;
-  pickMissions(); renderMissionsChip();
-  setMode('daily');
-  showWelcomeRecords(); updateHUD();
-  fitCanvas();
-  animId=requestAnimationFrame(loop);
-})();
-
-// ---------- debug hooks ----------
+  /* доктайл: подсказка */
+  ctx.fillStyle='rgba(200,200,210,.35)'; ctx.font='600 10px Inter,sans-serif'; ctx.textAlign='center'; ctx.fillText('тапай монеты · не трогай бомбы',W/2,H-14);
+  /* прогресс уровня */
+  const pw=goal>0?clamp(goalScore/goal,0,1):0; ctx.fillStyle='rgba(10,10,15,.7)'; ctx.beginPath(); ctx.roundRect(W/2-70,16,140,10,5); ctx.fill(); ctx.fillStyle='#D4A574'; ctx.beginPath(); ctx.roundRect(W/2-68,18,136*pw,6,3); ctx.fill(); }
+function drawObj(o){ const die=o.dying>0?1-o.dying:1; const sc=die*(o.dying>0?1+.4*o.dying:1);
+  ctx.save(); ctx.translate(o.x,o.y); ctx.scale(sc,sc);
+  const breathe=1+Math.sin(o.t*4)*.03; ctx.scale(breathe,breathe);
+  if(o.type==='coin'||o.type==='big'){ const R=o.r; const fw=Math.abs(Math.cos(o.flip)); const w=R*Math.max(.18,fw);
+    ctx.shadowColor='rgba(232,176,75,.75)'; ctx.shadowBlur=16;
+    const g=ctx.createLinearGradient(-w,0,w,0); g.addColorStop(0,'#B8863C'); g.addColorStop(.5,'#EFC878'); g.addColorStop(1,'#B8863C'); ctx.fillStyle=g;
+    ctx.beginPath(); ctx.ellipse(0,0,w,R,0,0,TAU); ctx.fill(); ctx.shadowBlur=0;
+    ctx.strokeStyle='rgba(120,80,20,.7)'; ctx.lineWidth=1.5; ctx.stroke();
+    if(fw>.55){ ctx.fillStyle='rgba(120,80,20,.55)'; starPath(0,0,R*.44,R*.2,Math.PI/2+(o.type==='big'?Math.PI/5:0)); ctx.fill(); if(o.type==='big'){ ctx.fillStyle='rgba(90,60,10,.8)'; ctx.font=`700 ${R*.5}px Inter,sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('5',0,1); } }
+    /* кольцо-таймер */
+    const k=clamp(o.life/o.maxLife,0,1); ctx.strokeStyle=k>.4?'rgba(255,255,255,.6)':'rgba(228,84,95,.9)'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(0,0,R+6,-Math.PI/2,-Math.PI/2+TAU*k); ctx.stroke(); }
+  else if(o.type==='bomb'){ ctx.shadowColor='rgba(228,84,95,.8)'; ctx.shadowBlur=14; ctx.fillStyle='#1A1A22'; ctx.beginPath(); ctx.arc(0,2,o.r,0,TAU); ctx.fill(); ctx.shadowBlur=0; ctx.strokeStyle='rgba(228,84,95,.8)'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.1)'; ctx.beginPath(); ctx.arc(-o.r*.3,-o.r*.25,o.r*.28,0,TAU); ctx.fill();
+    /* фитиль + искры */
+    ctx.strokeStyle='#B08968'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(o.r*.2,-o.r*.85); ctx.quadraticCurveTo(o.r*.55,-o.r*1.35,o.r*.85,-o.r*1.15); ctx.stroke();
+    const sp=1+Math.sin(o.t*14)*.5; ctx.fillStyle='#FFD9A8'; ctx.shadowColor='#FFB84B'; ctx.shadowBlur=10; ctx.beginPath(); ctx.arc(o.r*.85,-o.r*1.15,3*sp,0,TAU); ctx.fill(); ctx.shadowBlur=0;
+    ctx.fillStyle='#E4545F'; ctx.font=`700 ${o.r*.62}px Inter,sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('!',0,4); }
+  else if(o.type==='magnet'){ ctx.shadowColor='rgba(126,200,227,.8)'; ctx.shadowBlur=14;
+    ctx.strokeStyle='#7EC8E3'; ctx.lineWidth=7; ctx.beginPath(); ctx.arc(0,2,o.r*.62,Math.PI,0); ctx.stroke(); ctx.shadowBlur=0;
+    ctx.fillStyle='#C7CCE0'; ctx.fillRect(-o.r*.62-3.5,2,7,o.r*.5); ctx.fillRect(o.r*.62-3.5,2,7,o.r*.5);
+    ctx.fillStyle='#E4545F'; ctx.fillRect(-o.r*.62-3.5,2+o.r*.5,7,4); ctx.fillRect(o.r*.62-3.5,2+o.r*.5,7,4);
+    const k=clamp(o.life/o.maxLife,0,1); ctx.strokeStyle='rgba(126,200,227,.7)'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(0,0,o.r+6,-Math.PI/2,-Math.PI/2+TAU*k); ctx.stroke(); }
+  ctx.restore(); }
+function starPath(cx,cy,ro,ri,rot){ ctx.beginPath(); for(let i=0;i<10;i++){ const a=-Math.PI/2+(rot||0)+i*Math.PI/5; const r=i%2?ri:ro; ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r); } ctx.closePath(); }
+/* ─── Цикл ─── */
+let last=0,acc=0,rafId=0,annT=0;
+function loop(ts){ rafId=requestAnimationFrame(loop); if(!running)return; if(!last)last=ts; let dtms=ts-last; last=ts; if(dtms>200)dtms=200; acc+=dtms; let guard=0; while(acc>=STEP*1000&&guard++<6){ update(STEP); acc-=STEP*1000; } render(); }
+/* ─── Ввод: тапы ─── */
+function pt(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*(W/r.width),y:(e.clientY-r.top)*(H/r.height)}; }
+cv.addEventListener('pointerdown',e=>{ if(!running||over)return; audioInit(); const p=pt(e);
+  let hit=null,bd=1e9; objs.forEach(o=>{ if(o.dying)return; const d=Math.hypot(o.x-p.x,o.y-p.y); if(d<o.r+14&&d<bd){ bd=d; hit=o; } });
+  if(hit){ tapObj(hit); } else { comboBreak(); part(p.x,p.y,0,0,.25,'rgba(255,255,255,.4)',2); } });
+/* ─── Поток ─── */
+function resetGame(){ score=0; lives=3; combo=0; comboMult=1; magnetT=0; el.score.textContent='0'; el.lives.textContent='3'; el.combo.textContent='×1.0'; loadLevel(1); }
+function startGame(){ touchStreak(); audioInit(); if(mode==='daily')dailyRng=mulberry32(xmur3('cointap-'+today)()); else dailyRng=Math.random; resetGame(); running=true; over=false; last=0; acc=0; $('welcome').classList.add('hidden'); $('modal').classList.add('hidden'); $('game').classList.remove('hidden'); refreshHud(); if(!rafId)rafId=requestAnimationFrame(loop); }
+function refreshHud(){ el.daily.textContent=fmt(dailyBest); el.best.textContent=fmt(best); el.streakN.textContent=effStreak(); el.multN.textContent='×'+mult.toFixed(2); refreshMissionsUI(); }
+function refreshWelcome(){ el.wDaily.textContent=fmt(dailyBest); el.wBest.textContent=fmt(best); el.wStreak.textContent='🔥 '+effStreak(); $('daily-date').textContent='Вызов дня · '+today.slice(5).replace('-','.'); }
+function gameOver(){ over=true; running=false; sfx.over(); missionTick('score',Math.floor(score),true); let isRec=false,isRecDay=false; if(score>best){ best=Math.floor(score); lsSet(K_BEST,best); isRec=true; } if(score>dailyBest){ dailyBest=Math.floor(score); lsSet(K_DAILY,dailyBest); isRecDay=true; } setTimeout(()=>{ $('modal-badge').textContent=isRec||isRecDay?'Новый рекорд':'Игра окончена'; $('modal-badge').classList.toggle('record',isRec||isRecDay); $('modal-title').textContent=isRecDay&&!isRec?'Рекорд дня!':(isRec?'Абсолютный рекорд!':'Жила обвалилась'); $('modal-score').innerHTML=`Очки <b>${fmt(score)}</b> · Уровень <b>${level}</b><br>Рекорд <b>${fmt(best)}</b> · за день <b>${fmt(dailyBest)}</b>`; $('modal').classList.remove('hidden'); },800); }
+function toMenu(){ running=false; over=false; $('game').classList.add('hidden'); $('modal').classList.add('hidden'); $('welcome').classList.remove('hidden'); refreshWelcome(); }
+$('btn-play').addEventListener('click',()=>{ audioInit(); startGame(); });
+$('mode-daily').addEventListener('click',()=>{ mode='daily'; $('mode-daily').classList.add('active'); $('mode-free').classList.remove('active'); });
+$('mode-free').addEventListener('click',()=>{ mode='free'; $('mode-free').classList.add('active'); $('mode-daily').classList.remove('active'); });
+$('btn-restart').addEventListener('click',()=>{ audioInit(); startGame(); });
+$('btn-menu').addEventListener('click',toMenu);
+$('modal-btn').addEventListener('click',()=>{ audioInit(); startGame(); });
+$('modal-btn2').addEventListener('click',toMenu);
+$('btn-missions').addEventListener('click',()=>{ renderMissionsModal(); $('mmodal').classList.remove('hidden'); });
+$('missions-chip').addEventListener('click',()=>{ renderMissionsModal(); $('mmodal').classList.remove('hidden'); });
+$('mmodal-btn').addEventListener('click',()=>$('mmodal').classList.add('hidden'));
+function syncSoundBtn(){ $('btn-sound').textContent=muted?'🔇':'🔊'; }
+$('btn-sound').addEventListener('click',()=>{ muted=!muted; lsSet(K_MUTE,muted); if(master)master.gain.value=muted?0:0.5; syncSoundBtn(); if(!muted){ audioInit(); sfx.click(); } });
+refreshWelcome(); refreshHud(); syncSoundBtn();
+/* ─── Debug-хук ─── */
 window.__ct={
-  get state(){ return gameRunning?'play':'ui'; },
-  get level(){ return level; },
-  get score(){ return score; },
-  get lives(){ return lives; },
-  get best(){ return best; },
-  get missionsDone(){ return missions.filter(m=>(mState[m.id]||{}).done).length; },
-  tap(x, y){ handleTap(x, y); },
-  get items(){ return items.filter(i=>!i.collected).length; },
-  spawnCoin(){ if(cfg) items.push(new Item('coin')); },
-  spawnBomb(){ if(cfg) items.push(new Item('bomb')); },
-  flush(){ flushMissions(); },
+  start:startGame, over:()=>{ running=true; gameOver(); },
+  state(){ return {score:Math.floor(score),lives,level,goalScore,goal,combo:comboMult,objs:objs.map(o=>o.type),magnet:Math.round(magnetT*10)/10,running,over,mode}; },
+  tap:i=>{ const o=objs.filter(x=>!x.dying)[i]; if(o)tapObj(o); },
+  spawn:type=>{ const roll=type==='big'?.05:(type==='bomb'?.15:(type==='magnet'?.25:0)); const save=dailyRng; if(type){ dailyRng=()=>roll/1; spawnObj(); dailyRng=save; } else spawnObj(); },
+  addScore:n=>{ score+=n; goalScore+=n; }, missions:()=>missionData, records:()=>({best:lsGet(K_BEST,0),daily:lsGet(K_DAILY,0),streak:lsGet(K_STREAK,0),today}),
 };
