@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0A0A0F">
-  <title>Coin Tap — мини-игра | AXIIOM</title>
-  <meta name="description" content="Монетный дождь: тапай монеты, обходи бомбы, лови бонусы. Уровни, вызов дня, стрик и ежедневные миссии. Бесплатная мини-игра AXIIOM.">
+  <title>Золотая жила — реакция-аркада | AXIIOM</title>
+  <meta name="description" content="Космический шутер «Золотая жила»: веди корабль пальцем, отбивай волны врагов, собирай дропы оружия и щита, побеждай боссов. Вызов дня, стрик и ежедневные миссии. Бесплатно, в браузере.">
   <link rel="canonical" href="https://bestdeejay-design.github.io/minigames/coin-tap/">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://bestdeejay-design.github.io/minigames/coin-tap/">
-  <meta property="og:title" content="Coin Tap — мини-игра | AXIIOM">
-  <meta property="og:description" content="Тапай монеты, обходи бомбы, лови магнит и щит. Уровни, вызов дня и миссии.">
+  <meta property="og:title" content="Золотая жила — реакция-аркада | AXIIOM">
+  <meta property="og:description" content="Веди корабль, отбивай волны, качай оружие и держи стрик. Боссы, дропы, вызов дня и миссии.">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Coin Tap — мини-игра | AXIIOM">
-  <meta name="twitter:description" content="Монетный дождь: тапай монеты и держи стрик.">
+  <meta name="twitter:title" content="Золотая жила — реакция-аркада | AXIIOM">
+  <meta name="twitter:description" content="Веди корабль, отбивай волны, качай оружие и держи стрик.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🪙</text></svg>">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -28,9 +28,11 @@
   </header>
   <div id="welcome">
     <span class="w-badge">AXIIOM · Мини-игры</span>
-    <h1>Coin Tap</h1>
-    <div class="deco-row" id="deco-row" aria-hidden="true"></div>
-    <p>Монетный дождь. Тапай <b>монеты</b>, обходи <b>бомбы</b>, ловь магнит, замедление и щит. Проклятье сжимает монеты, ускорение — наоборот. Уровень пройден, когда цель собрана.</p>
+    <h1>Золотая жила</h1>
+    <div class="ship-row" aria-hidden="true">
+      <i class="d-red"></i><i class="d-gold"></i><i class="d-purple"></i><i class="d-gold"></i><i class="d-cyan"></i>
+    </div>
+    <p>Тапай <b>монеты</b>, пока не истаяло кольцо, лови <b>большие монеты ×5</b> и <b>магниты</b>, но не трогай <b>бомбы</b>. Серия без промаха растёт до <b>×3</b> — жадность против точности. 20 уровней с целями, потом бесконечная жила.</p>
     <span class="w-daily-chip" id="daily-chip"><span class="dot"></span><span id="daily-date">Вызов дня</span></span>
     <div class="w-records">
       <span class="w-rec"><span>Рекорд дня</span><b id="w-daily-best">0</b></span>
@@ -42,54 +44,62 @@
       <button id="mode-free">Свободная</button>
     </div>
     <button id="btn-play">Играть</button>
-    <span class="w-hint">спокойный темп · без таймеров · рекорды хранятся у вас</span>
+    <span class="w-hint">веди пальцем · автоогонь · рекорды хранятся у вас</span>
   </div>
   <div id="game" class="hidden">
     <section id="stats">
-      <div class="stat"><span class="stat-label">Уровень</span><span class="stat-value gold" id="level-val">1</span></div>
+      <div class="stat"><span class="stat-label">Очки</span><span class="stat-value gold" id="score-val">0</span></div>
       <div class="stat"><span class="stat-label">Рекорд дня</span><span class="stat-value" id="daily-val">0</span></div>
       <div class="stat"><span class="stat-label">Рекорд</span><span class="stat-value" id="best-val">0</span></div>
       <div class="stat"><span class="stat-label">Жизни</span><span class="stat-value" id="lives-val">3</span></div>
     </section>
     <div id="meta-bar">
       <span class="m-chip" id="streak-chip" title="Серия дней: заходи каждый день, множитель растёт до ×1.5">🔥 <b id="streak-n">0</b><i id="mult-n">×1.0</i></span>
-      <span class="m-chip" id="target-chip">Цель <b id="target-n">0/10</b></span>
-      <button class="m-chip as-btn" id="missions-chip">🎯 Миссии <b id="missions-n">0/3</b></button>
+      <span class="m-chip" id="combo-chip">Серия <b id="combo-n">×1.0</b></span><span class="m-chip" id="goal-chip">Цель <b id="goal-n">0/10</b></span><button class="m-chip as-btn" id="missions-chip">🎯 Миссии <b id="missions-n">0/3</b></button>
     </div>
+    <div id="hull-wrap"><div id="hull-fill"></div><span id="hull-shield"></span></div>
     <div id="canvas-wrap">
       <canvas id="gc"></canvas>
+      <div id="announce" class="hidden"></div>
     </div>
     <div id="bottom">
-      <button id="btn-new">Заново</button>
+      <button id="btn-restart">Заново</button>
       <button id="btn-missions">Миссии</button>
       <button id="btn-menu">В меню</button>
-      <button id="btn-sound" aria-label="Звук">🔊</button>
+      <button id="btn-sound" title="Звук">🔊</button>
     </div>
   </div>
   <div id="modal" class="hidden">
-    <div class="modal-card" id="modal-card">
-      <span class="modal-badge" id="modal-badge">Забег окончен</span>
-      <div id="modal-title">Уровень 1</div>
-      <div id="modal-score"></div>
-      <div id="modal-legend"></div>
+    <div class="modal-card">
+      <span class="modal-badge" id="modal-badge">Игра окончена</span>
+      <h2 id="modal-title">Корабль потерян</h2>
+      <p id="modal-score"></p>
       <div class="modal-actions">
-        <button id="modal-btn">Начать</button>
-        <a id="modal-btn2" href="../">Каталог</a>
+        <button id="modal-btn">Ещё раз</button>
+        <button id="modal-btn2">В меню</button>
       </div>
     </div>
   </div>
   <div id="mmodal" class="hidden">
     <div class="modal-card">
-      <span class="modal-badge">Ежедневные задания</span>
-      <div id="mmodal-title">Миссии дня</div>
+      <span class="modal-badge">Ежедневные миссии</span>
+      <h2>Задания дня</h2>
       <div id="mmodal-list"></div>
-      <p class="mmodal-note">Каждая выполненная миссия даёт бонусные очки. Набор обновляется в полночь МСК.</p>
+      <p class="mm-note">Награда за миссию: <b>+25 × множитель стрика</b> к счёту при выполнении. Обновляются каждый день.</p>
       <div class="modal-actions">
-        <button id="mmodal-btn">Продолжить</button>
+        <button id="mmodal-btn">Понятно</button>
       </div>
     </div>
   </div>
-  <div id="toasts"></div>
+  <div id="bmodal" class="hidden">
+    <div class="modal-card">
+      <span class="modal-badge">Строительство</span>
+      <h2>Выбери этаж</h2>
+      <div id="bmodal-list"></div>
+      <div class="modal-actions"><button id="bmodal-btn">Отмена</button></div>
+    </div>
+  </div>
+  <div id="toasts" aria-live="polite"></div>
 </div>
 <script src="game.js"></script>
 </body>
