@@ -24,6 +24,7 @@
 | 🛡️ Рубеж 64 | оригинальная RTS: минералы, технологии, ретрансляторы, 3 сложности | [играть](https://bestdeejay-design.github.io/minigames/rubezh64/) |
 | ✳️ Контур | аркада одним жестом: обводи искры, собирай комбо за 45 секунд | [играть](https://bestdeejay-design.github.io/minigames/contour/) |
 | 🎱 Кладезь | бильярд 2.0: призрачная траектория, комбо, 30 уровней и миссии | [играть](https://bestdeejay-design.github.io/minigames/billiards/) |
+| 🎱 Бильярд · Классика | оригинальная физика: долгое качение, мягкие борта, открытые лузы, траектория точками | [играть](https://bestdeejay-design.github.io/minigames/billiards-classic/) |
 | 🧨 Разлом | брейкер: рой шаров, вызов дня, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/breaker/) |
 | ⚔️ Звёздный рубеж | RTS: кампания, оборона с волнами, две расы (люди/кхарид), техника, турели, ремонт | [играть](https://bestdeejay-design.github.io/minigames/rts/) |
 | 🪙 Золотая жила | Coin Tap 2.0: 3D-флип монет, бомбы, магниты, серия до ×3 | [играть](https://bestdeejay-design.github.io/minigames/coin-tap/) |
