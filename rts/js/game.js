@@ -7,8 +7,8 @@
 // ============================================================
 import {
   TILE, MAP_W, MAP_H, WORLD_W, WORLD_H, LOGIC_DT, MAX_FRAME_DT,
-  START_MINERALS, BUILDINGS, UNITS, SUPPLY_MAX,
-  fname,
+  START_MINERALS, BUILDINGS, UNITS, SUPPLY_MAX, UPGRADES,
+  fname, fdesc,
 } from './config.js';
 import { GameMap, CC_WORKER_OFFS } from './map.js';
 import { Fog } from './fog.js';
@@ -24,8 +24,48 @@ import { attachInput, updateCamera } from './input.js';
 const BUILD_ORDER = [
   ['KeyQ', 'cc'], ['KeyW', 'depot'], ['KeyE', 'barracks'],
   ['KeyR', 'turret'], ['KeyT', 'bunker'], ['KeyY', 'wall'], ['KeyU', 'factory'],
+  ['KeyI', 'lab'],
 ];
 const PRODUCE_KEYS = ['KeyQ', 'KeyW', 'KeyE'];
+const RESEARCH_KEYS = ['KeyQ', 'KeyW', 'KeyE', 'KeyR'];
+const RESEARCH_ORDER = ['infAtk', 'vehAtk', 'infArm', 'vehArm'];
+
+// ------------------------------------------------------------
+// Данные тултипов кнопок панели (подписи юнитов/зданий/улучшений).
+// ------------------------------------------------------------
+function buildingTip(type, fac) {
+  const cfg = BUILDINGS[type];
+  const lines = [`Прочность ${cfg.hp} · размер ${cfg.w}×${cfg.h} · стройка ${cfg.buildTime}с`];
+  if (cfg.supplyGain) lines.push('Население +' + cfg.supplyGain);
+  if (cfg.produces) {
+    const list = Array.isArray(cfg.produces) ? cfg.produces : [cfg.produces];
+    lines.push('Обучает: ' + list.map((t) => fname(UNITS[t], fac)).join(', '));
+  }
+  if (cfg.attack) lines.push('Атака ' + cfg.dmg + ' · дальность ' + cfg.range);
+  if (cfg.garrisonCap) lines.push('Гарнизон до ' + cfg.garrisonCap + ' пехотинцев');
+  if (cfg.research) lines.push('Исследует улучшения армии');
+  if (cfg.requires) lines.push('Требует: ' + fname(BUILDINGS[cfg.requires], fac));
+  return { title: fname(cfg, fac), cost: cfg.cost, desc: fdesc(cfg, fac), lines };
+}
+function unitTip(type, fac) {
+  const cfg = UNITS[type];
+  const lines = [
+    'ОЗ ' + cfg.hp + ' · урон ' + cfg.dmg + ' · дальность ' + cfg.range,
+    'Население ' + cfg.supply + ' · обучение ' + cfg.trainTime + 'с',
+  ];
+  if (cfg.splash) lines.push('Осколки по площади');
+  if (cfg.canHeal) lines.push('Лечит пехоту: +' + cfg.healRate + ' ОЗ/с');
+  if (cfg.vehicle) lines.push('Техника: чинится рабочими');
+  return { title: fname(cfg, fac), cost: cfg.cost, desc: fdesc(cfg, fac), lines };
+}
+function upgradeTip(key, fac, lvl) {
+  const u = UPGRADES[key];
+  return {
+    title: fname(u, fac) + ' ур.' + (lvl + 1), cost: u.costs[lvl],
+    desc: fdesc(u, fac),
+    lines: ['Время: ' + u.times[lvl] + 'с', 'Действует сразу на всю армию'],
+  };
+}
 
 export class Game {
   constructor() {
@@ -80,6 +120,13 @@ export class Game {
       stats: { kills: 0, losses: 0, mined: 0 },
       bcount: { player: 0, enemy: 0 },
       defenseWave: 0,
+      // Уровни улучшений обеих сторон (растут исследованиями лаборатории).
+      tech: {
+        player: { infAtk: 0, infArm: 0, vehAtk: 0, vehArm: 0 },
+        enemy:  { infAtk: 0, infArm: 0, vehAtk: 0, vehArm: 0 },
+      },
+      noBase: !!m.noBase,           // стелс-миссия: отряд без базы
+      shakeT: 0, shakeMag: 0,       // тряска экрана от взрывов
       lastAlertT: -99, lastSupplyToast: -99, lastRepairToast: -99,
     };
     st.map = new GameMap(seed, m.map);
@@ -93,11 +140,27 @@ export class Game {
     // Стартовые базы: командный центр + рабочие (враг — зеркален).
     for (const side of ['player', 'enemy']) {
       const base = st.map.bases[side];
+      if (side === 'player' && st.noBase) continue; // стелс-миссия — отряд вместо базы
       const cc = new B.Building(st, side, 'cc', base.cc.x, base.cc.y, true);
       st.map.markBuilding(cc);
       st.bcount[side]++;
       for (const [dx, dy] of CC_WORKER_OFFS) {
         U.spawnUnit(st, side, 'worker', (base.cc.x + dx + 0.5) * TILE, (base.cc.y + dy + 0.5) * TILE, true);
+      }
+    }
+
+    // Стелс-миссия: стартовый отряд без базы (workers нет — строить нельзя).
+    if (st.noBase && m.squad) {
+      const pb = st.map.bases.player.cc;
+      let i = 0;
+      for (const [type, n] of m.squad) {
+        for (let k = 0; k < n; k++) {
+          const a = (i / 12) * Math.PI * 2;
+          U.spawnUnit(st, 'player', type,
+            (pb.x + 2 + Math.cos(a) * 3.2) * TILE,
+            (pb.y + 2 + Math.sin(a) * 3.2) * TILE);
+          i++;
+        }
       }
     }
 
@@ -251,10 +314,32 @@ export class Game {
           cmds.push({
             code: PRODUCE_KEYS[i], icon: b.faction === 'alien' ? 'a_' + type : type,
             label: fname(ut, st.factions.player), cost: ut.cost,
+            tip: unitTip(type, st.factions.player),
             enabled: () => st.minerals.player >= ut.cost,
             on: () => this.hooks.train(b, type),
           });
         });
+      }
+      // Лаборатория: исследования улучшений (по одному за раз).
+      if (b.done && b.cfg.research) {
+        RESEARCH_ORDER.forEach((key, i) => {
+          const up = UPGRADES[key];
+          const lvl = st.tech.player[key] || 0;
+          if (lvl >= up.max) return; // изучено до максимума
+          cmds.push({
+            code: RESEARCH_KEYS[i], icon: 'u_' + key,
+            label: fname(up, st.factions.player) + ' ур.' + (lvl + 1), cost: up.costs[lvl],
+            tip: upgradeTip(key, st.factions.player, lvl),
+            enabled: () => !b.res && st.minerals.player >= up.costs[lvl],
+            on: () => this.hooks.startResearch(b, key),
+          });
+        });
+        if (b.res) {
+          cmds.push({
+            code: 'KeyX', icon: 'stop', label: 'Отменить',
+            on: () => this.hooks.cancelResearch(b),
+          });
+        }
       }
       // Гарнизон: выпустить пехоту из бункера/кокона.
       if (b.done && b.cfg.garrisonCap && b.garrison.length) {
@@ -279,6 +364,7 @@ export class Game {
             cmds.push({
               code, icon: fac === 'alien' ? 'a_' + type : type,
               label: fname(cfg, fac), cost: cfg.cost,
+              tip: buildingTip(type, fac),
               enabled: () => st.minerals.player >= cfg.cost,
               on: () => this.hooks.beginPlace(type),
             });
@@ -314,6 +400,16 @@ export class Game {
         else if (r === 'queue') { ui.toast('Очередь заполнена', 'error'); this.sound.error(); }
         else this.sound.click();
       },
+
+      startResearch: (b, key) => {
+        const r = B.startResearch(st(), b, key);
+        if (r === 'money') { ui.toast('Не хватает минералов', 'error'); this.sound.error(); }
+        else if (r === 'busy') { ui.toast('Лаборатория уже занята исследованием', 'error'); this.sound.error(); }
+        else if (r === 'max') { ui.toast('Улучшение изучено до предела', 'error'); }
+        else this.sound.click();
+      },
+
+      cancelResearch: (b) => { B.cancelResearch(st(), b); this.sound.click(); },
 
       cancelQueue: (b, i) => B.cancelQueueItem(st(), b, i),
 
@@ -459,6 +555,8 @@ export class Game {
     const st = this.state;
     st.tick++;
     st.time += LOGIC_DT;
+    st.shakeT = Math.max(0, st.shakeT - LOGIC_DT);
+    if (st.shakeT === 0) st.shakeMag = 0;
 
     updateCamera(this, LOGIC_DT);
 
@@ -503,6 +601,18 @@ export class Game {
     const st = this.state;
     if (st.gameOver) return;
     const def = this.mission && this.mission.defense;
+    // Стелс-миссия: база отсутствует — проигрыш по гибели всего отряда.
+    if (st.noBase) {
+      const alive = st.units.some((u) => u.side === 'player' && !u.dead);
+      if (st.bcount.enemy <= 0) {
+        this.win('Гнездо разорено — отряд выполнил задачу!');
+      } else if (!alive) {
+        st.gameOver = 'lose';
+        this.sound.lose();
+        ui.showEnd(false, st.stats, this.endOpts(false, 'Отряд погиб — миссия провалена'));
+      }
+      return;
+    }
     if (st.bcount.enemy <= 0) {
       this.win('Противник уничтожен!');
     } else if (st.bcount.player <= 0) {
@@ -564,6 +674,13 @@ export class Game {
 
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
+
+    // Тряска экрана: затухающие случайные смещения от взрывов/артиллерии.
+    if (st.shakeT > 0) {
+      const k = st.shakeMag * (st.shakeT / 0.3);
+      ctx.save();
+      ctx.translate((Math.random() - 0.5) * 2 * k, (Math.random() - 0.5) * 2 * k);
+    }
 
     // Рельеф: один drawImage видимого куска кэша 2048×2048.
     const sw = Math.min(W, WORLD_W - cam.x), sh = Math.min(H, WORLD_H - cam.y);
@@ -645,6 +762,8 @@ export class Game {
     }
     ctx.globalAlpha = 1;
     ctx.textAlign = 'left';
+
+    if (st.shakeT > 0) ctx.restore(); // конец зоны тряски
   }
 
   drawCrystal(ctx, c, camX, camY) {
@@ -718,6 +837,36 @@ export class Game {
         ctx.globalAlpha = 1 - k;
         ctx.fillStyle = '#fff3b0';
         ctx.beginPath(); ctx.arc(ex, ey, 3.5, 0, Math.PI * 2); ctx.fill();
+      } else if (e.kind === 'smoke') {
+        // Дым повреждённого здания: поднимающийся серый клуб.
+        const a = (1 - k) * 0.35;
+        ctx.globalAlpha = a;
+        ctx.fillStyle = '#565c64';
+        ctx.beginPath();
+        ctx.arc(ex, ey - k * 26, 5 + k * 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = a * 0.6;
+        ctx.fillStyle = '#3a3f45';
+        ctx.beginPath();
+        ctx.arc(ex + 4, ey - k * 34, 3 + k * 10, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (e.kind === 'debris') {
+        // Обломки/шипики: разлёт из точки смерти с затуханием.
+        const d = e.dist * (0.3 + 0.7 * k);
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = k < 0.4 ? '#ffd977' : '#9aa2ad';
+        const dx = ex + Math.cos(e.ang) * d, dy = ey + Math.sin(e.ang) * d - k * 8;
+        ctx.fillRect(dx - 1.5, dy - 1.5, 3, 3);
+      } else if (e.kind === 'heal') {
+        // Зелёный плюсик над леченым юнитом.
+        ctx.globalAlpha = 1 - k;
+        ctx.strokeStyle = '#7dff9b';
+        ctx.lineWidth = 2;
+        const r = 4 + k * 2;
+        ctx.beginPath();
+        ctx.moveTo(ex, ey - r); ctx.lineTo(ex, ey + r);
+        ctx.moveTo(ex - r, ey); ctx.lineTo(ex + r, ey);
+        ctx.stroke();
       }
     }
     ctx.globalAlpha = 1;
@@ -725,6 +874,8 @@ export class Game {
 }
 
 // Пересчёт населения: cap — по достроенным зданиям, used — по живым юнитам.
+// В стелс-миссии базы нет — отряду ставим виртуальный потолок, чтобы
+// производство/подсказки не считали отряд «перезаселением».
 function calcSupply(st) {
   st.supply.player.used = 0;
   st.supply.enemy.used = 0;
@@ -734,7 +885,7 @@ function calcSupply(st) {
     for (const b of st.buildings) {
       if (!b.dead && b.side === side && b.done) cap += b.cfg.supplyGain || 0;
     }
-    st.supply[side].cap = Math.min(cap, SUPPLY_MAX);
+    st.supply[side].cap = (st.noBase && side === 'player') ? 99 : Math.min(cap, SUPPLY_MAX);
   }
 }
 

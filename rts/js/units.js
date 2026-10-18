@@ -13,6 +13,31 @@ import { pathToPoint, pathToRect, distToRectPx } from './pathfinding.js';
 
 let nextId = 1;
 
+// ----------------------------------------------------------
+// Технологии сторон: бонусы атак/брони из исследований лаборатории.
+// attacker.kind==='building' (турель) считается пехотным оружием.
+// ----------------------------------------------------------
+export function atkBonus(st, attacker) {
+  if (!st || !st.tech || !attacker || !attacker.side) return 0;
+  const t = st.tech[attacker.side];
+  if (!t) return 0;
+  const veh = attacker.kind === 'unit' && attacker.cfg.vehicle;
+  return (t[veh ? 'vehAtk' : 'infAtk'] || 0) * (veh ? 5 : 3);
+}
+export function armorVal(st, victim) {
+  if (!st || !st.tech || !victim || victim.kind !== 'unit') return 0;
+  const t = st.tech[victim.side];
+  if (!t) return 0;
+  return (t[victim.cfg.vehicle ? 'vehArm' : 'infArm'] || 0) * (victim.cfg.vehicle ? 3 : 2);
+}
+
+// Тряска экрана (в пикселях и секундах) — вызывается при взрывах.
+export function addShake(st, mag, time = 0.22) {
+  if (!st) return;
+  st.shakeMag = Math.max(st.shakeMag || 0, mag);
+  st.shakeT = Math.max(st.shakeT || 0, time);
+}
+
 export class Unit {
   constructor(st, side, type, x, y) {
     this.id = nextId++;
@@ -207,8 +232,17 @@ function updateOrderByKind(st, u, dt, grid) {
   const o = u.order;
   switch (o.kind) {
     case 'idle': {
+      // Медики прежде всего ищут раненых — только потом драку.
+      if (u.cfg.canHeal) {
+        u.scanT -= dt;
+        if (u.scanT <= 0) {
+          u.scanT = 0.4;
+          const hurt = findHealTarget(st, u);
+          if (hurt) { u.order = { kind: 'heal', target: hurt }; break; }
+        }
+      }
       // Бойцы без приказа сами ищут цель в радиусе обзора.
-      if (!u.cfg.canMine) {
+      if (!u.cfg.canMine && !u.cfg.canHeal) {
         u.scanT -= dt;
         if (u.scanT <= 0) {
           u.scanT = 0.25 + Math.random() * 0.15;
@@ -227,7 +261,44 @@ function updateOrderByKind(st, u, dt, grid) {
     case 'build': updateBuild(st, u, dt); break;
     case 'repair': updateRepair(st, u, dt); break;
     case 'garrison': updateGarrison(st, u); break;
+    case 'heal': updateHeal(st, u, dt); break;
   }
+}
+
+// Ближайший раненый «органический» союзник (технику чинят только рабочие).
+function findHealTarget(st, u) {
+  let best = null, bd = Infinity;
+  for (const a of st.units) {
+    if (a.dead || a.garrison || a === u || a.side !== u.side) continue;
+    if (a.cfg.vehicle || a.hp >= a.maxHp) continue;
+    const d = Math.hypot(a.x - u.x, a.y - u.y);
+    if (d < bd && d <= u.cfg.sightTiles * TILE) { bd = d; best = a; }
+  }
+  return best;
+}
+
+// Лечение: подойти вплотную и восстанавливать ОЗ, пока цель не здорова.
+function updateHeal(st, u, dt) {
+  const t = u.order.target;
+  if (!t || t.dead || t.side !== u.side || t.cfg.vehicle || t.hp >= t.maxHp) {
+    orderStop(u);
+    return;
+  }
+  const d = Math.hypot(t.x - u.x, t.y - u.y);
+  if (d <= u.r + t.r + 16) {
+    u.path = null; u.moving = false;
+    u.angle = Math.atan2(t.y - u.y, t.x - u.x);
+    t.hp = Math.min(t.maxHp, t.hp + u.cfg.healRate * dt);
+    if (Math.random() < dt * 3) {
+      addEffect(st, { kind: 'heal', x: t.x + (Math.random() - 0.5) * 14, y: t.y - 8 - Math.random() * 8, t: 0, life: 0.7 });
+    }
+    return;
+  }
+  if (!u.path) {
+    u.path = pathToPoint(st.map, (u.x / TILE) | 0, (u.y / TILE) | 0, t.x, t.y);
+    u.pathI = 0;
+  }
+  if (followPath(u)) u.path = null;
 }
 
 // Движение по пути: true — путь завершён.
@@ -292,28 +363,31 @@ function updateAttack(st, u, dt, grid) {
 // Стрелять может и здание (турель) — важно, чтобы был cfg.projectile.
 export function shoot(st, u, t) {
   const cfg = u.cfg;
+  const dmg = cfg.dmg + atkBonus(st, u);   // исследования усиливают выстрел
   const reach = u.r || Math.max(cfg.w, cfg.h) * TILE * 0.5;
   u.angle = Math.atan2(t.y - u.y, t.x - u.x);
   const muzzleX = u.x + Math.cos(u.angle) * (reach + 4);
   const muzzleY = u.y + Math.sin(u.angle) * (reach + 4);
   addEffect(st, { kind: 'muzzle', x: muzzleX, y: muzzleY, ang: u.angle, t: 0, life: cfg.projectile === 'shell' ? 0.1 : 0.06 });
+  // Тяжёлая артиллерия отдаёт тряской.
+  if (cfg.projectile === 'shell' && cfg.splash && cfg.splash.r >= 50) addShake(st, 5, 0.18);
 
   if (cfg.projectile === 'bullet') {
     st.projectiles.push({
       x: muzzleX, y: muzzleY, tx: t.x, ty: t.y,
-      target: t, speed: BULLET_SPEED, dmg: cfg.dmg, src: u, dead: false,
+      target: t, speed: BULLET_SPEED, dmg, src: u, dead: false,
     });
     st.game.sound.shot();
   } else if (cfg.projectile === 'shell') {
     st.projectiles.push({
       x: muzzleX, y: muzzleY, tx: t.x, ty: t.y,
-      target: t, speed: SHELL_SPEED, dmg: cfg.dmg, src: u, dead: false,
+      target: t, speed: SHELL_SPEED, dmg, src: u, dead: false,
       splash: cfg.splash,
     });
     st.game.sound.cannon();
   } else {
     // Удар в упор (рабочий) — урон сразу + искра.
-    damageEntity(st, t, cfg.dmg, u);
+    damageEntity(st, t, dmg, u);
     addEffect(st, { kind: 'spark', x: t.x, y: t.y, ang: u.angle, t: 0, life: 0.22 });
     st.game.sound.mine();
   }
@@ -693,6 +767,8 @@ export function damageEntity(st, victim, dmg, attacker) {
   // гарнизона (пустой массив истинен!), раньше эта строка делала ВСЕ
   // постройки бессмертными — вражескую базу было невозможно разрушить.
   if (victim.kind === 'unit' && victim.garrison) return;
+  // Исследования брони снижают входящий урон (минимум 1 — кровь всегда течёт).
+  dmg = Math.max(1, dmg - armorVal(st, victim));
   victim.hp -= dmg;
   victim.flashT = 0.14;
   // Тревога для игрока — не чаще раза в 8 секунд.
@@ -710,12 +786,33 @@ function killEntity(st, v, attacker) {
   v.selected = false;
   if (v.kind === 'unit') {
     addEffect(st, { kind: 'boom', x: v.x, y: v.y, t: 0, life: v.cfg.vehicle ? 0.6 : 0.4, big: !!v.cfg.vehicle });
+    // Обломки/шипики разлетаются веером — техника даёт больше мусора.
+    const n = v.cfg.vehicle ? 7 : 4;
+    for (let i = 0; i < n; i++) {
+      addEffect(st, {
+        kind: 'debris', x: v.x, y: v.y,
+        ang: Math.random() * Math.PI * 2,
+        dist: 10 + Math.random() * 22,
+        t: 0, life: 0.4 + Math.random() * 0.3,
+      });
+    }
+    if (v.cfg.vehicle) addShake(st, 3, 0.16);
     st.game.sound.boom(!!v.cfg.vehicle);
   } else {
     if (v.garrison && v.garrison.length) releaseGarrison(st, v); // выжившие выпрыгивают
     st.map.unmarkBuilding(v);
     st.bcount[v.side]--;
     addEffect(st, { kind: 'boom', x: v.x, y: v.y, t: 0, life: 0.8, big: true });
+    for (let i = 0; i < 10; i++) {
+      addEffect(st, {
+        kind: 'debris', x: v.x + (Math.random() - 0.5) * v.w * TILE * 0.6,
+        y: v.y + (Math.random() - 0.5) * v.h * TILE * 0.6,
+        ang: Math.random() * Math.PI * 2,
+        dist: 14 + Math.random() * 30,
+        t: 0, life: 0.5 + Math.random() * 0.4,
+      });
+    }
+    addShake(st, 6, 0.3);
     st.game.sound.boom(true);
   }
   if (attacker && attacker.side === 'player' && v.side !== 'player') st.stats.kills++;
@@ -897,6 +994,89 @@ export function drawUnit(ctx, u, rx, ry) {
       ctx.beginPath(); ctx.arc(-1, 0, 8.5, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#d7e3f5';
       ctx.beginPath(); ctx.arc(2, 0, 3.4, 0, Math.PI * 2); ctx.fill();
+    }
+  } else if (u.type === 'medic') {
+    if (alien) {
+      // Спорыш: приземистая капля с растущим ростком-свечой.
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.ellipse(-2, 0, 9, 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = base;
+      ctx.beginPath(); ctx.ellipse(1, 0, 7, 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#b7f0c8'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-2, -4); ctx.lineTo(-2, -12); ctx.stroke();
+      ctx.fillStyle = '#9ff5b8';
+      ctx.beginPath(); ctx.arc(-2, -13, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#eafff0';
+      ctx.beginPath(); ctx.arc(6, 0, 2.6, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // Медик: белый комбинезон, красный крест, короткий карабин.
+      ctx.fillStyle = dark;
+      ctx.fillRect(-8, -6, 4, 12);
+      ctx.fillStyle = '#e8edf4';
+      ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e04b3f';
+      ctx.fillRect(-2, -6, 4, 12); ctx.fillRect(-6, -2, 12, 4);
+      ctx.fillStyle = '#2c3138';
+      ctx.fillRect(5, -1.5, 9, 3);
+      ctx.fillStyle = '#d7e3f5';
+      ctx.beginPath(); ctx.arc(3, 0, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  } else if (u.type === 'flamer') {
+    if (alien) {
+      // Жгут: пузатый ползун с оранжевой пастью-соплом.
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.ellipse(-1, 0, 11, 9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = base;
+      ctx.beginPath(); ctx.ellipse(2, 0, 8, 6.6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f0a53a';
+      ctx.fillRect(8, -3, 8, 6);
+      ctx.fillStyle = '#9ff5b8';
+      ctx.beginPath(); ctx.arc(-5, -5, 2.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(-5, 5, 2.4, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // Огнемётчик: широкий корпус, баллон за спиной, толстое сопло.
+      ctx.fillStyle = '#7a3428';
+      ctx.fillRect(-11, -5, 5, 10);
+      ctx.fillStyle = dark;
+      ctx.fillRect(-6, -8, 5, 16);
+      ctx.fillStyle = base;
+      ctx.beginPath(); ctx.arc(0, 0, 9.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e04b3f';
+      ctx.fillRect(4, -3.5, 6, 7);
+      ctx.fillStyle = '#2c3138';
+      ctx.fillRect(10, -2, 8, 4);
+      ctx.fillStyle = '#d7e3f5';
+      ctx.beginPath(); ctx.arc(3, 0, 3.2, 0, Math.PI * 2); ctx.fill();
+    }
+  } else if (u.type === 'arty') {
+    if (alien) {
+      // Метатель: огромный червь с вздутой спиной-мортирой.
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.ellipse(0, 0, 18, 14, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = base;
+      ctx.beginPath(); ctx.ellipse(3, 0, 13, 9.6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#241c34';
+      ctx.beginPath(); ctx.ellipse(-4, 0, 7, 9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#2c3138'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(-4, -8); ctx.lineTo(-14, -16); ctx.stroke();
+      ctx.fillStyle = '#b7f0c8';
+      ctx.beginPath(); ctx.arc(-14, -17, 3.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#eafff0';
+      ctx.beginPath(); ctx.arc(12, 0, 3.6, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // САУ: длинное орудие на гусеничной платформе, сошник сзади.
+      ctx.fillStyle = '#23262b';
+      ctx.fillRect(-14, -12, 26, 6);
+      ctx.fillRect(-14, 6, 26, 6);
+      ctx.fillStyle = dark;
+      ctx.fillRect(-12, -7, 22, 14);
+      ctx.fillStyle = base;
+      ctx.fillRect(-9, -5, 18, 10);
+      ctx.fillStyle = '#2c3138';
+      ctx.fillRect(6, -2, 26, 4);
+      ctx.fillRect(-13, -3, 4, 6);
+      ctx.fillStyle = '#d7e3f5';
+      ctx.beginPath(); ctx.arc(1, 0, 3.2, 0, Math.PI * 2); ctx.fill();
     }
   }
   // Груз минералов на спине.

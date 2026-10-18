@@ -1,6 +1,6 @@
 # Мини-игры AXIIOM
 
-> Коллекция из 26 браузерных мини-игр: физика, аркады, головоломки и стратегии.
+> Коллекция из 28 браузерных мини-игр: физика, 3D-экшен, аркады, головоломки и стратегии.
 > Без регистрации, без установки — открыл и играешь. Разработка **[AXIIOM](https://axiiom.ru)**.
 
 **Живой каталог игр:** https://bestdeejay-design.github.io/minigames/
@@ -21,20 +21,22 @@
 | 🍉 Fruit Drop | физика падающих фруктов: слияния вплоть до арбуза | [играть](https://bestdeejay-design.github.io/minigames/games/fruit-drop/) |
 | 🐥 Road Hopper | бесконечная дорога: машины, брёвна, поезд и 8 скинов | [играть](https://bestdeejay-design.github.io/minigames/games/road-hopper/) |
 | 🕳️ Hungry Hole | арена 2000×2000: 800 объектов, 5 ботов и двухминутный раунд | [играть](https://bestdeejay-design.github.io/minigames/games/hungry-hole/) |
+| 🌴 Неон-Бэй '84 | 3D-шутер от первого лица в стиле 80-х: спорткары, синтвейв-радио, 5 миссий и розыск | [играть](https://bestdeejay-design.github.io/minigames/miami84/) |
 | 🛡️ Рубеж 64 | оригинальная RTS: минералы, технологии, ретрансляторы, 3 сложности | [играть](https://bestdeejay-design.github.io/minigames/rubezh64/) |
 | ✳️ Контур | аркада одним жестом: обводи искры, собирай комбо за 45 секунд | [играть](https://bestdeejay-design.github.io/minigames/contour/) |
 | 🎱 Кладезь | бильярд 2.0: призрачная траектория, комбо, 30 уровней и миссии | [играть](https://bestdeejay-design.github.io/minigames/billiards/) |
+| 🎱 Бильярд · Классика | оригинальная физика: долгое качение, мягкие борта, открытые лузы, траектория точками | [играть](https://bestdeejay-design.github.io/minigames/billiards-classic/) |
 | 🧨 Разлом | брейкер: рой шаров, вызов дня, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/breaker/) |
 | ⚔️ Звёздный рубеж | RTS: кампания, оборона с волнами, две расы (люди/кхарид), техника, турели, ремонт | [играть](https://bestdeejay-design.github.io/minigames/rts/) |
-| 🪙 Coin Tap | монетный дождь: бомбы, бонусы, вызов дня и миссии | [играть](https://bestdeejay-design.github.io/minigames/coin-tap/) |
+| 🪙 Золотая жила | Coin Tap 2.0: 3D-флип монет, бомбы, магниты, серия до ×3 | [играть](https://bestdeejay-design.github.io/minigames/coin-tap/) |
 | 💠 Кристаллы | merge-drop: физика слияний, вызов дня | [играть](https://bestdeejay-design.github.io/minigames/crystals/) |
 | 🔫 Штурм | рейкастинг-шутер: боссы, дробовик, мини-карта и миссии | [играть](https://bestdeejay-design.github.io/minigames/fps3d/) |
 | 🧩 Три в ряд | головоломка | [играть](https://bestdeejay-design.github.io/minigames/match3/) |
-| 🎮 Платформер | 8 уровней, монеты, шипы, coyote time, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/platformer/) |
+| 🎮 Руины | платформер 2.0: coyote-time, слизни, ключ и дверь, 12 уровней | [играть](https://bestdeejay-design.github.io/minigames/platformer/) |
 | 🏎 Ночной поток | ночная трасса: риск ×2, нитро, три сектора, вызов дня | [играть](https://bestdeejay-design.github.io/minigames/race/) |
-| 🎰 Рулетка | европейское колесо, сохраняемый банк, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/roulette/) |
+| 🎰 Золотое колесо | рулетка 2.0: реальный стол, дефлекторы, лента истории | [играть](https://bestdeejay-design.github.io/minigames/roulette/) |
 | 👾 Импульс | космический шутер: боссы, щит, оружие, вызов дня и миссии | [играть](https://bestdeejay-design.github.io/minigames/shooter/) |
-| 🎯 Рогатка | кристаллы-мишени, баллистика, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/sling/) |
+| 🎯 Хрустальный тир | рогатка 2.0: хрустальные ромбы, осколки, сквозные выстрелы | [играть](https://bestdeejay-design.github.io/minigames/sling/) |
 | 🧱 Тетрис | падающие блоки: SRS, T-спины, Спринт | [играть](https://bestdeejay-design.github.io/minigames/tetris/) |
 | 🏙 Мегаполис | тайкун 2.0: офисы, кафе, люксы, лифт, день/ночь и сохраняемый город | [играть](https://bestdeejay-design.github.io/minigames/tycoon/) |
 
@@ -54,6 +56,7 @@
   `node --experimental-default-type=module --test games/tests/acceptance.test.mjs`.
 - «Рубеж 64» — автономные проверки логики: `node --test tests/game.test.mjs`
   из папки игры (нужен только Node.js, без пакетов).
+- «Неон-Бэй '84» (`miami84/`) — 3D-шутер от первого лица на локальном `Three.js r160` (`libs/three.module.min.js`), с процедурным городом, синтвейв-радио в Web Audio и автономными тестами: `node --test miami84/tests/game.test.mjs`.
 - Игры канона AXIIOM (кристаллы, разлом и 9 пересобранных): welcome-экран,
   вызов дня (seed от даты МСК), стрик-множитель до ×1.5, ежедневные миссии,
   fixed timestep, тосты и модалки в едином стиле.
@@ -70,8 +73,8 @@ games/<slug>/       — десять новых игр: index.html, style.css, j
                       js/game.js, js/config.js (иногда также js/logic.js)
 <game>/             — папка старой игры: index.html, style.css, game.js
                     (match3 — однофайловая: только index.html;
-                     rts и rubezh64 — модульные: ES-модули в js/,
-                     у rubezh64 также автономные тесты в tests/)
+                     rts, rubezh64 и miami84 — модульные: ES-модули в js/,
+                     у rubezh64 и miami84 также автономные тесты в tests/)
 ```
 
 ---

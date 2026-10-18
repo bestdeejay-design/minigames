@@ -5,7 +5,7 @@
 // Весь UI — DOM поверх canvas; иконки команд рисуются кодом.
 // ============================================================
 import {
-  TILE, UNITS, BUILDINGS, WORLD_W, WORLD_H, MAP_W, MAP_H, SUPPLY_MAX, COLORS,
+  TILE, UNITS, BUILDINGS, UPGRADES, WORLD_W, WORLD_H, MAP_W, MAP_H, SUPPLY_MAX, COLORS,
   fname, fdesc,
 } from './config.js';
 import { MISSIONS, loadProgress } from './missions.js';
@@ -87,6 +87,57 @@ function icon(type) {
       g.fillStyle = steel; g.fillRect(-10, -4, 20, 12);
       g.fillStyle = '#3a3f45'; g.fillRect(-4, 0, 8, 8);
       g.fillStyle = '#565c64'; g.fillRect(-8, -10, 4, 7);
+      break;
+    case 'medic':
+      g.fillStyle = '#e8edf4'; g.beginPath(); g.arc(0, 2, 7, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#e04b3f'; g.fillRect(-1.5, -4, 3, 12); g.fillRect(-6, 0.5, 12, 3);
+      g.fillStyle = '#2c3138'; g.fillRect(6, 0, 8, 3);
+      break;
+    case 'flamer':
+      g.fillStyle = blue; g.beginPath(); g.arc(0, 2, 7, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#e04b3f'; g.fillRect(-9, -4, 5, 8);
+      g.fillStyle = '#f0a53a'; g.fillRect(4, 0, 11, 4);
+      g.fillStyle = '#ffd977'; g.beginPath(); g.arc(15, 2, 2.4, 0, Math.PI * 2); g.fill();
+      break;
+    case 'arty':
+      g.fillStyle = '#23262b'; g.fillRect(-9, -8, 18, 4); g.fillRect(-9, 4, 18, 4);
+      g.fillStyle = blue; g.fillRect(-7, -4, 14, 8);
+      g.fillStyle = '#2c3138'; g.fillRect(0, -1.5, 15, 3);
+      break;
+    case 'lab':
+      g.fillStyle = steel; g.fillRect(-10, -2, 20, 12);
+      g.fillStyle = '#565c64'; g.beginPath(); g.arc(-3, -2, 7, Math.PI, 0); g.fill();
+      g.strokeStyle = blue; g.lineWidth = 2;
+      g.beginPath(); g.arc(6, -6, 4, Math.PI * 0.2, Math.PI); g.stroke();
+      break;
+    case 'u_infAtk':
+      g.strokeStyle = '#e04b3f'; g.lineWidth = 2.5;
+      g.beginPath(); g.moveTo(-6, 6); g.lineTo(6, -6); g.stroke();
+      g.strokeStyle = orange; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(-4, 1); g.lineTo(-1, 4); g.moveTo(-6, 8); g.lineTo(-8, 6); g.stroke();
+      break;
+    case 'u_infArm':
+      g.strokeStyle = blue; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(0, -8); g.lineTo(7, -5); g.lineTo(7, 2);
+      g.quadraticCurveTo(7, 7, 0, 9); g.quadraticCurveTo(-7, 7, -7, 2);
+      g.lineTo(-7, -5); g.closePath(); g.stroke();
+      g.fillStyle = blue; g.fillRect(-1.5, -4, 3, 8); g.fillRect(-4, -1.5, 8, 3);
+      break;
+    case 'u_vehAtk':
+      g.fillStyle = '#2c3138'; g.fillRect(-3, -9, 6, 13);
+      g.fillStyle = orange; g.fillRect(-5, 2, 10, 6);
+      g.fillStyle = '#ffd977'; g.beginPath(); g.arc(0, -9, 2.4, 0, Math.PI * 2); g.fill();
+      break;
+    case 'u_vehArm':
+      g.strokeStyle = steel; g.lineWidth = 2;
+      g.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3 - Math.PI / 2;
+        const px2 = Math.cos(a) * 8, py2 = Math.sin(a) * 8;
+        if (i === 0) g.moveTo(px2, py2); else g.lineTo(px2, py2);
+      }
+      g.closePath(); g.stroke();
+      g.fillStyle = steel; g.fillRect(-1.5, -5, 3, 10); g.fillRect(-5, -1.5, 10, 3);
       break;
     case 'build':
       g.fillStyle = steel; g.fillRect(-9, -8, 10, 8);           // боёк молота
@@ -173,6 +224,29 @@ function icon(type) {
       g.beginPath(); g.arc(-4, 0, 2, 0, Math.PI * 2); g.fill();
       g.beginPath(); g.arc(3, -1, 2, 0, Math.PI * 2); g.fill();
       g.beginPath(); g.arc(0, 4, 2, 0, Math.PI * 2); g.fill();
+      break;
+    case 'a_medic':
+      g.fillStyle = purple; g.beginPath(); g.ellipse(0, 2, 8, 6.5, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#9ff5b8'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(0, -3); g.lineTo(0, -10); g.stroke();
+      g.fillStyle = '#b7f0c8'; g.beginPath(); g.arc(0, -11, 2.8, 0, Math.PI * 2); g.fill();
+      break;
+    case 'a_flamer':
+      g.fillStyle = purple; g.beginPath(); g.ellipse(-1, 2, 9, 7, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#f0a53a'; g.fillRect(6, 0, 9, 4);
+      g.fillStyle = '#ffd977'; g.beginPath(); g.arc(15, 2, 2.2, 0, Math.PI * 2); g.fill();
+      break;
+    case 'a_arty':
+      g.fillStyle = purple; g.beginPath(); g.ellipse(0, 2, 10, 7.5, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#3a2f4c'; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(-3, -4); g.lineTo(-11, -11); g.stroke();
+      g.fillStyle = '#b7f0c8'; g.beginPath(); g.arc(-11, -12, 2.8, 0, Math.PI * 2); g.fill();
+      break;
+    case 'a_lab':
+      g.fillStyle = '#3a2f4c'; g.beginPath(); g.ellipse(0, 4, 10, 7, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#b7f0c8';
+      g.beginPath(); g.moveTo(-5, 2); g.lineTo(-2, -6); g.lineTo(1, 2); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(2, 2); g.lineTo(5, -4); g.lineTo(8, 2); g.closePath(); g.fill();
       break;
   }
   iconCache[type] = c;
@@ -297,7 +371,16 @@ export function showMissions(game) {
   els.missionOverlay.classList.remove('hidden');
   const unlocked = loadProgress();
   els.missionList.innerHTML = '';
+  let lastAct = null;
   MISSIONS.forEach((m) => {
+    // Заголовок акта перед первой миссией акта.
+    if (m.act !== lastAct) {
+      lastAct = m.act;
+      const head = document.createElement('div');
+      head.className = 'act-head';
+      head.textContent = m.act;
+      els.missionList.appendChild(head);
+    }
     const card = document.createElement('button');
     card.className = 'mission-card' + (m.id > unlocked ? ' locked' : '');
     const fac = FACTIONS[m.faction];
@@ -308,6 +391,7 @@ export function showMissions(game) {
       `<div class="mc-name">${m.name}</div>` +
       `<div class="mc-place">${m.place}</div>` +
       `<div class="mc-obj">${m.objective}</div>` +
+      (m.intro ? `<div class="mc-intro">${m.intro}</div>` : '') +
       (m.defense ? '<div class="mc-def">🛡 режим обороны: волны врага</div>' : '');
     if (m.id <= unlocked) {
       card.addEventListener('click', () => {
@@ -328,7 +412,8 @@ export function showBrief(game, m) {
   els.briefBadge.className = 'badge ' + fac.cls;
   els.briefTitle.textContent = m.name;
   els.briefPlace.textContent = m.place;
-  els.briefText.innerHTML = m.brief.map((p) => `<p>${p}</p>`).join('');
+  els.briefText.innerHTML = m.brief.map((p) => `<p>${p}</p>`).join('') +
+    (m.intro ? `<p class="brief-intro">${m.intro}</p>` : '');
   els.briefObjective.textContent = 'Цель: ' + m.objective +
     (m.defense ? ` · подготовка ${Math.round(m.defense.prep / 60)} мин, затем ${Math.round(m.defense.total / 60)} мин обороны` : '');
   els.briefOverlay.classList.remove('hidden');
@@ -407,11 +492,13 @@ export function update(game) {
   els.time.textContent = `${mm}:${ss}`;
   els.canvas.style.cursor = st.placing ? 'crosshair' : 'default';
 
-  // Подпись панели.
+  // Подпись панели: состав выделения + очередь/исследование выбранного здания —
+  // иначе «Очередь пуста» приклеивается после добавления первого юнита.
   const sel = st.selection.filter((e) => !e.dead);
+  const firstB = sel.length === 1 && sel[0].kind === 'building' ? sel[0] : null;
   const newSig = sel.map((e) => e.id + (e.done === false ? 'c' : '')).join(',') +
     '|' + (st.buildMenu ? 'B' : '') + (st.placing ? 'P' + st.placing.type : '') +
-    '|' + (sel.length === 1 && sel[0].kind === 'building' && sel[0].garrison ? 'G' + sel[0].garrison.length : '');
+    '|' + (firstB ? 'Q' + firstB.queue.length + (firstB.res ? 'R' + firstB.res.key : '') : '');
   if (newSig !== sig) {
     sig = newSig;
     rebuildPanel(game, sel);
@@ -457,40 +544,80 @@ function rebuildPanel(game, sel) {
       hint.className = 'small';
       hint.textContent = 'Стройку ведёт назначенный рабочий.';
       box.appendChild(hint);
-    } else if (b.queue.length) {
-      const q = document.createElement('div');
-      q.className = 'queue';
-      b.queue.forEach((item, i) => {
-        const chip = document.createElement('button');
-        chip.className = 'chip';
-        chip.title = fname(UNITS[item.type], b.faction) + ' — клик: отмена (возврат минералов)';
-        chip.appendChild(iconEl(b.faction === 'alien' ? 'a_' + item.type : item.type));
-        if (i === 0) {
-          const pr = document.createElement('div');
-          pr.className = 'chip-progress';
-          chip.appendChild(pr);
-          dyn.chipFill = pr;
+    } else {
+      // Описание здания — теперь подписано ВСЕГДА.
+      const desc = document.createElement('div');
+      desc.className = 'small';
+      desc.textContent = fdesc(b.cfg, b.faction);
+      box.appendChild(desc);
+
+      // Очередь производства — видна всегда у производящих зданий:
+      // и когда она есть (чипы + таймер), и когда пуста.
+      if (b.cfg.produces) {
+        const q = document.createElement('div');
+        q.className = 'queue';
+        if (b.queue.length) {
+          b.queue.forEach((item, i) => {
+            const chip = document.createElement('button');
+            chip.className = 'chip';
+            chip.title = fname(UNITS[item.type], b.faction) + ' — клик: отмена (возврат минералов)';
+            chip.appendChild(iconEl(b.faction === 'alien' ? 'a_' + item.type : item.type));
+            if (i === 0) {
+              const pr = document.createElement('div');
+              pr.className = 'chip-progress';
+              chip.appendChild(pr);
+              dyn.chipFill = pr;
+              const tm = document.createElement('span');
+              tm.className = 'chip-time';
+              chip.appendChild(tm);
+              dyn.timerEl = tm;
+            }
+            chip.addEventListener('click', () => game.hooks.cancelQueue(b, i));
+            q.appendChild(chip);
+          });
+        } else {
+          const empty = document.createElement('div');
+          empty.className = 'queue-empty';
+          empty.textContent = 'Очередь пуста — выберите юнита справа';
+          q.appendChild(empty);
         }
-        chip.addEventListener('click', () => game.hooks.cancelQueue(b, i));
-        q.appendChild(chip);
-      });
-      box.appendChild(q);
-    } else if (b.cfg.garrisonCap) {
-      const hint = document.createElement('div');
-      hint.className = 'small';
-      hint.textContent = 'Гарнизон: ' + b.garrison.length + '/' + b.cfg.garrisonCap +
-        ' · ПКМ бункера при выделенной пехоте — занять.';
-      box.appendChild(hint);
-    } else if (b.cfg.attack) {
-      const s = document.createElement('div');
-      s.className = 'small';
-      s.textContent = `Урон ${b.cfg.dmg} · дальность ${b.cfg.range} · перезарядка ${b.cfg.cooldown}с`;
-      box.appendChild(s);
-    } else if (b.cfg.produces) {
-      const hint = document.createElement('div');
-      hint.className = 'small';
-      hint.textContent = 'ПКМ по земле — точка сбора новых юнитов.';
-      box.appendChild(hint);
+        box.appendChild(q);
+      }
+
+      // Исследование (лаборатория): прогресс и остаток времени.
+      if (b.res) {
+        const up = UPGRADES[b.res.key];
+        const rl = document.createElement('div');
+        rl.className = 'res-line';
+        const t1 = document.createElement('div');
+        t1.textContent = fname(up, b.faction) + ' ур.' + b.res.lvl + ' — осталось ' + Math.ceil(b.res.t) + 'с';
+        rl.appendChild(t1);
+        const rp = bar(1 - b.res.t / b.res.total);
+        rp.fill.classList.add('amber');
+        rl.appendChild(rp.el);
+        dyn.resFill = rp.fill;
+        box.appendChild(rl);
+      }
+
+      if (b.cfg.garrisonCap) {
+        const hint = document.createElement('div');
+        hint.className = 'small';
+        hint.textContent = 'Гарнизон: ' + b.garrison.length + '/' + b.cfg.garrisonCap +
+          ' · ПКМ бункера при выделенной пехоте — занять.';
+        box.appendChild(hint);
+      }
+      if (b.cfg.attack) {
+        const s = document.createElement('div');
+        s.className = 'small';
+        s.textContent = `Урон ${b.cfg.dmg} · дальность ${b.cfg.range} · перезарядка ${b.cfg.cooldown}с`;
+        box.appendChild(s);
+      }
+      if (b.cfg.produces && !b.queue.length) {
+        const hint = document.createElement('div');
+        hint.className = 'small';
+        hint.textContent = 'ПКМ по земле — точка сбора новых юнитов.';
+        box.appendChild(hint);
+      }
     }
     els.selInfo.appendChild(box);
     infoStats(box, b);
@@ -539,10 +666,37 @@ function rebuildPanel(game, sel) {
     key.textContent = c.code.replace('Key', '');
     btn.appendChild(key);
     btn.addEventListener('click', () => c.on());
+    // Подсказка при наведении: полное описание юнита/здания/улучшения.
+    if (c.tip) {
+      btn.addEventListener('mouseenter', () => showTip(c.tip, btn));
+      btn.addEventListener('mouseleave', hideTip);
+      btn.addEventListener('click', hideTip);
+    }
     els.cmdGrid.appendChild(btn);
     dyn.cmds.push({ code: c.code, el: btn, cmd: c });
   }
 }
+
+// ------------------------------------------------------------
+// Тултип кнопки панели: имя, цена, описание и статы.
+// ------------------------------------------------------------
+let tipEl = null;
+function showTip(tip, btn) {
+  if (!tipEl) {
+    tipEl = document.createElement('div');
+    tipEl.id = 'cmd-tip';
+    document.body.appendChild(tipEl);
+  }
+  const rows = (tip.lines || []).map((l) => `<div class="tip-row">${l}</div>`).join('');
+  tipEl.innerHTML = `<div class="tip-title">${tip.title}<span class="tip-cost">${tip.cost || ''}</span></div>` +
+    (tip.desc ? `<div class="tip-desc">${tip.desc}</div>` : '') + rows;
+  tipEl.classList.add('show');
+  const r = btn.getBoundingClientRect();
+  tipEl.style.left = Math.max(8, Math.min(window.innerWidth - 320, r.left + r.width / 2 - 150)) + 'px';
+  const h = tipEl.offsetHeight || 120;
+  tipEl.style.top = Math.max(8, r.top - h - 8) + 'px';
+}
+function hideTip() { if (tipEl) tipEl.classList.remove('show'); }
 
 function refreshDynamic(game, sel) {
   if (!dyn) return;
@@ -551,7 +705,7 @@ function refreshDynamic(game, sel) {
   for (const c of dyn.cmds) {
     if (c.cmd.enabled) c.el.classList.toggle('disabled', !c.cmd.enabled());
   }
-  // Полоски HP / прогресса.
+  // Полоски HP / прогресса / таймер очереди / прогресс исследования.
   const first = sel[0];
   if (first) {
     if (dyn.hpFill) dyn.hpFill.style.width = Math.max(0, (first.hp / first.maxHp) * 100) + '%';
@@ -559,6 +713,10 @@ function refreshDynamic(game, sel) {
     if (dyn.chipFill && first.kind === 'building' && first.queue.length) {
       const q = first.queue[0];
       dyn.chipFill.style.width = ((1 - q.t / q.total) * 100) + '%';
+      if (dyn.timerEl) dyn.timerEl.textContent = q.hold ? 'ждёт' : Math.ceil(q.t) + 'с';
+    }
+    if (dyn.resFill && first.kind === 'building' && first.res) {
+      dyn.resFill.style.width = ((1 - first.res.t / first.res.total) * 100) + '%';
     }
   }
 }
