@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#14052b">
+  <title>Неон-Бэй '84 — 3D-шутер в стиле 1980-х | AXIIOM</title>
+  <meta name="description" content="Неон-Бэй '84 — трёхмерный шутер от первого лица в атмосфере солнечного приморского города 1980-х: синтвейв-радио, угон спорткаров, 5 миссий и неоновый закат.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./js/main.js"></script>
+</head>
+<body>
+  <div id="game-root" class="game-root">
+    <canvas id="game-canvas" aria-label="3D сцена Неон-Бэй '84"></canvas>
+
+    <!-- Эффекты постобработки через CSS: виньетка, scanlines и вспышка урона -->
+    <div class="vignette-overlay" aria-hidden="true"></div>
+    <div class="scanlines-overlay" aria-hidden="true"></div>
+    <div id="damage-overlay" class="damage-overlay" aria-hidden="true"></div>
+
+    <!-- Прицел по центру экрана -->
+    <div class="crosshair" aria-hidden="true">
+      <span class="ch-dot"></span>
+      <span class="ch-line ch-top"></span>
+      <span class="ch-line ch-bottom"></span>
+      <span class="ch-line ch-left"></span>
+      <span class="ch-line ch-right"></span>
+    </div>
+
+    <!-- Верхняя панель быстрых переключателей и каталога -->
+    <header class="top-utility-bar">
+      <a href="../" class="catalog-btn">← КАТАЛОГ</a>
+      <div class="top-utility-right">
+        <button id="btn-top-radio" type="button" class="util-btn" title="Сменить радиостанцию (Q)"><span id="hud-radio">📻 84.5 FM · SUNSET PULSE [Q]</span></button>
+        <button id="btn-top-night" type="button" class="util-btn" title="Переключить закат/ночь (N)"><span id="hud-time-mode">🌅 ЗАКАТ [N]</span></button>
+        <span id="hud-fps" class="fps-badge">60 FPS</span>
+        <button id="btn-top-pause" type="button" class="util-btn" title="Пауза (Esc)">ПАУЗА [ESC]</button>
+      </div>
+    </header>
+
+    <!-- Подсказка миссии сверху и всплывающие награды -->
+    <section class="hud-mission-box" aria-live="polite">
+      <div id="hud-mission-title" class="mission-title">МИССИЯ 1: СВЯЗНОЙ НА НАБЕРЕЖНОЙ</div>
+      <div id="hud-mission-hint" class="mission-hint">Доберитесь до неонового пирса на Лазурном бульваре</div>
+      <div id="hud-mission-status" class="mission-status"></div>
+    </section>
+
+    <div id="hud-popups" class="hud-popups" aria-live="polite"></div>
+    <div id="hud-interact" class="hud-interact" hidden>[E] СЕСТЬ ЗА РУЛЬ</div>
+
+    <!-- Справа вверху: деньги, здоровье, броня, звёзды розыска -->
+    <aside class="hud-status-panel" aria-label="Статус игрока">
+      <div id="hud-cash" class="hud-cash">$000250</div>
+      <div id="hud-stars" class="hud-stars" aria-label="Уровень розыска">
+        <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">♥ HP</span>
+        <div class="stat-bar-track"><div id="hud-health-bar" class="stat-bar-fill health-fill" style="width:100%"></div></div>
+        <strong id="hud-health-val" class="stat-val">100</strong>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">🛡 БРОНЯ</span>
+        <div class="stat-bar-track"><div id="hud-armor-bar" class="stat-bar-fill armor-fill" style="width:25%"></div></div>
+        <strong id="hud-armor-val" class="stat-val">25</strong>
+      </div>
+    </aside>
+
+    <!-- Слева внизу: круглая вращающаяся радар-миникарта -->
+    <aside class="hud-radar-wrap" aria-label="Радар-миникарта">
+      <canvas id="radar-canvas" width="164" height="164"></canvas>
+      <div class="radar-caption">РАДАР · НЕОН-БЭЙ</div>
+    </aside>
+
+    <!-- Справа внизу: иконка оружия, патроны и панель машины -->
+    <aside class="hud-weapon-panel" aria-label="Оружие и транспорт">
+      <div id="hud-car-panel" class="car-status-box" hidden>
+        <div class="car-header"><span>ТРАНСПОРТ</span><strong id="hud-car-speed">0 КМ/Ч</strong></div>
+        <div class="stat-bar-track"><div id="hud-car-hp" class="stat-bar-fill car-fill" style="width:100%"></div></div>
+      </div>
+      <canvas id="weapon-icon-canvas" width="120" height="48"></canvas>
+      <div id="hud-weapon-name" class="weapon-name">ПИСТОЛЕТ «ПУЛЬС-9»</div>
+      <div id="hud-weapon-ammo" class="weapon-ammo">12 / ∞</div>
+      <div class="weapon-keys-hint">[1] Пистолет · [2] ПП · [3] Дробовик · [R] Перезарядка</div>
+    </aside>
+
+    <!-- Мобильное сенсорное управление -->
+    <div class="mobile-controls" id="mobile-controls">
+      <div id="touch-joystick-zone" class="touch-joystick-zone" aria-label="Джойстик движения">
+        <div id="touch-joystick-knob" class="touch-joystick-knob"></div>
+      </div>
+      <div id="touch-look-zone" class="touch-look-zone" aria-label="Зона обзора"></div>
+      <div class="mobile-action-buttons">
+        <button id="btn-mobile-fire" type="button" class="mob-btn mob-fire">ОГОНЬ</button>
+        <button id="btn-mobile-jump" type="button" class="mob-btn">ПРЫЖОК</button>
+        <button id="btn-mobile-reload" type="button" class="mob-btn">ПЕРЕЗАРЯД</button>
+        <button id="btn-mobile-weapon" type="button" class="mob-btn">ОРУЖИЕ</button>
+        <button id="btn-mobile-car" type="button" class="mob-btn mob-car">МАШИНА (E)</button>
+      </div>
+    </div>
+
+    <!-- ЭКРАН СТАРТА -->
+    <section id="screen-start" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="title-start">
+      <div class="modal-card">
+        <div class="neon-kicker">SUNSET ARCADE EDITION · 1984</div>
+        <h1 id="title-start" class="neon-title">НЕОН-БЭЙ <span>'84</span></h1>
+        <p class="modal-subtitle">Трёхмерный шутер от первого лица в солнечном приморском городе 80-х. Пальмы, арт-деко отели, спорткары, синтвейв-радио и 5 горячих миссий.</p>
+
+        <div class="record-banner">
+          <span>ЛУЧШИЙ КАПИТАЛ (РЕКОРД):</span>
+          <strong id="best-score-start">$0</strong>
+        </div>
+
+        <div class="controls-grid">
+          <div><kbd>WASD</kbd> Ходьба / Вождение</div>
+          <div><kbd>Мышь / ЛКМ</kbd> Обзор и Огонь</div>
+          <div><kbd>Shift</kbd> Бег · <kbd>Пробел</kbd> Прыжок / Дрифт</div>
+          <div><kbd>1–3</kbd> или <kbd>Колёсико</kbd> Оружие · <kbd>R</kbd> Перезарядка</div>
+          <div><kbd>E</kbd> Сесть / Выйти из машины</div>
+          <div><kbd>Q</kbd> Радио · <kbd>N</kbd> Закат / Ночь · <kbd>Esc</kbd> Пауза</div>
+        </div>
+
+        <div class="settings-row">
+          <button id="btn-quality-toggle" type="button" class="secondary-neon-btn">КАЧЕСТВО: ВЫСОКОЕ</button>
+          <button id="btn-sound-toggle" type="button" class="secondary-neon-btn">ЗВУК: ВКЛ</button>
+        </div>
+
+        <button id="btn-start-game" type="button" class="primary-neon-btn">ВОЙТИ В НЕОН-БЭЙ →</button>
+      </div>
+    </section>
+
+    <!-- ЭКРАН ПАУЗЫ -->
+    <section id="screen-pause" class="modal-backdrop" role="dialog" aria-modal="true" hidden>
+      <div class="modal-card compact-card">
+        <div class="neon-kicker">СИСТЕМА НА ПАУЗЕ</div>
+        <h2 class="neon-title">ПАУЗА</h2>
+        <p class="modal-subtitle">Нажмите продолжить, чтобы вернуться на солнечные улицы Неон-Бэй.</p>
+        <div class="modal-actions">
+          <button id="btn-resume-game" type="button" class="primary-neon-btn">ПРОДОЛЖИТЬ ИГРУ</button>
+          <button id="btn-restart-pause" type="button" class="secondary-neon-btn">НАЧАТЬ ЗАНОВО</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ЭКРАН СМЕРТИ («WASTED» В СТИЛЕ 80-Х) -->
+    <section id="screen-wasted" class="modal-backdrop wasted-backdrop" role="dialog" aria-modal="true" hidden>
+      <div class="modal-card compact-card wasted-card">
+        <div class="neon-kicker">КРИТИЧЕСКИЙ УРОН</div>
+        <h2 class="wasted-title">ВЫРУБЛЕН В НЕОНЕ</h2>
+        <p class="modal-subtitle">Бригада скорой доставила вас к набережной Палм-Рояль.</p>
+        <p id="wasted-penalty" class="wasted-penalty">Штраф клиники: -$150</p>
+        <button id="btn-respawn" type="button" class="primary-neon-btn">ВОЗРОДИТЬСЯ НА БУЛЬВАРЕ</button>
+      </div>
+    </section>
+
+    <!-- ЭКРАН ИТОГА ПОСЛЕ 5 МИССИЙ -->
+    <section id="screen-victory" class="modal-backdrop" role="dialog" aria-modal="true" hidden>
+      <div class="modal-card">
+        <div class="neon-kicker">ВСЕ 5 МИССИЙ ЗАВЕРШЕНЫ</div>
+        <h2 class="neon-title">ЛЕГЕНДА <span>НЕОН-БЭЙ</span></h2>
+        <p class="modal-subtitle">Вы прошли все задания, сокрушили босса доков и взяли приморский мегаполис под свой контроль!</p>
+        <div class="victory-stats">
+          <div class="v-stat"><span>НАЛИЧНЫЕ</span><strong id="victory-cash">$0</strong></div>
+          <div class="v-stat"><span>УСТРАНЕНО ВРАГОВ</span><strong id="victory-kills">0</strong></div>
+          <div class="v-stat"><span>РЕКОРД</span><strong id="victory-best">$0</strong></div>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-continue-freeroam" type="button" class="primary-neon-btn">СВОБОДНАЯ ПРОГУЛКА ПО ГОРОДУ</button>
+          <button id="btn-new-campaign" type="button" class="secondary-neon-btn">ПРОЙТИ КАМПАНИЮ ЗАНОВО</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

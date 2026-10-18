@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Неон-Бэй '84 — Тест Three.js r160</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #14052b; color: #00f5d4; font-family: monospace; }
+    #status { position: fixed; top: 12px; left: 12px; z-index: 10; background: rgba(10,5,25,0.85); padding: 8px 14px; border: 1px solid #ff2a85; border-radius: 6px; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="status">Проверка Three.js...</div>
+  <script type="module">
+    import * as THREE from './libs/three.module.min.js';
+
+    const status = document.getElementById('status');
+    status.textContent = `Three.js r${THREE.REVISION} успешно загружен · Вращающийся куб активен`;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x180734);
+    scene.fog = new THREE.Fog(0xff2a85, 5, 25);
+
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 1.2, 4);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const ambient = new THREE.AmbientLight(0xffafcc, 0.8);
+    scene.add(ambient);
+    const dir = new THREE.DirectionalLight(0x00f5d4, 1.4);
+    dir.position.set(4, 6, 5);
+    scene.add(dir);
+
+    const cube = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 1.5, 1.5),
+      new THREE.MeshLambertMaterial({ color: 0xff2a85, emissive: 0x3b0631 })
+    );
+    scene.add(cube);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    function animate(t) {
+      requestAnimationFrame(animate);
+      cube.rotation.x = t * 0.0008;
+      cube.rotation.y = t * 0.0013;
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>

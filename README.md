@@ -1,6 +1,6 @@
 # Мини-игры AXIIOM
 
-> Коллекция из 26 браузерных мини-игр: физика, аркады, головоломки и стратегии.
+> Коллекция из 28 браузерных мини-игр: физика, 3D-экшен, аркады, головоломки и стратегии.
 > Без регистрации, без установки — открыл и играешь. Разработка **[AXIIOM](https://axiiom.ru)**.
 
 **Живой каталог игр:** https://bestdeejay-design.github.io/minigames/
@@ -21,6 +21,7 @@
 | 🍉 Fruit Drop | физика падающих фруктов: слияния вплоть до арбуза | [играть](https://bestdeejay-design.github.io/minigames/games/fruit-drop/) |
 | 🐥 Road Hopper | бесконечная дорога: машины, брёвна, поезд и 8 скинов | [играть](https://bestdeejay-design.github.io/minigames/games/road-hopper/) |
 | 🕳️ Hungry Hole | арена 2000×2000: 800 объектов, 5 ботов и двухминутный раунд | [играть](https://bestdeejay-design.github.io/minigames/games/hungry-hole/) |
+| 🌴 Неон-Бэй '84 | 3D-шутер от первого лица в стиле 80-х: спорткары, синтвейв-радио, 5 миссий и розыск | [играть](https://bestdeejay-design.github.io/minigames/miami84/) |
 | 🛡️ Рубеж 64 | оригинальная RTS: минералы, технологии, ретрансляторы, 3 сложности | [играть](https://bestdeejay-design.github.io/minigames/rubezh64/) |
 | ✳️ Контур | аркада одним жестом: обводи искры, собирай комбо за 45 секунд | [играть](https://bestdeejay-design.github.io/minigames/contour/) |
 | 🎱 Кладезь | бильярд 2.0: призрачная траектория, комбо, 30 уровней и миссии | [играть](https://bestdeejay-design.github.io/minigames/billiards/) |
@@ -55,6 +56,7 @@
   `node --experimental-default-type=module --test games/tests/acceptance.test.mjs`.
 - «Рубеж 64» — автономные проверки логики: `node --test tests/game.test.mjs`
   из папки игры (нужен только Node.js, без пакетов).
+- «Неон-Бэй '84» (`miami84/`) — 3D-шутер от первого лица на локальном `Three.js r160` (`libs/three.module.min.js`), с процедурным городом, синтвейв-радио в Web Audio и автономными тестами: `node --test miami84/tests/game.test.mjs`.
 - Игры канона AXIIOM (кристаллы, разлом и 9 пересобранных): welcome-экран,
   вызов дня (seed от даты МСК), стрик-множитель до ×1.5, ежедневные миссии,
   fixed timestep, тосты и модалки в едином стиле.
@@ -71,8 +73,8 @@ games/<slug>/       — десять новых игр: index.html, style.css, j
                       js/game.js, js/config.js (иногда также js/logic.js)
 <game>/             — папка старой игры: index.html, style.css, game.js
                     (match3 — однофайловая: только index.html;
-                     rts и rubezh64 — модульные: ES-модули в js/,
-                     у rubezh64 также автономные тесты в tests/)
+                     rts, rubezh64 и miami84 — модульные: ES-модули в js/,
+                     у rubezh64 и miami84 также автономные тесты в tests/)
 ```
 
 ---
