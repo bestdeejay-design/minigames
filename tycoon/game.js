@@ -1,694 +1,206 @@
 'use strict';
-/* Небоскрёб — idle-тайкун в стиле AXIIOM. canvas + vanilla JS, без зависимостей.
-   Мета: стрик-множитель, ежедневные миссии. Прогресс города сохраняется в localStorage.
-   Пересборка: векторная графика вместо эмодзи, работающая система терпения, сохранения,
-   фиксированный шаг логики. */
-
-// ---------- утилиты ----------
-const $ = id => document.getElementById(id);
-const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
-function xmur3(str){let h=1779033703^str.length;for(let i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=h<<13|h>>>19;}return function(){h=Math.imul(h^h>>>16,2246822507);h=Math.imul(h^h>>>13,3266489909);return (h^=h>>>16)>>>0;};}
-function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
-function lsGet(k, d){ try{ const v = localStorage.getItem(k); return v===null? d : JSON.parse(v); }catch(e){ return d; } }
-function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
-
-const dateFmt = new Intl.DateTimeFormat('sv-SE', {timeZone:'Europe/Moscow', year:'numeric', month:'2-digit', day:'2-digit'});
-const moscowDate = off => dateFmt.format(new Date(Date.now() + off*864e5));
-const today=moscowDate(0), yesterday=moscowDate(-1);
-
-const STEP_MS=1000/60;
-
-// ---------- DOM ----------
-const canvas=$('gc'), ctx=canvas.getContext('2d');
-const el={
-  welcome:$('welcome'), game:$('game'),
-  money:$('money-val'), floorsV:$('floors-val'), popV:$('pop-val'), bestV:$('best-val'),
-  streakN:$('streak-n'), multN:$('mult-n'), missionsN:$('missions-n'),
-  wMoney:$('w-money'), wFloors:$('w-floors'), wStreak:$('w-streak'),
-  modal:$('modal'), modalCard:$('modal-card'), modalBadge:$('modal-badge'), modalTitle:$('modal-title'), modalScore:$('modal-score'),
-  mmodal:$('mmodal'), mlist:$('mmodal-list'), toasts:$('toasts'),
-  decoRow:$('deco-row'), shop:$('shop'), btnBuild:$('btn-build')
+/* ═══════════════ МЕГАПОЛИС v2.0 · тайкун-небоскрёб · AXIIOM canon ═══════════════ */
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const rand=(a,b)=>a+Math.random()*(b-a);
+const TAU=Math.PI*2;
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v);}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+const fmt=n=>Math.floor(n).toLocaleString('ru-RU');
+const now=new Date();
+const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Moscow'}).format(now);
+const yDate=new Date(now.getTime()-86400000);
+const yesterday=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Moscow'}).format(yDate);
+/* ─── Аудио ─── */
+let AC=null,master=null;
+function audioInit(){ if(AC)return; try{ AC=new (window.AudioContext||window.webkitAudioContext)(); master=AC.createGain(); master.gain.value=muted?0:0.5; master.connect(AC.destination);}catch(e){} }
+function tone(freq,dur,type,vol,slide,delay){ if(!AC||muted)return; const t0=AC.currentTime+(delay||0); const o=AC.createOscillator(),g=AC.createGain(); o.type=type||'sine'; o.frequency.setValueAtTime(freq,t0); if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,freq+slide),t0+dur); g.gain.setValueAtTime(vol||.15,t0); g.gain.exponentialRampToValueAtTime(.001,t0+dur); o.connect(g);g.connect(master); o.start(t0);o.stop(t0+dur+.02); }
+function noiseB(dur,vol,fc){ if(!AC||muted)return; const n=Math.floor(AC.sampleRate*dur); const buf=AC.createBuffer(1,n,AC.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n); const src=AC.createBufferSource(); src.buffer=buf; const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=fc||800; const g=AC.createGain(); g.gain.value=vol; src.connect(f);f.connect(g);g.connect(master); src.start(); }
+const sfx={
+  build(){ noiseB(.25,.3,500); tone(180,.2,'square',.1,-60); tone(240,.15,'square',.08,40,.12); },
+  ding(){ tone(880,.12,'sine',.15); tone(1320,.14,'sine',.12,0,.09); },
+  coin(){ tone(990,.07,'square',.09); tone(1480,.1,'square',.07,0,.05); },
+  angry(){ tone(220,.25,'sawtooth',.14,-80); },
+  elev(){ tone(160,.3,'sine',.06,60); },
+  up(){ [523,659,784].forEach((f,i)=>tone(f,.1,'triangle',.13,0,i*.07)); },
+  click(){ tone(700,.05,'square',.07); },
 };
-
-// ---------- звук ----------
-let AC=null;
-let muted=lsGet('tycoon.muted', false);
-function audio(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==='suspended') AC.resume(); return AC; }
-function tone(f0, f1, dur, type, vol, when){
-  if(muted) return; const ac=audio(); if(!ac) return;
-  const t=ac.currentTime+(when||0);
-  const o=ac.createOscillator(), g=ac.createGain();
-  o.type=type||'sine'; o.frequency.setValueAtTime(f0, t);
-  if(f1&&f1!==f0) o.frequency.exponentialRampToValueAtTime(Math.max(f1,1), t+dur);
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol||0.1, t+0.012);
-  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
-  o.connect(g).connect(ac.destination); o.start(t); o.stop(t+dur+0.02);
-}
-const snd={
-  build(){ tone(180, 270, 0.18, 'square', 0.05); tone(320, 380, 0.14, 'square', 0.04, 0.11); },
-  buy(){ tone(660, 660, 0.09, 'sine', 0.05); tone(880, 880, 0.12, 'sine', 0.05, 0.06); },
-  earn(){ tone(1180, 1180, 0.07, 'sine', 0.028); },
-  angry(){ tone(220, 140, 0.18, 'sawtooth', 0.045); },
-  mission(){ tone(880, 880, 0.1, 'sine', 0.1); tone(1174, 1174, 0.16, 'sine', 0.1, 0.1); },
-  record(){ [523,659,784].forEach((f,i)=>tone(f, f, 0.14, 'triangle', 0.1, i*0.11)); },
-  click(){ tone(440, 440, 0.04, 'sine', 0.05); }
+/* ─── Хранилище/мета ─── */
+const K_BEST='tc.best',K_DAILY='tc.daily.'+today,K_STREAK='tc.streak',K_LASTDAY='tc.lastDay',K_MUTE='tc.muted',K_MISS='tc.missions.'+today,K_CITY='tc.city';
+const el={ bank:$('bank-val'),floors:$('floors-val'),guests:$('guests-val'),rep:$('rep-val'),streakN:$('streak-n'),multN:$('mult-n'),missionsN:$('missions-n'),elevN:$('elev-n'),elevCost:$('elev-cost'),wDaily:$('w-daily-best'),wBest:$('w-best'),wStreak:$('w-streak'),gc:$('gc') };
+const W=400,H=580,STEP=1/60;
+const cv=el.gc,ctx=cv.getContext('2d');
+let dpr=1;
+function fitCanvas(){ dpr=Math.min(window.devicePixelRatio||1,2); cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+'px'; cv.style.height=H+'px'; ctx.setTransform(dpr,0,0,dpr,0,0); }
+fitCanvas(); window.addEventListener('resize',fitCanvas);
+/* ─── Типы этажей ─── */
+const FTYPES={
+  office:{name:'Офис',cost:80, pay:14,color:'#7EC8E3',glow:'rgba(126,200,227,',unlock:0},
+  cafe:  {name:'Кафе',cost:150,pay:27,color:'#E8B04B',glow:'rgba(232,176,75,',unlock:5},
+  lux:   {name:'Люкс',cost:280,pay:50,color:'#B06AE4',glow:'rgba(176,106,228,',unlock:10},
 };
-
-// ---------- стрик ----------
-const getMult = s => 1 + Math.min(Math.max(s-1,0),10)*0.05;
-let streak = lsGet('tycoon.streak', 0), lastDay = lsGet('tycoon.lastDay', '');
-function effStreak(){ return (lastDay===today || lastDay===yesterday) ? streak : 0; }
-function refreshMult(){ mult = effStreak()>0 ? getMult(streak) : 1; }
-function markDay(){
-  if(lastDay===today){ mult=getMult(streak); return; }
-  streak = (lastDay===yesterday) ? (streak||0)+1 : 1;
-  lastDay = today;
-  lsSet('tycoon.streak', streak); lsSet('tycoon.lastDay', lastDay);
-  mult = getMult(streak);
-  if(streak>1) toast(`🔥 Стрик <b>${streak}</b> · награды миссий ×<b>${mult.toFixed(2)}</b>`);
-}
-let mult=1; refreshMult();
-
-// ---------- тосты ----------
-function toast(html){
-  const d=document.createElement('div'); d.className='toast'; d.innerHTML=html;
-  el.toasts.appendChild(d);
-  requestAnimationFrame(()=>d.classList.add('show'));
-  setTimeout(()=>{ d.classList.remove('show'); setTimeout(()=>d.remove(), 300); }, 2600);
-}
-
-// ---------- миссии ----------
+const FTYPES_OR=['office','cafe','lux'];
+/* ─── Город (сохраняемый) ─── */
+let city=lsGet(K_CITY,null)||{bank:120,floors:['office'],rep:50,elev:1,guestsServed:0,earned:0};
+function saveCity(){ lsSet(K_CITY,city); }
+let muted=lsGet(K_MUTE,false);
+let running=false,over=false;
+let best=lsGet(K_BEST,0),dailyBest=lsGet(K_DAILY,0);
+let streak=lsGet(K_STREAK,0),lastDay=lsGet(K_LASTDAY,'');
+let mult=1;
+/* живое состояние */
+let guests=[],cabin={y:0,ty:0,rider:null,speed:.9},spawnT=2,dayT=0,camY=0,parts=[],texts=[],emo=[];
+const FLOOR_H=44,TOWER_W=150,TOWER_X=(W-TOWER_W)/2+30;
+const GROUND=H-96;
+function floorY(i){ return GROUND-(i+1)*FLOOR_H; } /* y верха этажа i */
+/* ─── Мета ─── */
+function effStreak(){ return (lastDay===today||lastDay===yesterday)?streak:0; }
+function getMult(s){ return 1+Math.min(Math.max(s-1,0),10)*0.05; }
+function touchStreak(){ if(lastDay===today){ mult=getMult(streak); return; } streak=(lastDay===yesterday)?(streak||0)+1:1; lastDay=today; lsSet(K_STREAK,streak); lsSet(K_LASTDAY,lastDay); mult=getMult(streak); if(streak>1)toast(`🔥 Стрик <b>${streak}</b> · доход ×<b>${mult.toFixed(2)}</b>`); }
 const MISSIONS=[
-  {id:'earn200',   t:()=>'Заработай 200 монет (за день)',           n:200, cum:true},
-  {id:'floors5',   t:()=>'Построй 5 этажей (суммарно)',             n:5,  cum:true},
-  {id:'visitors15',t:()=>'Обслужи 15 посетителей (за день)',        n:15, cum:true},
-  {id:'biz4',      t:()=>'Открой 4 бизнеса одновременно',           n:4},
-  {id:'money1000', t:()=>'Накопи 1000 монет в банке',               n:1000},
-  {id:'tips10',    t:()=>'Получи 10 чаевых (за день)',              n:10, cum:true},
-  {id:'jewelry',   t:()=>'Открой «Ювелирку»',                       n:1},
-  {id:'angry0',    t:()=>'Обслужи 8 посетителей без ушедших (день)',n:8,  cum:true}
+  {id:'build10', name:'Построить 10 этажей',        target:10, track:'floors'},
+  {id:'earn2k',  name:'Заработать $2000 всего',     target:2000,track:'earned'},
+  {id:'guests50',name:'Обслужить 50 гостей',        target:50, track:'served'},
+  {id:'rep90',   name:'Поднять репутацию до 90',    target:90, track:'rep'},
+  {id:'lux5',    name:'Построить 5 люксов',         target:5,  track:'lux'},
+  {id:'elev3',   name:'Лифт 3-го уровня',           target:3,  track:'elev'},
+  {id:'night10', name:'Обслужить 10 гостей ночью',  target:10, track:'night'},
+  {id:'tower15', name:'Башня в 15 этажей',          target:15, track:'height'},
 ];
-let missions=[], mState=lsGet('tycoon.missions.'+today, {});
-let mDirty=false;
-function flushMissions(){ if(!mDirty) return; mDirty=false; lsSet('tycoon.missions.'+today, mState); }
-function pickMissions(){
-  const seed = xmur3('tycoon-missions-'+today)();
-  const rng = mulberry32(seed);
-  const pool = MISSIONS.slice(); missions=[];
-  for(let k=0;k<3;k++){
-    const i = Math.floor(rng()*pool.length) % pool.length;
-    missions.push(pool.splice(i,1)[0]);
-  }
+let missionData=lsGet(K_MISS,{p:{},done:{}});
+if(!missionData.p)missionData={p:{},done:{}};
+function saveMissions(){ lsSet(K_MISS,missionData); }
+function missionAward(mid){ if(missionData.done[mid])return; missionData.done[mid]=1; saveMissions(); const bonus=Math.round(50*mult); city.bank+=bonus; saveCity(); toast(`🎯 Миссия выполнена: <b>+$${bonus}</b>`); sfx.up(); refreshMissionsUI(); refreshStats(); }
+function missionTick(track,val,absolute){ MISSIONS.forEach(m=>{ if(m.track!==track||missionData.done[m.id])return; if(absolute){ if(val>(missionData.p[m.id]||0))missionData.p[m.id]=val; } else missionData.p[m.id]=(missionData.p[m.id]||0)+val; if(missionData.p[m.id]>=m.target)missionAward(m.id); }); saveMissions(); refreshMissionsUI(); }
+function refreshMissionsUI(){ const done=MISSIONS.filter(m=>missionData.done[m.id]).length; el.missionsN.textContent=done+'/3'; }
+function renderMissionsModal(){ const list=$('mmodal-list'); list.innerHTML=''; MISSIONS.forEach(m=>{ const p=Math.min(missionData.p[m.id]||0,m.target); const done=!!missionData.done[m.id]; const d=document.createElement('div'); d.className='mm-item'+(done?' done':''); d.innerHTML=`<span class="mm-check">✓</span><span class="mm-body"><span class="mm-name">${m.name}</span><span class="mm-prog"><b>${fmt(p)}</b> / ${fmt(m.target)}</span></span>`; list.appendChild(d); }); }
+function toast(html){ const t=document.createElement('span'); t.className='toast'; t.innerHTML=html; $('toasts').appendChild(t); setTimeout(()=>t.classList.add('out'),2600); setTimeout(()=>t.remove(),3000); }
+function floatTxt(x,y,txt,color,size){ texts.push({x,y,txt,color,size:size||13,life:1,maxLife:1}); }
+function emoPop(x,y,kind){ emo.push({x,y,kind,t:0}); }
+/* ─── Экономика ─── */
+function dayPhase(){ return (dayT%70)/70; } /* 0..1 */
+function isNight(){ const p=dayPhase(); return p>.5; }
+function guestPay(ft){ const t=FTYPES[ft]; let pay=t.pay; if(ft==='office'&&!isNight())pay*=1.3; if(ft==='lux'&&isNight())pay*=1.35; return Math.round(pay*(1+city.elev*.08)*mult); }
+function buildFloor(type){ const t=FTYPES[type]; if(city.floors.length<t.unlock){ toast(`🔒 «${t.name}» откроется на ${t.unlock} этажах`); return; } if(city.bank<t.cost){ toast(`Не хватает $${fmt(t.cost-city.bank)}`); return; } city.bank-=t.cost; city.floors.push(type); saveCity(); sfx.build(); floatTxt(TOWER_X+TOWER_W/2,floorY(city.floors.length-1)+10,t.name+'!','#D4A574',14); missionTick('floors',1); if(type==='lux')missionTick('lux',1); missionTick('height',city.floors.length,true); refreshStats(); camY=Math.max(0,(city.floors.length)*FLOOR_H-H*.55); }
+function elevCost(){ return Math.round(190*Math.pow(1.75,city.elev-1)); }
+function upgradeElev(){ const c=elevCost(); if(city.bank<c){ toast(`Не хватает $${fmt(c-city.bank)}`); return; } city.bank-=c; city.elev++; saveCity(); sfx.up(); toast(`🛗 Лифт ур.<b>${city.elev}</b>`); missionTick('elev',city.elev,true); refreshStats(); }
+/* ─── Гости ─── */
+function spawnGuest(){ if(!city.floors.length)return; const want=city.floors[(Math.random()*city.floors.length)|0]; guests.push({x:W+16,state:'walk',want,pat:1,patMax:12,emo:0,fx:rand(30,110),floor:-1,t:0}); }
+function update(dt){
+  if(over)return;
+  dayT+=dt;
+  spawnT-=dt*(1+city.rep*.006); if(spawnT<=0){ spawnGuest(); spawnT=6.5-city.rep*.04+rand(-.6,.6); }
+  /* гости */
+  for(let i=guests.length-1;i>=0;i--){ const g=guests[i]; g.t+=dt;
+    if(g.state==='walk'){ const door=TOWER_X+TOWER_W-14; g.x+=(door-g.x)*dt*1.4; if(Math.abs(g.x-door)<3){ g.state='wait'; g.pat=1; } }
+    else if(g.state==='wait'){ g.pat-=dt/g.patMax*(cabin.rider?1.6:1); if(g.pat<=0){ /* злой уходит */ city.rep=clamp(city.rep-6,0,100); saveCity(); g.state='angry'; g.emo=1; sfx.angry(); emoPop(g.x,floorY(-1)+8,'angry'); missionTick('rep',city.rep,true); } }
+    else if(g.state==='ride'){ /* в кабине */ }
+    else if(g.state==='leave'){ g.x+=dt*90; if(g.x>W+20)guests.splice(i,1); }
+    else if(g.state==='angry'){ g.x+=dt*130; if(g.x>W+20){ guests.splice(i,1); refreshStats(); } } }
+  /* лифт: берёт ждущего с минимальным терпением */
+  if(!cabin.rider&&!cabin.moving){ let best=null; guests.forEach(g=>{ if(g.state==='wait'&&(!best||g.pat<best.pat))best=g; }); if(best){ best.state='ride'; cabin.rider=best; cabin.ty=floorY(city.floors.findIndex((f,ix)=>f===best.want&&ix>=0)||0); /* первый этаж нужного типа */ const idx=city.floors.indexOf(best.want); cabin.ty=floorY(idx<0?0:idx); cabin.moving=true; sfx.elev(); } }
+  if(cabin.moving){ cabin.speed=.9+city.elev*.45; const dy=cabin.ty-cabin.y; const step=Math.sign(dy)*Math.min(Math.abs(dy),cabin.speed*dt*60*.16); cabin.y+=step; if(Math.abs(cabin.ty-cabin.y)<2){ cabin.y=cabin.ty; /* прибытие */ const g=cabin.rider; if(g){ const pay=guestPay(g.want); city.bank+=pay; city.earned+=pay; city.guestsServed++; city.rep=clamp(city.rep+2,0,100); saveCity(); sfx.coin(); floatTxt(TOWER_X+TOWER_W+18,cabin.y+18,'+$'+pay,'#D4A574',13); emoPop(TOWER_X+TOWER_W+34,cabin.y+14,'happy'); missionTick('earned',city.earned,true); missionTick('served',1); missionTick('rep',city.rep,true); if(isNight())missionTick('night',1); g.state='leave'; g.emo=0; cabin.rider=null; refreshStats(); } cabin.moving=false; } }
+  /* частицы/тексты/эмоции */
+  parts=parts.filter(p=>{ p.life-=dt; return p.life>0; });
+  texts=texts.filter(t=>{ t.life-=dt; t.y-=24*dt; return t.life>0; });
+  emo=emo.filter(e=>{ e.t+=dt; return e.t<1.4; });
 }
-function missionProgress(id, val){
-  const def = missions.find(m=>m.id===id); if(!def) return;
-  const st = mState[id] || {p:0, done:false};
-  if(st.done) return;
-  const before=st.p;
-  st.p = def.cum ? st.p + val : Math.max(st.p, val);
-  if(st.p!==before) mDirty=true;
-  mState[id]=st;
-  if(st.p >= def.n){
-    st.done = true; st.p = def.n; mDirty=true;
-    const reward = Math.round(25*mult);
-    city.money += reward;
-    toast(`🎯 Миссия: <b>${def.t()}</b> · +<b>${reward}</b>`);
-    snd.mission();
-  }
-  renderMissionsChip();
-}
-function renderMissionsChip(){ el.missionsN.textContent = missions.filter(m=>(mState[m.id]||{}).done).length+'/3'; }
-function renderMissionsModal(){
-  el.mlist.innerHTML = missions.map(m=>{
-    const st = mState[m.id] || {p:0, done:false};
-    const pct = Math.min(100, Math.round(st.p/m.n*100));
-    return `<div class="mission-item ${st.done?'done':''}">
-      <div class="mission-top"><span>${m.t()}</span><span class="m-state">${st.done?'✓':Math.min(st.p,m.n)+'/'+m.n}</span></div>
-      <div class="mission-bar"><i style="width:${pct}%"></i></div>
-    </div>`;
-  }).join('');
-}
-
-// ---------- бизнесы ----------
-const BUSINESSES=[
-  {id:'pizza',   name:'Пиццерия',  letter:'П', cost:0,   income:4,  color:'#C96A6A', dur:3000, pop:30},
-  {id:'cafe',    name:'Кафе',      letter:'К', cost:60,  income:6,  color:'#D4A574', dur:3500, pop:25},
-  {id:'burger',  name:'Бургерная', letter:'Б', cost:120, income:8,  color:'#E8B04B', dur:2500, pop:20},
-  {id:'library', name:'Библиотека',letter:'Л', cost:80,  income:5,  color:'#5F7E8A', dur:5000, pop:15},
-  {id:'arcade',  name:'Аркада',    letter:'А', cost:200, income:12, color:'#7A6A8F', dur:4000, pop:20},
-  {id:'sushi',   name:'Суши',      letter:'С', cost:350, income:18, color:'#8B9D83', dur:3000, pop:15},
-  {id:'fashion', name:'Мода',      letter:'М', cost:500, income:25, color:'#B0563F', dur:4500, pop:10},
-  {id:'jewelry', name:'Ювелирка',  letter:'Ю', cost:800, income:35, color:'#E8C9A0', dur:4000, pop:5},
-];
-const bizById = id => BUSINESSES.find(b=>b.id===id);
-
-// типы гостей: любимые бизнесы, терпение, чаевые
-const CHAR_TYPES=[
-  {wants:['pizza','cafe','library'],  patience:15000, tip:2, color:'#5F7E8A'},
-  {wants:['cafe','burger'],           patience:10000, tip:3, color:'#D4A574'},
-  {wants:['sushi','arcade','cafe'],   patience:12000, tip:4, color:'#7A6A8F'},
-  {wants:['library','cafe','pizza'],  patience:20000, tip:1, color:'#8B9D83'},
-  {wants:['fashion','jewelry','cafe'],patience:15000, tip:5, color:'#B0563F'},
-  {wants:['arcade','pizza','burger'], patience:8000,  tip:1, color:'#C96A6A'},
-];
-
-// ---------- город (с сохранением) ----------
-let city=null;
-function freshCity(){
-  return {
-    money: 150,
-    floors: [ {business:null}, {business:'pizza'} ],   // индекс 0 = вход
-    bestFloors: 1,
-    totalEarned: 0,
-    totalVisitors: 0,
-    savedAt: Date.now()
-  };
-}
-function saveCity(){ if(city){ city.savedAt=Date.now(); lsSet('tycoon.city', city); } }
-function loadCity(){
-  const c=lsGet('tycoon.city', null);
-  if(c && c.floors && c.floors.length>=2){ city=c; return true; }
-  city=freshCity(); return false;
-}
-
-// ---------- рантайм-состояние ----------
-let cw=0, ch=0, dpr=1;
-let floorH=55;
-const FLOOR_MIN=34;
-let chars=[], elevators=[], charId=0;
-let selectedFloor=null;
-let spawnTimer=0, saveTimer=0;
-let floaters=[];
-let animId=null, acc=0, lastT=0, paused=false;
-let visitorsServed=0, angryLeft=0, happyStreak=0;
-
-function getFloorY(i){ return ch-(i+1)*floorH; }
-function recalcFloorH(){ floorH=Math.min(55, Math.max(FLOOR_MIN, (ch-16)/(city.floors.length+0.4))); }
-function getElevatorCount(){ const n=city.floors.length-1; return n<=4?1:n<=8?2:3; }
-function getBuildCost(){ return Math.floor(80+(city.floors.length-2)*50); }
-function incomePerMin(){
-  let perSec=0;
-  for(const f of city.floors){
-    if(!f.business) continue;
-    const b=bizById(f.business); if(!b) continue;
-    // средний цикл гостя: ожидание+поездка+визит(dur)+уход, грубо dur+4000
-    perSec += (b.income+2)/( (b.dur+4000)/1000 ) * 0.6;
-  }
-  return Math.round(perSec*60);
-}
-
-function fitCanvas(){
-  const rect=canvas.parentElement.getBoundingClientRect();
-  dpr=Math.min(window.devicePixelRatio||1, 2);
-  cw=Math.floor(rect.width); ch=Math.floor(rect.height);
-  canvas.width=cw*dpr; canvas.height=ch*dpr;
-  canvas.style.width=cw+'px'; canvas.style.height=ch+'px';
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  recalcFloorH();
-}
-
-// ---------- лифты ----------
-function rebuildElevators(){
-  const target=getElevatorCount();
-  while(elevators.length<target){
-    const idx=elevators.length;
-    elevators.push({id:idx, y:getFloorY(0)+floorH/2-9, targetFloor:0, occupants:[], state:'idle', timer:30+idx*10, capacity:4});
-  }
-  while(elevators.length>target){
-    const e=elevators.pop();
-    for(const occ of e.occupants) occ.state='waiting';
-  }
-}
-function updateElevators(){
-  rebuildElevators();
-  const gy=getFloorY(0)+floorH/2-9;
-  for(const ev of elevators){
-    if(ev.state==='idle'){
-      ev.y+=(gy-ev.y)*0.1;
-      const waiting=chars.filter(c=>c.state==='waiting');
-      if(waiting.length>0){
-        const take=Math.min(ev.capacity, waiting.length);
-        for(let i=0;i<take;i++){ waiting[i].state='elevator'; ev.occupants.push(waiting[i]); }
-        ev.state='going';
-        ev.targetFloor=ev.occupants[0].targetFloor;
-        ev.timer=Math.abs(ev.targetFloor)*10+20;
-      }
-    }
-    else if(ev.state==='going'){
-      const ty=getFloorY(ev.targetFloor)+floorH/2-9;
-      ev.y+=(ty-ev.y)*0.08;
-      ev.timer--;
-      if(ev.timer<=0||Math.abs(ev.y-ty)<2){
-        ev.y=ty;
-        const arriving=ev.occupants.filter(o=>o.targetFloor===ev.targetFloor);
-        for(const occ of arriving){
-          occ.state='visiting';
-          occ.timer=bizById(occ.biz).dur;
-        }
-        ev.occupants=ev.occupants.filter(o=>o.targetFloor!==ev.targetFloor);
-        if(ev.occupants.length>0){
-          ev.targetFloor=ev.occupants[0].targetFloor;
-          ev.timer=Math.abs(ev.targetFloor-ev.targetFloor)*10+20;
-        } else {
-          ev.state='returning'; ev.timer=30;
-        }
-      }
-    }
-    else if(ev.state==='returning'){
-      ev.y+=(gy-ev.y)*0.05;
-      ev.timer--;
-      if(ev.timer<=0||Math.abs(ev.y-gy)<2){ ev.y=gy; ev.state='idle'; ev.timer=20; }
-    }
-  }
-}
-
-// ---------- гости ----------
-function spawnChar(){
-  const activeBiz=city.floors.map(f=>f.business).filter(Boolean);
-  if(activeBiz.length===0) return;
-  const ct=CHAR_TYPES[(Math.random()*CHAR_TYPES.length)|0];
-  const wants=ct.wants.filter(w=>activeBiz.includes(w));
-  if(wants.length===0) return;
-  const wantBiz=wants[(Math.random()*wants.length)|0];
-  const idx=city.floors.findIndex(f=>f.business===wantBiz);
-  if(idx<0) return;
-  chars.push({
-    id:charId++, type:ct, biz:wantBiz, targetFloor:idx,
-    state:'waiting', timer:ct.patience, gaveTip:false,
-    x: 44+((chars.filter(c=>c.state==='waiting').length)%8)*20
-  });
-}
-function updateChars(){
-  for(const c of chars){
-    if(c.state==='waiting'){
-      c.timer-=STEP_MS;
-      if(c.timer<=0){
-        c.state='gone';
-        angryLeft++; happyStreak=0;
-        floaters.push({x:c.x, y:getFloorY(0)+floorH/2, text:'ушёл', color:'#E4545F', life:50, max:50});
-        snd.angry();
-      }
-    }
-    else if(c.state==='visiting'){
-      c.timer-=STEP_MS;
-      if(c.timer<=0){
-        const b=bizById(c.biz);
-        const earn=(b?b.income:0)+(c.gaveTip?0:c.type.tip);
-        city.money+=Math.round(earn);
-        city.totalEarned+=Math.round(earn);
-        visitorsServed++; city.totalVisitors++; happyStreak++;
-        if(!c.gaveTip){ missionProgress('tips10',1); c.gaveTip=true; }
-        c.state='gone';
-        snd.earn();
-        floaters.push({x:cw-70-Math.random()*30, y:getFloorY(c.targetFloor)+floorH/2, text:'+$'+Math.round(earn), color:'#E8B04B', life:50, max:50});
-        missionProgress('earn200', Math.round(earn));
-        missionProgress('visitors15',1);
-        if(happyStreak>=8) missionProgress('angry0', visitorsServed);
-      }
-    }
-  }
-  chars=chars.filter(c=>c.state!=='gone');
-}
-
-// ---------- логика шага ----------
-function update(){
-  recalcFloorH();
-  // пассивный доход — фиксированный, не случайный
-  for(let i=1;i<city.floors.length;i++){
-    const f=city.floors[i];
-    if(!f.business) continue;
-    const b=bizById(f.business); if(!b) continue;
-    f.acc=(f.acc||0)+STEP_MS;
-    if(f.acc>=b.dur*4){ f.acc-=b.dur*4; city.money+=Math.max(1, Math.round(b.income*0.5)); }
-  }
-  // спавн гостей
-  spawnTimer+=STEP_MS;
-  const spawnRate=Math.max(1800, 4200-city.floors.filter(f=>f.business).length*220);
-  if(spawnTimer>spawnRate && chars.filter(c=>c.state==='waiting'||c.state==='elevator').length<8){
-    spawnTimer=0; spawnChar();
-  }
-  updateElevators();
-  updateChars();
-  for(let i=floaters.length-1;i>=0;i--){ const f=floaters[i]; f.y-=0.55; if(--f.life<=0) floaters.splice(i,1); }
-  // автосохранение раз в 5с
-  saveTimer+=STEP_MS;
-  if(saveTimer>5000){ saveTimer=0; saveCity(); }
-  // миссии состояния
-  missionProgress('money1000', city.money);
-  const bizCount=city.floors.filter(f=>f.business).length;
-  missionProgress('biz4', bizCount);
-  if(city.floors.some(f=>f.business==='jewelry')) missionProgress('jewelry',1);
-}
-
-// ---------- отрисовка ----------
-function draw(){
-  ctx.clearRect(0,0,cw,ch);
-  // фон
-  ctx.fillStyle='#0B0B12';
-  ctx.fillRect(0,0,cw,ch);
-
-  const numElev=getElevatorCount();
-  const SHAFT=24*numElev+6;
-  const shaftX=cw-SHAFT;
-
-  for(let i=0;i<city.floors.length;i++){
-    const f=city.floors[i];
-    const y=getFloorY(i);
-    const isGround=i===0;
-    const isSel=selectedFloor===i;
-
-    ctx.fillStyle=isSel?'#2A2116':(isGround?'#0E0E14':'#12121A');
-    ctx.fillRect(0,y,cw,floorH);
-    ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(cw,y); ctx.stroke();
-
-    // номер этажа
-    ctx.fillStyle='#78787D';
-    ctx.font='9px Inter, sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
-    ctx.fillText(isGround?'ВХОД':String(i)+'F', 6, y+floorH/2);
-
-    if(f.business && !isGround){
-      drawShopfront(34, y+3, floorH-6, bizById(f.business), f);
-    } else if(!isGround){
-      ctx.strokeStyle='rgba(212,165,116,.3)'; ctx.lineWidth=1;
-      roundRect(ctx, 34, y+5, floorH-10, floorH-10, 4); ctx.stroke();
-      ctx.fillStyle='rgba(212,165,116,.55)';
-      ctx.font='13px Inter, sans-serif'; ctx.textAlign='center';
-      ctx.fillText('+', 34+(floorH-10)/2, y+floorH/2-2);
-      ctx.fillStyle='rgba(255,255,255,.18)';
-      ctx.font='7px Inter, sans-serif';
-      ctx.fillText('свободен', 34+(floorH-10)/2, y+floorH/2+10);
-    }
-
-    // шахта лифта
-    ctx.fillStyle='#08080C';
-    ctx.fillRect(shaftX, y, SHAFT, floorH);
-    ctx.strokeStyle='rgba(255,255,255,.07)';
-    ctx.strokeRect(shaftX, y, SHAFT, floorH);
-  }
-
-  // кабины лифтов
-  for(const ev of elevators){
-    const carX=shaftX+3+ev.id*24;
-    ctx.fillStyle=ev.occupants.length>0?'#D4A574':'#8A7350';
-    roundRect(ctx, carX, ev.y, 20, 16, 3); ctx.fill();
-    if(ev.occupants.length>0){
-      ctx.fillStyle='#14100B';
-      ctx.font='bold 8px Inter, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText(String(ev.occupants.length), carX+10, ev.y+8);
-    }
-  }
-
-  // ожидающие гости
-  let wx=44;
-  for(const c of chars){
-    if(c.state!=='waiting') continue;
-    const gy=getFloorY(0)+floorH/2;
-    const impatient=c.timer<c.type.patience*0.35;
-    drawPerson(c.x, gy, c.type.color, impatient);
-    wx+=20;
-    if(wx>shaftX-14) break;
-  }
-  // гости внутри лифтов
-  for(const ev of elevators){
-    const carX=shaftX+3+ev.id*24;
-    let px=carX+5;
-    for(const occ of ev.occupants){
-      drawPerson(px, ev.y+9, occ.type.color, false, 0.7);
-      px+=6;
-    }
-  }
-  // гости на этажах (визит)
-  for(const c of chars){
-    if(c.state!=='visiting') continue;
-    const vy=getFloorY(c.targetFloor)+floorH/2;
-    const sx=shaftX-24-(chars.filter(o=>o.state==='visiting'&&o.targetFloor===c.targetFloor).indexOf(c)+1)*12;
-    drawPerson(sx, vy, c.type.color, false, 0.8);
-  }
-
-  // всплывающие суммы
-  for(const f of floaters){
-    ctx.globalAlpha=Math.max(0,f.life/f.max);
-    ctx.fillStyle=f.color;
-    ctx.font='bold 11px Inter, sans-serif'; ctx.textAlign='center';
-    ctx.fillText(f.text, f.x, f.y);
-  }
-  ctx.globalAlpha=1;
-}
-
-// витрина бизнеса — векторная
-function drawShopfront(x, y, h, biz, f){
-  const w=floorH-10;
-  ctx.fillStyle='#1A1A24';
-  roundRect(ctx, x, y, w, h, 4); ctx.fill();
-  // навес-маркиза
-  ctx.fillStyle=biz.color;
-  for(let sx=0; sx<w; sx+=7){
-    ctx.fillStyle= (sx/7)%2===0 ? biz.color : shade(biz.color,-30);
-    ctx.fillRect(x+sx, y+2, Math.min(7,w-sx), 5);
-  }
-  // окно
-  ctx.fillStyle=shade(biz.color,-55);
-  roundRect(ctx, x+4, y+10, w-8, h-20, 2); ctx.fill();
-  // монограмма
-  ctx.fillStyle='#EDEDF0';
-  ctx.font='bold 10px Inter, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(biz.letter, x+w/2, y+h/2+3);
-  // сила света окна — активность
-  const visitors=chars.filter(c=>c.state==='visiting'&&city.floors[c.targetFloor]===f);
-  if(visitors.length>0){
-    ctx.fillStyle='rgba(232,176,75,.5)';
-    ctx.fillRect(x+4, y+h-6, w-8, 2);
-  }
-}
-function drawPerson(x, y, color, impatient, scale){
-  const s=scale||1;
-  ctx.save();
-  ctx.translate(x,y);
-  ctx.scale(s,s);
-  if(impatient && Math.floor(Date.now()/250)%2===0){
-    ctx.strokeStyle='rgba(228,84,95,.8)'; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.arc(0,-3,8,0,Math.PI*2); ctx.stroke();
-  }
-  // тело
-  ctx.fillStyle=color;
-  roundRect(ctx,-4,-2,8,9,3); ctx.fill();
-  // голова
-  ctx.fillStyle='#C9CDD4';
-  ctx.beginPath(); ctx.arc(0,-6,3.4,0,Math.PI*2); ctx.fill();
-  ctx.restore();
-}
-function roundRect(c,x,y,w,h,r){ r=Math.min(r,w/2,h/2); c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
-function shade(hex, amt){
-  const h=hex.replace('#','');
-  const r=clamp(parseInt(h.substr(0,2),16)+amt,0,255);
-  const g=clamp(parseInt(h.substr(2,2),16)+amt,0,255);
-  const b=clamp(parseInt(h.substr(4,2),16)+amt,0,255);
-  return `rgb(${r},${g},${b})`;
-}
-
-// ---------- HUD ----------
-function updateHUD(){
-  el.money.textContent=Math.floor(city.money);
-  el.floorsV.textContent=city.floors.length-1;
-  el.popV.textContent=chars.length;
-  el.bestV.textContent=city.bestFloors;
-  const cost=getBuildCost();
-  el.btnBuild.textContent='Построить $'+cost;
-  el.btnBuild.disabled=city.money<cost;
-  el.wMoney.textContent=Math.floor(city.money);
-  el.wFloors.textContent=city.bestFloors;
-  el.wStreak.textContent='🔥 '+effStreak();
-  el.streakN.textContent=effStreak();
-  el.multN.textContent='×'+mult.toFixed(2);
-}
-
-// ---------- магазин ----------
-function renderShop(){
-  const target=selectedFloor;
-  if(target===null||target<=0||city.floors[target].business){ el.shop.classList.add('hidden'); return; }
-  el.shop.classList.remove('hidden');
-  el.shop.innerHTML='';
-  const afford=Math.min(800, city.money+100);
-  for(const biz of BUSINESSES){
-    if(biz.cost>afford) continue;
-    if(biz.cost===0 && target>1) continue;
-    if(city.floors.some((f,idx)=>idx>0&&f.business===biz.id&&biz.cost===0)) continue;
-    const btn=document.createElement('button');
-    btn.className='shop-btn';
-    btn.disabled=biz.cost>city.money;
-    btn.innerHTML=`<span class="swatch" style="background:${biz.color}">${biz.letter}</span><span class="bname">${biz.name}</span><span class="bprice">$${biz.cost}</span>`;
-    btn.addEventListener('click',()=>{
-      if(city.money<biz.cost||city.floors[target].business) return;
-      city.money-=biz.cost;
-      city.floors[target].business=biz.id;
-      snd.buy();
-      toast(`${biz.name} — открыто! +$${biz.income}/визит`);
-      floaters.push({x:cw/2, y:getFloorY(target)+floorH/2, text:biz.letter, color:'#8B9D83', life:50, max:50});
-      selectedFloor=null;
-      renderShop(); saveCity(); updateHUD();
-    });
-    el.shop.appendChild(btn);
-  }
-  if(!el.shop.children.length){
-    const p=document.createElement('span');
-    p.style.cssText='color:#78787D;font-size:.75rem;padding:6px;';
-    p.textContent='Пока нечего открыть — копи монеты';
-    el.shop.appendChild(p);
-  }
-}
-
-// ---------- строительство ----------
-function buildFloor(){
-  const cost=getBuildCost();
-  if(city.money<cost) return false;
-  city.money-=cost;
-  snd.build();
-  city.floors.push({business:null});
-  const floors=city.floors.length-1;
-  if(floors>city.bestFloors){
-    if(city.bestFloors>1){ toast('🏆 Новый рекорд: <b>'+floors+'</b> этажей!'); snd.record(); }
-    city.bestFloors=floors;
-  }
-  missionProgress('floors5',1);
-  recalcFloorH();
-  selectedFloor=city.floors.length-1;
-  renderShop(); saveCity(); updateHUD();
-  return true;
-}
-el.btnBuild.addEventListener('click', buildFloor);
-
-// ---------- тапы ----------
-function onCanvasTap(x, y){
-  let hit=null;
-  for(let i=city.floors.length-1;i>=0;i--){
-    const fy=getFloorY(i);
-    if(y>=fy&&y<=fy+floorH){ hit=i; break; }
-  }
-  if(hit!==null&&hit>0&&!city.floors[hit].business){ selectedFloor=hit; }
-  else { selectedFloor=null; }
-  renderShop();
-}
-canvas.addEventListener('touchstart',e=>{
-  e.preventDefault();
-  const t=e.touches[0], r=canvas.getBoundingClientRect();
-  onCanvasTap(t.clientX-r.left, t.clientY-r.top);
-},{passive:false});
-canvas.addEventListener('mousedown',e=>{
-  const r=canvas.getBoundingClientRect();
-  onCanvasTap(e.clientX-r.left, e.clientY-r.top);
-});
-
-// ---------- цикл ----------
-function loop(now){
-  animId=requestAnimationFrame(loop);
-  if(!lastT) lastT=now;
-  let delta=now-lastT; lastT=now;
-  if(paused){ draw(); return; }
-  delta=Math.min(delta,100);
-  acc+=delta;
-  let steps=0;
-  while(acc>=STEP_MS&&steps<4){ update(); acc-=STEP_MS; steps++; }
-  if(steps===4) acc=0;
-  flushMissions();
-  updateHUD();
-  draw();
-}
-
-// ---------- экраны ----------
-function startGame(){
-  el.welcome.classList.add('hidden');
-  el.game.classList.remove('hidden');
-  fitCanvas();
-  rebuildElevators();
-  selectedFloor=null; renderShop();
-  if(!animId) animId=requestAnimationFrame(loop);
-}
-function toMenu(){
-  el.game.classList.add('hidden');
-  el.shop.classList.add('hidden');
-  el.welcome.classList.remove('hidden');
-  saveCity();
-  updateHUD();
-}
-
-$('btn-play').addEventListener('click',()=>{ snd.click(); startGame(); });
-$('btn-menu').addEventListener('click',()=>{ snd.click(); toMenu(); });
-$('btn-missions').addEventListener('click',openMissions);
-$('missions-chip').addEventListener('click',openMissions);
-$('mmodal-btn').addEventListener('click',()=>{ snd.click(); el.mmodal.classList.add('hidden'); });
-function openMissions(){ snd.click(); renderMissionsModal(); el.mmodal.classList.remove('hidden'); }
-
-$('btn-reset-city').addEventListener('click',()=>{
-  snd.click();
-  el.modalBadge.textContent='Новый город';
-  el.modalTitle.textContent='Снести башню?';
-  el.modalScore.innerHTML=`Прогресс текущего города будет удалён: <b>${city.floors.length-1}</b> этажей, банк <b>${Math.floor(city.money)}</b>.`;
-  $('modal-btn').textContent='Снести';
-  $('modal-btn').onclick=()=>{
-    snd.click();
-    city=freshCity();
-    chars=[]; elevators=[]; selectedFloor=null;
-    saveCity();
-    el.modal.classList.add('hidden');
-    updateHUD();
-    toast('🏙 Новый город построен с нуля');
-  };
-  $('modal-btn2').onclick=()=>{ snd.click(); el.modal.classList.add('hidden'); };
-  el.modal.classList.remove('hidden');
-});
-
-function updateSoundBtn(){ $('btn-sound').textContent=muted?'🔇':'🔊'; }
-$('btn-sound').addEventListener('click',()=>{
-  muted=!muted; lsSet('tycoon.muted', muted);
-  updateSoundBtn(); if(!muted) snd.click();
-});
-updateSoundBtn();
-
-document.addEventListener('visibilitychange',()=>{
-  paused=document.hidden;
-  if(document.hidden) saveCity(); else lastT=0;
-});
-window.addEventListener('pagehide', saveCity);
-
-function onResize(){
-  if(el.game.classList.contains('hidden')) return;
-  fitCanvas();
-  for(const ev of elevators) ev.y=getFloorY(0)+floorH/2-9;
-}
-window.addEventListener('resize', onResize);
-if(window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
-
-// ---------- init ----------
-(function init(){
-  for(let i=0;i<7;i++) el.decoRow.appendChild(document.createElement('i'));
-  pickMissions(); renderMissionsChip();
-  loadCity();
-  fitCanvas();
-  updateHUD();
-  animId=requestAnimationFrame(loop);
-})();
-
-// ---------- debug hooks ----------
-window.__ty={
-  get money(){ return Math.floor(city.money); },
-  get floors(){ return city.floors.length-1; },
-  get best(){ return city.bestFloors; },
-  get visitors(){ return city.totalVisitors; },
-  get missionsDone(){ return missions.filter(m=>(mState[m.id]||{}).done).length; },
-  get saved(){ return !!lsGet('tycoon.city', null); },
-  addMoney(v){ city.money+=v; updateHUD(); },
-  build(){ city.money=Math.max(city.money, getBuildCost()+10); updateHUD(); buildFloor(); },
-  buyCheapest(){
-    const idx=city.floors.findIndex((f,i)=>i>0&&!f.business);
-    if(idx<0) return 'no floor';
-    city.money=Math.max(city.money, 300); updateHUD();
-    selectedFloor=idx; renderShop();
-    const btn=el.shop.querySelector('.shop-btn:not(:disabled)');
-    if(btn){ btn.click(); return 'bought'; }
-    return 'none affordable';
-  },
-  spawnVisitor(){ spawnChar(); },
-  flush(){ flushMissions(); saveCity(); },
+function refreshStats(){ el.bank.textContent='$'+fmt(city.bank); el.floors.textContent=city.floors.length; el.guests.textContent=city.guestsServed; el.rep.textContent=Math.round(city.rep); el.elevN.textContent=city.elev; el.elevCost.textContent='$'+fmt(elevCost()); }
+/* ═══ РЕНДЕР ═══ */
+function skyColors(){ const p=dayPhase(); /* день → закат → ночь → рассвет */ const key=[['#1A2438','#324A6B'],['#2A1E38','#6B4A3A'],['#0B0D16','#141A2C'],['#1A1E30','#3A3A5C']]; const seg=p*4, i=seg|0, f=seg-i; const a=key[i%4],b=key[(i+1)%4]; const mix=(c1,c2)=>{ const h=x=>parseInt(x,16); const r1=h(c1.slice(1,3)),g1=h(c1.slice(3,5)),b1=h(c1.slice(5,7)); const r2=h(c2.slice(1,3)),g2=h(c2.slice(3,5)),b2=h(c2.slice(5,7)); return `rgb(${r1+(r2-r1)*f|0},${g1+(g2-g1)*f|0},${b1+(b2-b1)*f|0})`; }; return [mix(a[0],b[0]),mix(a[1],b[1])]; }
+function render(){
+  const [c1,c2]=skyColors();
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,c1); g.addColorStop(1,c2); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  /* звёзды ночью */
+  const night=isNight(); const nAlpha=night?clamp((dayPhase()-.5)*6,0,1):clamp((.5-dayPhase())*6,0,1);
+  if(nAlpha>0){ ctx.fillStyle=`rgba(240,240,255,${nAlpha*.8})`; for(let i=0;i<40;i++){ const x=(i*97)%W,y=(i*61)%240; const tw=.5+Math.sin(performance.now()*.002+i)*.4; ctx.globalAlpha=nAlpha*tw; ctx.fillRect(x,y,1.5,1.5); } ctx.globalAlpha=1; }
+  /* солнце/луна */
+  const p=dayPhase(); const ang=p*TAU-Math.PI/2; const sx=W/2+Math.cos(ang)*150,sy=210-Math.sin(ang)*150;
+  if(!night){ ctx.fillStyle='#E8B04B'; ctx.shadowColor='#E8B04B'; ctx.shadowBlur=30; ctx.beginPath(); ctx.arc(sx,sy,20,0,TAU); ctx.fill(); ctx.shadowBlur=0; }
+  else { ctx.fillStyle='#C7CCE0'; ctx.shadowColor='#AAB2D0'; ctx.shadowBlur=24; ctx.beginPath(); ctx.arc(sx,sy,16,0,TAU); ctx.fill(); ctx.shadowBlur=0; ctx.fillStyle='rgba(160,168,190,.35)'; ctx.beginPath(); ctx.arc(sx-5,sy-4,4,0,TAU); ctx.arc(sx+6,sy+3,3,0,TAU); ctx.fill(); }
+  /* облака */
+  ctx.fillStyle=`rgba(255,255,255,${night?.06:.1})`;
+  for(let i=0;i<5;i++){ const cx=((i*137+dayT*(6+i*2))%(W+120))-60, cy=70+i*38; ctx.beginPath(); ctx.ellipse(cx,cy,34,10,0,0,TAU); ctx.ellipse(cx+20,cy-6,22,9,0,0,TAU); ctx.fill(); }
+  /* земля/улица */
+  ctx.fillStyle='#101018'; ctx.fillRect(0,GROUND+2,W,H-GROUND);
+  ctx.fillStyle='rgba(212,165,116,.25)'; ctx.fillRect(0,GROUND,W,2);
+  for(let x=8;x<W;x+=34){ ctx.fillStyle='rgba(255,255,255,.06)'; ctx.fillRect(x,GROUND+((x/34)%2?26:44),16,3); }
+  /* башня: подложка-шахта лифта */
+  ctx.fillStyle='#0D0D14'; ctx.fillRect(TOWER_X-26,floorY(city.floors.length)-10,30,city.floors.length*FLOOR_H+12);
+  /* крыша */
+  const topY=floorY(city.floors.length-1);
+  ctx.fillStyle='#1A1A24'; ctx.beginPath(); ctx.roundRect(TOWER_X-6,topY-12,TOWER_W+12,14,4); ctx.fill();
+  ctx.strokeStyle='rgba(228,84,95,.8)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(TOWER_X+TOWER_W-14,topY-12); ctx.lineTo(TOWER_X+TOWER_W-14,topY-26); ctx.stroke(); const blink=Math.sin(performance.now()*.006)>0; if(blink){ ctx.fillStyle='#E4545F'; ctx.shadowColor='#E4545F'; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(TOWER_X+TOWER_W-14,topY-28,3,0,TAU); ctx.fill(); ctx.shadowBlur=0; }
+  /* этажи */
+  city.floors.forEach((ft,i)=>{ drawFloor(ft,TOWER_X,floorY(i),i); });
+  /* вход */
+  ctx.fillStyle='#14141E'; ctx.beginPath(); ctx.roundRect(TOWER_X+TOWER_W-34,GROUND-30,34,30,4); ctx.fill(); ctx.fillStyle='rgba(232,176,75,.7)'; ctx.font='700 9px Inter,sans-serif'; ctx.textAlign='center'; ctx.fillText('ВХОД',TOWER_X+TOWER_W-17,GROUND-36);
+  /* шахта лифта: кабина */
+  const cabY=cabin.y;
+  ctx.fillStyle='#2A2A38'; ctx.beginPath(); ctx.roundRect(TOWER_X-24,cabY+6,22,FLOOR_H-12,3); ctx.fill(); ctx.strokeStyle='rgba(212,165,116,.5)'; ctx.strokeRect(TOWER_X-24,cabY+6,22,FLOOR_H-12);
+  ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.beginPath(); ctx.moveTo(TOWER_X-13,0); ctx.lineTo(TOWER_X-13,cabY+6); ctx.stroke();
+  if(cabin.rider){ drawPerson(TOWER_X-13,cabY+FLOOR_H-12,1,'#E8C89A'); }
+  /* гости на улице */
+  guests.forEach(gt=>{ if(gt.state==='ride')return; const y=GROUND+34; drawPerson(gt.x,y,1,gt.state==='angry'?'#E4545F':'#C7C7CC');
+    if(gt.state==='wait'){ /* терпение */ const w=26; ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(gt.x-w/2,y-30,w,4); ctx.fillStyle=gt.pat>.4?'#8B9D83':(gt.pat>.2?'#E8B04B':'#E4545F'); ctx.fillRect(gt.x-w/2,y-30,w*clamp(gt.pat,0,1),4);
+      /* иконка желания */ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='700 9px Inter,sans-serif'; ctx.textAlign='center'; ctx.fillText(FTYPES[gt.want].name.toUpperCase(),gt.x,y-36); } });
+  /* эмоции */
+  emo.forEach(e=>{ ctx.globalAlpha=1-e.t/1.4; drawFace(e.x,e.y-e.t*26,e.kind); ctx.globalAlpha=1; });
+  /* тексты */
+  texts.forEach(t=>{ ctx.globalAlpha=clamp(t.life/t.maxLife,0,1); ctx.font=`700 ${t.size}px Inter,sans-serif`; ctx.textAlign='center'; ctx.fillStyle=t.color; ctx.fillText(t.txt,t.x,t.y); }); ctx.globalAlpha=1;
+  /* индикатор дня/ночи */
+  ctx.fillStyle='rgba(10,10,15,.6)'; ctx.beginPath(); ctx.roundRect(10,10,84,24,8); ctx.fill(); ctx.fillStyle=night?'#AAB2D0':'#E8B04B'; ctx.font='600 11px Inter,sans-serif'; ctx.textAlign='center'; ctx.fillText(night?'🌙 Ночь · люкс ×1.35':'☀ День · офис ×1.3',52,26); }
+function drawFloor(ft,x,y,i){ const t=FTYPES[ft]; const night=isNight();
+  /* корпус этажа */
+  ctx.fillStyle='#15151E'; ctx.fillRect(x,y,TOWER_W,FLOOR_H-2);
+  ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.strokeRect(x+.5,y+.5,TOWER_W-1,FLOOR_H-3);
+  /* витрина: окна светятся ночью */
+  const glow=night?.95:.55; ctx.fillStyle=t.glow+(glow*.5)+')';
+  ctx.beginPath(); ctx.roundRect(x+10,y+8,34,FLOOR_H-18,3); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(x+TOWER_W-58,y+8,34,FLOOR_H-18,3); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.1)'; ctx.fillRect(x+10,y+8,34,6); ctx.fillRect(x+TOWER_W-58,y+8,34,6);
+  /* дверь по центру */
+  ctx.fillStyle='rgba(10,10,15,.8)'; ctx.beginPath(); ctx.roundRect(x+TOWER_W/2-9,y+12,18,FLOOR_H-14,3); ctx.fill();
+  ctx.fillStyle=t.glow+'.9)'; ctx.beginPath(); ctx.arc(x+TOWER_W/2+5,y+12+FLOOR_H/2-6,1.6,0,TAU); ctx.fill();
+  /* табличка типа слева */
+  ctx.fillStyle=t.glow+'.9)'; ctx.beginPath(); ctx.arc(x+TOWER_W/2-24,y+10,0,0,TAU); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.75)'; ctx.font='600 8px Inter,sans-serif'; ctx.textAlign='left'; ctx.fillText(t.name.toUpperCase(),x+46,y+FLOOR_H/2+14);
+  /* номер этажа */
+  ctx.fillStyle='rgba(255,255,255,.3)'; ctx.font='600 8px Inter,sans-serif'; ctx.textAlign='right'; ctx.fillText((i+1)+'F',x+TOWER_W-4,y+11); }
+function drawPerson(x,y,s,color){ ctx.save(); ctx.translate(x,y); ctx.scale(s,s);
+  ctx.fillStyle=color; ctx.beginPath(); ctx.arc(0,-10,3.2,0,TAU); ctx.fill(); ctx.fillRect(-2.4,-7.4,4.8,9); ctx.fillStyle='rgba(20,20,28,.9)'; ctx.fillRect(-2.6,1.4,2,5); ctx.fillRect(.6,1.4,2,5); ctx.restore(); }
+function drawFace(x,y,kind){ ctx.save(); ctx.translate(x,y); ctx.fillStyle='rgba(255,255,255,.92)'; ctx.beginPath(); ctx.arc(0,0,9,0,TAU); ctx.fill(); ctx.strokeStyle='rgba(0,0,0,.1)'; ctx.stroke();
+  ctx.fillStyle='#14100B'; if(kind==='happy'){ ctx.beginPath(); ctx.arc(-3,-2,1.2,0,TAU); ctx.arc(3,-2,1.2,0,TAU); ctx.fill(); ctx.strokeStyle='#14100B'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.arc(0,1,3.6,.15*Math.PI,.85*Math.PI); ctx.stroke(); } else { ctx.lineWidth=1.4; ctx.strokeStyle='#14100B'; ctx.beginPath(); ctx.moveTo(-4.5,-4); ctx.lineTo(-1.5,-1.5); ctx.moveTo(4.5,-4); ctx.lineTo(1.5,-1.5); ctx.stroke(); ctx.beginPath(); ctx.arc(0,-3,1.2,0,TAU); ctx.arc(0,2,1.2,0,TAU); ctx.fill(); ctx.beginPath(); ctx.arc(0,5,3.6,1.15*Math.PI,1.85*Math.PI); ctx.stroke(); } ctx.restore(); }
+/* ─── Цикл ─── */
+let last=0,acc=0,rafId=0;
+function loop(ts){ rafId=requestAnimationFrame(loop); if(!running)return; if(!last)last=ts; let dtms=ts-last; last=ts; if(dtms>200)dtms=200; acc+=dtms; let guard=0; while(acc>=STEP*1000&&guard++<6){ update(STEP); acc-=STEP*1000; } refreshStats(); render(); }
+/* ─── Поток ─── */
+function startGame(){ touchStreak(); audioInit(); running=true; over=false; last=0; acc=0; dayT=14; guests=[]; cabin={y:floorY(0),ty:floorY(0),rider:null,speed:.9,moving:false}; spawnT=1.6; $('welcome').classList.add('hidden'); $('modal').classList.add('hidden'); $('game').classList.remove('hidden'); refreshStats(); refreshHud(); renderBuildModal(); if(!rafId)rafId=requestAnimationFrame(loop); }
+function refreshHud(){ el.wDaily.textContent=fmt(dailyBest); el.wBest.textContent=fmt(best); el.streakN.textContent=effStreak(); el.multN.textContent='×'+mult.toFixed(2); refreshStats(); refreshMissionsUI(); }
+function refreshWelcome(){ el.wDaily.textContent=fmt(dailyBest); el.wBest.textContent=fmt(best); el.wStreak.textContent='🔥 '+effStreak(); $('daily-date').textContent='Город живёт · '+today.slice(5).replace('-','.'); }
+function gameOver(win){ over=true; running=false; missionTick('height',city.floors.length,true); let isRec=false,isRecDay=false; const val=city.floors.length; if(val>best){ best=val; lsSet(K_BEST,best); isRec=true; } if(val>dailyBest){ dailyBest=val; lsSet(K_DAILY,dailyBest); isRecDay=true; } sfx.up(); setTimeout(()=>{ $('modal-badge').textContent=isRec||isRecDay?'Новый рекорд':'Город сохранён'; $('modal-badge').classList.toggle('record',isRec||isRecDay); $('modal-title').textContent=isRec?'Небоскрёб года!':(isRecDay?'Рекорд дня!':'Мегаполис ждёт'); $('modal-score').innerHTML=`Этажей <b>${city.floors.length}</b> · Гостей <b>${fmt(city.guestsServed)}</b> · Заработано <b>$${fmt(city.earned)}</b><br>Рекорд высоты <b>${best}</b> · за день <b>${dailyBest}</b>`; $('modal').classList.remove('hidden'); },600); }
+function toMenu(){ running=false; over=false; saveCity(); $('game').classList.add('hidden'); $('modal').classList.add('hidden'); $('welcome').classList.remove('hidden'); refreshWelcome(); }
+/* ─── Билд-модал ─── */
+function renderBuildModal(){ const list=$('bmodal-list'); list.innerHTML=''; FTYPES_OR.forEach(k=>{ const t=FTYPES[k]; const locked=city.floors.length<t.unlock; const d=document.createElement('button'); d.className='bt-card bt-'+k+(locked?' locked':''); d.innerHTML=`<span class="bt-icon">${k==='office'?'💼':(k==='cafe'?'☕':'💎')}</span><span class="bt-body"><span class="bt-name">${t.name}</span><span class="bt-sub">+$${t.pay}/гость${k==='office'?' · день ×1.3':''}${k==='lux'?' · ночь ×1.35':''}${locked?' · открыть на '+t.unlock+' этажах':''}</span></span><span class="bt-cost">$${t.cost}</span>`; d.addEventListener('click',()=>{ if(locked)return; buildFloor(k); $('bmodal').classList.add('hidden'); }); list.appendChild(d); }); }
+$('btn-build').addEventListener('click',()=>{ audioInit(); sfx.click(); renderBuildModal(); $('bmodal').classList.remove('hidden'); });
+$('bmodal-btn').addEventListener('click',()=>$('bmodal').classList.add('hidden'));
+$('elev-chip').addEventListener('click',()=>{ audioInit(); upgradeElev(); });
+/* ─── Кнопки ─── */
+$('btn-play').addEventListener('click',()=>{ audioInit(); startGame(); });
+$('btn-menu').addEventListener('click',toMenu);
+$('btn-missions').addEventListener('click',()=>{ renderMissionsModal(); $('mmodal').classList.remove('hidden'); });
+$('missions-chip').addEventListener('click',()=>{ renderMissionsModal(); $('mmodal').classList.remove('hidden'); });
+$('mmodal-btn').addEventListener('click',()=>$('mmodal').classList.add('hidden'));
+function syncSoundBtn(){ $('btn-sound').textContent=muted?'🔇':'🔊'; }
+$('btn-sound').addEventListener('click',()=>{ muted=!muted; lsSet(K_MUTE,muted); if(master)master.gain.value=muted?0:0.5; syncSoundBtn(); if(!muted){ audioInit(); sfx.coin(); } });
+/* сброс города на welcome-экране: длинный тап по рекорду? Нет — кнопка в модалке game over нет. Сделаем кнопку «Новый город» в welcome если город существует */
+(function(){ const w=$('welcome'); const btn=document.createElement('button'); btn.id='btn-reset-city'; btn.className='w-hint'; btn.style.cssText='margin-top:2px;background:none;border:1px solid var(--clr-border);color:var(--clr-faint);padding:7px 14px;border-radius:10px;font-family:inherit;font-size:.68rem;cursor:pointer;letter-spacing:.4px'; btn.textContent='🏗 Начать новый город (сброс)'; btn.addEventListener('click',()=>{ if(confirm('Снести город и начать заново? Прогресс будет удалён.')){ city={bank:120,floors:['office'],rep:50,elev:1,guestsServed:0,earned:0}; saveCity(); toast('🏗 Новый город основан'); refreshHud(); } }); w.appendChild(btn); })();
+refreshWelcome(); refreshHud(); syncSoundBtn();
+/* ─── Debug-хук ─── */
+window.__tc={
+  start:startGame, over:()=>{ running=true; gameOver(true); },
+  state(){ return {bank:Math.round(city.bank),floors:city.floors.length,rep:Math.round(city.rep),guests:guests.length,served:city.guestsServed,elev:city.elev,night:isNight(),running,over}; },
+  addBank:n=>{ city.bank+=n; saveCity(); }, build:type=>buildFloor(type||'office'), elev:upgradeElev,
+  guest:()=>spawnGuest(), serve:()=>{ const g=guests.find(x=>x.state==='wait'); if(g){ g.pat=0; } },
+  city:()=>city, missions:()=>missionData, records:()=>({best:lsGet(K_BEST,0),daily:lsGet(K_DAILY,0),streak:lsGet(K_STREAK,0),today}),
 };
