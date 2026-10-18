@@ -1,0 +1,3 @@
+@import url("../_shared/base.css");
+:root{--accent:#e6b961;--accent2:#87dcdf;}
+.actions{grid-template-columns:repeat(2,minmax(0,1fr))}.action{min-height:47px}

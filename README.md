@@ -1,6 +1,6 @@
 # Мини-игры AXIIOM
 
-> Коллекция из 16 браузерных мини-игр: физика, аркады, головоломки и стратегии.
+> Коллекция из 26 браузерных мини-игр: физика, аркады, головоломки и стратегии.
 > Без регистрации, без установки — открыл и играешь. Разработка **[AXIIOM](https://axiiom.ru)**.
 
 **Живой каталог игр:** https://bestdeejay-design.github.io/minigames/
@@ -11,31 +11,47 @@
 
 | Игра | Жанр | Ссылка |
 |------|------|--------|
+| 🌱 Merge Garden | сад слияний: пары и цепочки от трёх, заказы, энергия и новые клетки | [играть](https://bestdeejay-design.github.io/minigames/games/merge-garden/) |
+| ⛏️ Idle Miner | idle-магнат: 8 шахт, менеджеры, офлайн-доход и престиж | [играть](https://bestdeejay-design.github.io/minigames/games/idle-miner/) |
+| 🏗️ Tower Stack | башня на точность: Perfect-комбо и обрезка блоков | [играть](https://bestdeejay-design.github.io/minigames/games/tower-stack/) |
+| 🍬 Candy Match | три в ряд: 15 уровней, лёд и особые конфеты | [играть](https://bestdeejay-design.github.io/minigames/games/candy-match/) |
+| 🛡️ Swarm Survivor | выживание 10 минут: боссы, оружие, пассивные навыки | [играть](https://bestdeejay-design.github.io/minigames/games/swarm-survivor/) |
+| 🔵 Ball Blitz | залп шаров: рикошеты, блоки и особые препятствия | [играть](https://bestdeejay-design.github.io/minigames/games/ball-blitz/) |
+| 🧪 Color Sort | 30 уровней переливания: отмена и дополнительная пробирка | [играть](https://bestdeejay-design.github.io/minigames/games/color-sort/) |
+| 🍉 Fruit Drop | физика падающих фруктов: слияния вплоть до арбуза | [играть](https://bestdeejay-design.github.io/minigames/games/fruit-drop/) |
+| 🐥 Road Hopper | бесконечная дорога: машины, брёвна, поезд и 8 скинов | [играть](https://bestdeejay-design.github.io/minigames/games/road-hopper/) |
+| 🕳️ Hungry Hole | арена 2000×2000: 800 объектов, 5 ботов и двухминутный раунд | [играть](https://bestdeejay-design.github.io/minigames/games/hungry-hole/) |
 | 🛡️ Рубеж 64 | оригинальная RTS: минералы, технологии, ретрансляторы, 3 сложности | [играть](https://bestdeejay-design.github.io/minigames/rubezh64/) |
 | ✳️ Контур | аркада одним жестом: обводи искры, собирай комбо за 45 секунд | [играть](https://bestdeejay-design.github.io/minigames/contour/) |
-| 🎱 Бильярд | пирамида и лузы, траектория с отскоками, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/billiards/) |
+| 🎱 Кладезь | бильярд 2.0: призрачная траектория, комбо, 30 уровней и миссии | [играть](https://bestdeejay-design.github.io/minigames/billiards/) |
 | 🧨 Разлом | брейкер: рой шаров, вызов дня, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/breaker/) |
 | ⚔️ Звёздный рубеж | RTS: кампания, оборона с волнами, две расы (люди/кхарид), техника, турели, ремонт | [играть](https://bestdeejay-design.github.io/minigames/rts/) |
 | 🪙 Coin Tap | монетный дождь: бомбы, бонусы, вызов дня и миссии | [играть](https://bestdeejay-design.github.io/minigames/coin-tap/) |
 | 💠 Кристаллы | merge-drop: физика слияний, вызов дня | [играть](https://bestdeejay-design.github.io/minigames/crystals/) |
-| 🔫 FPS Corridor | 3D-шутер: 6 волн, свайп-обзор на мобильных, миссии | [играть](https://bestdeejay-design.github.io/minigames/fps3d/) |
+| 🔫 Штурм | рейкастинг-шутер: боссы, дробовик, мини-карта и миссии | [играть](https://bestdeejay-design.github.io/minigames/fps3d/) |
 | 🧩 Три в ряд | головоломка | [играть](https://bestdeejay-design.github.io/minigames/match3/) |
 | 🎮 Платформер | 8 уровней, монеты, шипы, coyote time, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/platformer/) |
-| 🏎 Гонка | ночная трасса, звёзды, вызов дня и миссии | [играть](https://bestdeejay-design.github.io/minigames/race/) |
+| 🏎 Ночной поток | ночная трасса: риск ×2, нитро, три сектора, вызов дня | [играть](https://bestdeejay-design.github.io/minigames/race/) |
 | 🎰 Рулетка | европейское колесо, сохраняемый банк, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/roulette/) |
-| 👾 Шутер | космический тир: волны, арсенал, вызов дня и миссии | [играть](https://bestdeejay-design.github.io/minigames/shooter/) |
+| 👾 Импульс | космический шутер: боссы, щит, оружие, вызов дня и миссии | [играть](https://bestdeejay-design.github.io/minigames/shooter/) |
 | 🎯 Рогатка | кристаллы-мишени, баллистика, стрик и миссии | [играть](https://bestdeejay-design.github.io/minigames/sling/) |
 | 🧱 Тетрис | падающие блоки: SRS, T-спины, Спринт | [играть](https://bestdeejay-design.github.io/minigames/tetris/) |
-| 🏙 Небоскрёб | idle-тайкун: терпение гостей, сохраняемый город, миссии | [играть](https://bestdeejay-design.github.io/minigames/tycoon/) |
+| 🏙 Мегаполис | тайкун 2.0: офисы, кафе, люксы, лифт, день/ночь и сохраняемый город | [играть](https://bestdeejay-design.github.io/minigames/tycoon/) |
 
 ## Технически
 
 - Каждая игра — самостоятельная статическая страница без бэкенда и сборки.
-  Большинство игр используют `canvas` + vanilla JS; FPS Corridor загружает Three.js из CDN.
+  Десять новых игр в `games/` используют только Canvas 2D, ES-модули, CSS, Web Audio
+  и `localStorage`: без npm, CDN, сетевых запросов и внешних ассетов.
+  Существующие игры хаба сохраняют свои реализации; «Штурм» использует программный рейкастинг.
 - Общий тёмный UI-кит хаба (`index.html`); там, где предусмотрено сохранение,
   прогресс и рекорды хранятся в `localStorage`.
+- Десять новых игр: сенсорное управление Pointer Events и мышь; кнопки звука, паузы
+  и рестарта, адаптация под вертикальный экран, локальные рекорды и прогресс.
 - «Контур» работает без внешних библиотек: управление через Pointer Events,
   рекорд хранится на устройстве, звук включается по желанию.
+- Десять новых игр — автономная проверка приёмки без зависимостей:
+  `node --experimental-default-type=module --test games/tests/acceptance.test.mjs`.
 - «Рубеж 64» — автономные проверки логики: `node --test tests/game.test.mjs`
   из папки игры (нужен только Node.js, без пакетов).
 - Игры канона AXIIOM (кристаллы, разлом и 9 пересобранных): welcome-экран,
@@ -47,11 +63,15 @@
 ## Структура
 
 ```
-index.html   — хаб-каталог со ссылками на все игры
-<game>/      — папка игры: index.html, style.css, game.js
-               (match3 и fps3d — однофайловые: только index.html,
-                rts и rubezh64 — модульные: ES-модули в js/,
-                у rubezh64 также автономные тесты в tests/)
+index.html          — хаб-каталог со ссылками на все игры
+.nojekyll           — статическая публикация в GitHub Pages
+games/_shared/      — общий мобильный каркас десяти новых игр
+games/<slug>/       — десять новых игр: index.html, style.css, js/main.js,
+                      js/game.js, js/config.js (иногда также js/logic.js)
+<game>/             — папка старой игры: index.html, style.css, game.js
+                    (match3 — однофайловая: только index.html;
+                     rts и rubezh64 — модульные: ES-модули в js/,
+                     у rubezh64 также автономные тесты в tests/)
 ```
 
 ---

@@ -11,7 +11,6 @@
   <meta property="og:url" content="https://bestdeejay-design.github.io/minigames/">
   <meta property="og:title" content="Мини-игры | AXIIOM">
   <meta property="og:description" content="Коллекция браузерных мини-игр AXIIOM: бильярд, гонки, шутеры, головоломки и экономические стратегии. Играйте без регистрации прямо в браузере.">
-  <meta property="og:image" content="https://axiiom.ru/og-image.png">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Мини-игры | AXIIOM">
@@ -36,7 +35,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html { font-size: 16px; scroll-behavior: smooth; }
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 1.0625rem;
       background: var(--clr-bg);
       color: var(--clr-text);
@@ -348,9 +347,6 @@
       .demo-grid { grid-template-columns: 1fr; }
     }
   </style>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="noise"></div>
@@ -413,6 +409,96 @@
   <section class="section">
     <div class="container">
       <div class="demo-grid">
+        <a class="demo-card reveal" href="games/merge-garden/">
+          <div class="demo-accent" style="background:linear-gradient(135deg,#8fdb93,#f6cc6b)"></div>
+          <div class="demo-body">
+            <h3>🌱 Merge Garden</h3>
+            <p>Перетаскивайте растения, сливайте пары и запускайте цепочки от трёх. Выполняйте заказы, расширяйте сад и следите за энергией.</p>
+            <div class="demo-tags"><span>Canvas 2D</span><span>Merge</span><span>Сад</span></div>
+            <span class="demo-link">Играть →</span>
+          </div>
+        </a>
+        <a class="demo-card reveal" href="games/idle-miner/">
+          <div class="demo-accent" style="background:linear-gradient(135deg,#d4a574,#f6cc6b)"></div>
+          <div class="demo-body">
+            <h3>⛏️ Idle Miner</h3>
+            <p>Восемь шахт: тапайте, нанимайте менеджеров, собирайте офлайн-доход и устраивайте престиж ради кристаллов.</p>
+            <div class="demo-tags"><span>Canvas 2D</span><span>Idle</span><span>Шахты</span></div>
+            <span class="demo-link">Играть →</span>
+          </div>
+        </a>
+        <a class="demo-card reveal" href="games/tower-stack/">
+          <div class="demo-accent" style="background:linear-gradient(135deg,#88dafa,#a29bfe)"></div>
+          <div class="demo-body">
+            <h3>🏗️ Tower Stack</h3>
+            <p>Останавливайте движущиеся блоки точно над башней. Perfect-серия расширяет платформу, а промах отрезает край.</p>
+            <div class="demo-tags"><span>Canvas 2D</span><span>Реакция</span><span>Башня</span></div>
+            <span class="demo-link">Играть →</span>
+          </div>
+        </a>
+        <a class="demo-card reveal" href="games/candy-match/">
+          <div class="demo-accent" style="background:linear-gradient(135deg,#ff7289,#facb62)"></div>
+          <div class="demo-body">
+            <h3>🍬 Candy Match</h3>
+            <p>Три в ряд на поле 8×8: 15 уровней, лёд, бомбы, линейные конфеты, радуга и звёзды за оставшиеся ходы.</p>
+            <div class="demo-tags"><span>Canvas 2D</span><span>Match-3</span><span>15 уровней</span></div>
+            <span class="demo-link">Играть →</span>
+          </div>
+        </a>
+        <a class="demo-card reveal" href="games/swarm-survivor/">
+          <div class="demo-accent" style="background:linear-gradient(135deg,#f4808e,#aa91e7)"></div>
+          <div class="demo-body">
+            <h3>🛡️ Swarm Survivor</h3>
+            <p>Продержитесь 10 минут против роя, побеждайте боссов каждые две минуты и выбирайте прокачку оружия и пассивных навыков.</p>
+            <div class="demo-tags"><span>Canvas 2D</span><span>Survivor</span><span>Прокачка</span></div>
+            <span class="demo-link">Играть →</span>
+          </div>
+        </a>
+        <a class="demo-card reveal" href="games/ball-blitz/">
+          <div class="demo-accent" style="background:linear-gradient(135deg,#7bd9ed,#b7a1fc)"></div>
+          <div class="demo-body">
+            <h3>🔵 Ball Blitz</h3>
+            <p>Запускайте рой шаров рикошетом по блокам, собирайте дополнительные шары и используйте бомбы, лазеры и заморозку.</p>
+            <div class="demo-tags"><span>Canvas 2D</span><span>Аркада</span><span>Рикошеты</span></div>
+            <span class="demo-link">Играть →</span>
+          </div>
+        </a>
+        <a class="demo-card reveal" href="games/color-sort/">
+          <div class="demo-accent" style="background:linear-gradient(135deg,#fc8194,#83bdf0)"></div>
+          <div class="demo-body">
+            <h3>🧪 Color Sort</h3>
+            <p>Разлейте цвета по пробиркам: 30 решаемых уровней, две пустые ёмкости, отмена хода и дополнительная пробирка.</p>
+            <div class="demo-tags"><span>Canvas 2D</span><span>Головоломка</span><span>30 уровней</span></div>
+            <span class="demo-link">Играть →</span>
+          </div>
+        </a>
+        <a class="demo-card reveal" href="games/fruit-drop/">
+          <div class="demo-accent" style="background:linear-gradient(135deg,#ef6f7d,#78c989)"></div>
+          <div class="demo-body">
+            <h3>🍉 Fruit Drop</h3>
+            <p>Роняйте фрукты с физикой, соединяйте одинаковые в цепочки и вырастите арбуз, не переполнив контейнер.</p>
+            <div class="demo-tags"><span>Canvas 2D</span><span>Физика</span><span>Слияние</span></div>
+            <span class="demo-link">Играть →</span>
+          </div>
+        </a>
+        <a class="demo-card reveal" href="games/road-hopper/">
+          <div class="demo-accent" style="background:linear-gradient(135deg,#89dfaa,#a9c7ff)"></div>
+          <div class="demo-body">
+            <h3>🐥 Road Hopper</h3>
+            <p>Прыгайте по бесконечным рядам между машинами, брёвнами и поездами, собирайте монеты и открывайте восемь обликов.</p>
+            <div class="demo-tags"><span>Canvas 2D</span><span>Аркада</span><span>Бесконечная</span></div>
+            <span class="demo-link">Играть →</span>
+          </div>
+        </a>
+        <a class="demo-card reveal" href="games/hungry-hole/">
+          <div class="demo-accent" style="background:linear-gradient(135deg,#8ce9df,#bc9af3)"></div>
+          <div class="demo-body">
+            <h3>🕳️ Hungry Hole</h3>
+            <p>За две минуты поглотите город и обгоните пять соперников. 800 объектов, рост дыры, респаун и таблица лидеров.</p>
+            <div class="demo-tags"><span>Canvas 2D</span><span>Арена</span><span>Соперники</span></div>
+            <span class="demo-link">Играть →</span>
+          </div>
+        </a>
         <a class="demo-card reveal" href="rubezh64/">
           <div class="demo-accent" style="background:linear-gradient(135deg,#0b2028,#76e3d7)"></div>
           <div class="demo-body">
@@ -614,7 +700,7 @@
             <h3>🔫 Штурм</h3>
             <p>Рейкастинг-шутер 2.0: светящиеся враги, боссы секторов, дробовик, мини-карта. Вызов дня и миссии.</p>
             <div class="demo-tags">
-              <span>Three.js</span>
+              <span>Raycasting</span>
               <span>Game</span>
               <span>3D FPS</span>
             </div>

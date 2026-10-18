@@ -1,0 +1,15 @@
+export const CONFIG=Object.freeze({
+  runGoalSeconds:600,bossEverySeconds:120,enemyCap:400,spatialCell:64,
+  spawnBaseInterval:1.2,spawnFastestInterval:.17,spawnAccelerationPerSecond:.0018,
+  spawnMargin:95,playerHp:100,playerSpeed:128,playerInvulnerability:.48,
+  projectileSpeed:420,projectileRange:470,projectileBaseDamage:15,projectileCooldown:.72,
+  pickupRadius:47,pickupMagnetRange:160,pickupSpeed:250,
+  xpBase:12,xpPerLevel:8,weaponMaxLevel:5,passiveMaxLevel:6,
+  passiveDamageBonus:.15,passiveSpeedBonus:.10,passivePickupBonus:20,
+  passiveHpBonus:20,passiveFireRateBonus:.12,
+  enemy:{normal:{hp:28,speed:59,damage:9,xp:3,coin:1,radius:11,color:'#f4808e'},fast:{hp:19,speed:113,damage:7,xp:4,coin:2,radius:9,color:'#f7bd79'},tank:{hp:112,speed:42,damage:15,xp:11,coin:4,radius:17,color:'#aa91e7'},shooter:{hp:30,speed:52,damage:9,xp:7,coin:3,radius:12,color:'#8cc8f2'},boss:{hp:560,speed:39,damage:24,xp:75,coin:45,radius:29,color:'#f1d187'}},
+  shooterRange:245,shooterFireSeconds:2.15,shooterShotSpeed:185,
+  orbitBaseRadius:46,orbitBaseDamage:11,lightningBaseDamage:35,
+  auraBaseRadius:62,auraBaseDps:9,bossSlowSeconds:1.2,bossSlowScale:.25,
+  metaCostBase:55,metaCostGrowth:1.8,metaHpPerLevel:15,metaDamagePerLevel:.10,metaSpeedPerLevel:.06,
+});
