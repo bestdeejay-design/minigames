@@ -26,6 +26,12 @@ export function attachInput(game) {
     game.mouse.y = e.clientY;
     const st = game.state;
     if (!st) return;
+    // Перетаскивание карты СКМ: камера следует за мышью 1:1.
+    if (game.pan) {
+      st.camera.x = game.pan.cx - (e.clientX - game.pan.sx);
+      st.camera.y = game.pan.cy - (e.clientY - game.pan.sy);
+      game.clampCam();
+    }
     const w = screenToWorld(e);
     st.mouseWorld = w;
     if (st.placing) updatePlacing(st, w);
@@ -42,10 +48,24 @@ export function attachInput(game) {
     } else if (e.button === 2) {
       if (st.placing) { st.placing = null; return; }
       game.hooks.issueRMB(w.x, w.y);
+    } else if (e.button === 1) {
+      // СКМ — «взять» карту и перетащить. Самый прямой способ двигать
+      // камеру: зажал — потянул — отпустил.
+      e.preventDefault();
+      game.pan = { sx: e.clientX, sy: e.clientY, cx: st.camera.x, cy: st.camera.y };
+      cv.style.cursor = 'grabbing';
     }
   });
 
+  // Средняя кнопка не должна вызывать системный автоскролл.
+  cv.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
+
   window.addEventListener('mouseup', (e) => {
+    if (e.button === 1 && game.pan) {
+      game.pan = null;
+      cv.style.cursor = '';
+      return;
+    }
     const st = game.state;
     if (e.button !== 0 || !st || !game.box) return;
     const box = game.box;
@@ -85,7 +105,13 @@ export function attachInput(game) {
       return;
     }
     if (e.code === 'KeyP') { game.togglePause(); return; }
-    if (e.code === 'Space') { e.preventDefault(); return; } // пробел не скроллит страницу
+    if (e.code === 'Space') {
+      // Пробел — мгновенный прыжок камерой к своей базе.
+      e.preventDefault();
+      const cc = st.buildings.find((b) => b.side === 'player' && b.type === 'cc' && !b.dead);
+      if (cc) { game.centerCamera(cc.x, cc.y); game.sound.click(); }
+      return;
+    }
     // Хоткеи панели команд (Q/W/E — стройка и производство, B, S).
     if (!e.ctrlKey && !e.altKey) game.ui.handleHotkey(e.code);
   });
@@ -150,7 +176,10 @@ function boxSelect(game, st, box, shift) {
   st.buildMenu = false;
 }
 
-// Камера: стрелки + мышь у края экрана, кламп по границам мира.
+// Камера: стрелки, СКМ-перетаскивание, мышь у края игровой области.
+// Края считаются внутри игровой зоны: над верхней/нижней панелями UI
+// краевой скролл не срабатывает — иначе наведение на кнопки уводило
+// камеру в сторону (главная причина «неудобно двигать карту»).
 export function updateCamera(game, dt) {
   const st = game.state;
   if (!st) return;
@@ -164,13 +193,17 @@ export function updateCamera(game, dt) {
   if (dx || dy) {
     st.camera.x += dx * KEY_SCROLL_SPEED * dt;
     st.camera.y += dy * KEY_SCROLL_SPEED * dt;
-  } else if (game.started && !st.gameOver && game.mouse.x >= 0) {
+  } else if (!game.pan && game.started && !st.gameOver && game.mouse.x >= 0) {
     const m = game.mouse, M = EDGE_MARGIN;
     const w = window.innerWidth, h = window.innerHeight;
-    if (m.x < M) st.camera.x -= EDGE_SCROLL_SPEED * dt;
-    else if (m.x > w - M) st.camera.x += EDGE_SCROLL_SPEED * dt;
-    if (m.y < M) st.camera.y -= EDGE_SCROLL_SPEED * dt;
-    else if (m.y > h - M) st.camera.y += EDGE_SCROLL_SPEED * dt;
+    const top = game.uiTop || 0, bot = game.uiBottom || 0;
+    const inPlay = m.y > top && m.y < h - bot; // курсор в игровой зоне
+    if (inPlay) {
+      if (m.x < M) st.camera.x -= EDGE_SCROLL_SPEED * dt;
+      else if (m.x > w - M) st.camera.x += EDGE_SCROLL_SPEED * dt;
+      if (m.y < top + M) st.camera.y -= EDGE_SCROLL_SPEED * dt;
+      else if (m.y > h - bot - M) st.camera.y += EDGE_SCROLL_SPEED * dt;
+    }
   }
   game.clampCam();
 }
